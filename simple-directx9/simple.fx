@@ -1,5 +1,7 @@
 float4x4 g_matWorldViewProj;
 float4 g_lightNormal = { 0.3f, 1.0f, 0.5f, 0.0f };
+float4 g_meshColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+float g_useTexture = 1.0f;
 
 texture texture1;
 sampler textureSampler = sampler_state {
@@ -31,8 +33,13 @@ void PixelShader1(in float4 inScreenColor : COLOR0,
 
                   out float4 outColor     : COLOR)
 {
-    float4 workColor = (float4)0;
-    workColor = tex2D(textureSampler, inTexCood);
+    float4 workColor = g_meshColor;
+
+    if (g_useTexture > 0.5f)
+    {
+        workColor = tex2D(textureSampler, inTexCood);
+    }
+
     outColor = inScreenColor * workColor;
 }
 
