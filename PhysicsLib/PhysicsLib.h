@@ -1,45 +1,58 @@
-﻿//-----------------------------------------------------
-// DirectX9で衝突判定のためのライブラリ
-// 
-// ・静的なInitialize関数、Update関数、Finalize関数を持つ。
-// ・衝突判定ライブラリへのアクセスにインスタンス生成は必要ない。すべて静的メンバ関数を通して実行可能である。
-// ・Load関数で衝突判定用の3Dモデルを読み込む。
-//   ・この時にenum型で種類を選ぶ。
-//     ・すり抜けられる物体（回復アイテム、銃弾など）
-//     ・壁摺りが必要な物体（坂道、地面など）
-//     ・壁摺りが必要でさらに、移動する物体（動く床など）
-//   ・戻り値でIDを受け取る。
-//   ・Load関数で失敗したら例外を送出する。
-//   ・Load関数の引数で摩擦係数を設定できる。0.0~1.0とする。
-// ・CheckCollide関数で衝突判定を行う。
-//   ・CheckCollide関数は引数に、現在の場所、移動量ベクトルをD3DXVECTOR3型で受け取る。
-//   ・CheckCollide関数は引数で、自分の形状を、点、球、円柱から選べる。
-//     ・球、円柱の場合は、追加の引数で大きさを指定できる。
-//       ・球の場合は、半径を指定する。円柱の場合は半径と高さを指定する。
-//   ・CheckCollide関数はポインタ型の引数を通して、衝突判定後の移動先の位置を取得できる。
-//     衝突した物体が壁摺り可能な物体の場合は、壁摺り後の位置になる。
-//     すり抜けられる物体の場合は、すり抜けた先の位置になる。
-//     すり抜けた先に壁摺り可能な物体があったら、壁摺り後の位置になる。
-//   ・CheckCollide関数はポインタ型の引数を通して、何と接触しているか、を2つのIDリストで取得できる。
-//     大量のアイテムがある場合など、複数と接触することが可能なのでstd::vector<int>型のリストで取得する。
-//     すり抜け可能な物体とそうでない物体で別々に取得する。つまりstd::vector<int>型のリストを二つ取得する。
-//     すり抜け可能な物体のIDリストの順番は順不同となる。
-//     すり抜けできない物体のIDリストの順番は衝突順となる。壁摺り前後で衝突した候補すべてが含まれる。
-// ・D3DXVECTOR3で座標や移動ベクトル扱うとき、1.0fは1メートルを意味する。
-// ・重力は地球と同じ9.8m/s^2とする。このとき、1フレームは1/60秒として扱う。
-//   CheckCollide関数を呼ぶたびに重力が適用される。
-//   そのためCheckCollide関数は1フレーム内で同じ物体に対して2度実行してはいけない。
-//   別の物体に対しては、それぞれ1回ずつ実行してよい。
-// ・壁摺りを行った先に、さらに別の物体との衝突がないかを1回だけ調べる。別の物体との衝突があるなら、衝突した場所で停止する。
-// 
-//-----------------------------------------------------
-
 #pragma once
+
+#include <d3dx9.h>
+#include <tchar.h>
+
+#include <vector>
 
 namespace PhysicsLib
 {
 class PhysicsLib
 {
+public:
+    enum class ObjectType
+    {
+        PassThrough,
+        Slide,
+        MovingSlide,
+    };
+
+    enum class ShapeType
+    {
+        Point,
+        Sphere,
+        Cylinder,
+    };
+
+    struct Transform
+    {
+        D3DXVECTOR3 position = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        D3DXVECTOR3 rotation = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        D3DXVECTOR3 scale = D3DXVECTOR3(1.0f, 1.0f, 1.0f);
+        D3DXVECTOR3 velocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    };
+
+    static void Initialize();
+    static void Finalize();
+    static void Update(float deltaSeconds = 1.0f / 60.0f);
+
+    static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
+
+    static void SetTransform(int id,
+                             const D3DXVECTOR3& position,
+                             const D3DXVECTOR3& rotation = D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                             const D3DXVECTOR3& scale = D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+
+    static void SetVelocity(int id, const D3DXVECTOR3& velocity);
+    static Transform GetTransform(int id);
+
+    static bool CheckCollide(const D3DXVECTOR3& currentPosition,
+                             const D3DXVECTOR3& moveVector,
+                             ShapeType shapeType,
+                             D3DXVECTOR3* outPosition,
+                             std::vector<int>* outPassThroughIds,
+                             std::vector<int>* outSolidIds,
+                             float radius = 0.0f,
+                             float height = 0.0f);
 };
 }
-
