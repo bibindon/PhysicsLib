@@ -682,7 +682,7 @@ void Render()
 
     DrawMesh(g_pCubeMesh,
              g_playerPosition + D3DXVECTOR3(0.0f, 0.5f, 0.0f),
-             D3DXVECTOR3(0.8f, 0.8f, 0.8f),
+             D3DXVECTOR3(1.0f, 1.0f, 1.0f),
              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
              D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f),
              true);
