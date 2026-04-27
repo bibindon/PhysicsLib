@@ -44,6 +44,7 @@ std::vector<LPDIRECT3DTEXTURE9> g_pTextures;
 DWORD g_dwNumMaterials = 0;
 LPD3DXEFFECT g_pEffect = NULL;
 bool g_bClose = false;
+HWND g_mainWindow = NULL;
 std::vector<LPD3DXMESH> g_ownedSceneMeshes;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
@@ -114,6 +115,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
                              NULL,
                              wc.hInstance,
                              NULL);
+    g_mainWindow = hWnd;
 
     InitD3D(hWnd);
     PhysicsLib::PhysicsLib::Initialize();
@@ -367,7 +369,8 @@ void ResetPlayer()
 
 void UpdatePlayer()
 {
-    bool isF1Pressed = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
+    const bool isWindowActive = (GetForegroundWindow() == g_mainWindow);
+    bool isF1Pressed = isWindowActive && ((GetAsyncKeyState(VK_F1) & 0x8000) != 0);
     if (isF1Pressed && !g_prevF1Pressed)
     {
         ResetPlayer();
@@ -391,19 +394,19 @@ void UpdatePlayer()
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
 
-    if (GetAsyncKeyState('W') & 0x8000)
+    if (isWindowActive && (GetAsyncKeyState('W') & 0x8000))
     {
         inputMove.z += 1.0f;
     }
-    if (GetAsyncKeyState('S') & 0x8000)
+    if (isWindowActive && (GetAsyncKeyState('S') & 0x8000))
     {
         inputMove.z -= 1.0f;
     }
-    if (GetAsyncKeyState('A') & 0x8000)
+    if (isWindowActive && (GetAsyncKeyState('A') & 0x8000))
     {
         inputMove.x -= 1.0f;
     }
-    if (GetAsyncKeyState('D') & 0x8000)
+    if (isWindowActive && (GetAsyncKeyState('D') & 0x8000))
     {
         inputMove.x += 1.0f;
     }
@@ -417,7 +420,7 @@ void UpdatePlayer()
     g_playerMoveVector.x += inputMove.x;
     g_playerMoveVector.z += inputMove.z;
 
-    if (GetAsyncKeyState(VK_SPACE) & 0x8000)
+    if (isWindowActive && (GetAsyncKeyState(VK_SPACE) & 0x8000))
     {
         g_playerMoveVector.y = kJumpVelocity;
     }
@@ -679,7 +682,7 @@ void Render()
 
     DrawMesh(g_pCubeMesh,
              g_playerPosition + D3DXVECTOR3(0.0f, 0.5f, 0.0f),
-             D3DXVECTOR3(0.8f, 1.0f, 0.8f),
+             D3DXVECTOR3(0.8f, 0.8f, 0.8f),
              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
              D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f),
              true);
