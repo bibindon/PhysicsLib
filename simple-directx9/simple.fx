@@ -23,6 +23,7 @@ void VertexShader1(in  float4 inPosition  : POSITION,
 
     float lightIntensity = dot(inNormal, g_lightNormal);
     outDiffuse.rgb = max(0, lightIntensity);
+    outDiffuse.rgb += 0.3f;
     outDiffuse.a = 1.0f;
 
     outTexCood = inTexCood;
