@@ -18,7 +18,8 @@ namespace PhysicsLib
 {
 namespace
 {
-constexpr float kGravityPerFrame = 9.8f / 3600.0f;
+constexpr float kDeltaSeconds = 1.0f / 60.0f;
+constexpr float kGravityPerFrame = 9.8f * kDeltaSeconds;
 constexpr float kHorizontalDamping = 0.5f;
 constexpr float kSkinWidth = 0.01f;
 
@@ -515,15 +516,16 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     D3DXVECTOR3 nextMoveVector = moveVector;
     nextMoveVector.y -= kGravityPerFrame;
 
-    D3DXVECTOR3 nextPosition = currentPosition + nextMoveVector;
+    D3DXVECTOR3 frameMove = nextMoveVector * kDeltaSeconds;
+    D3DXVECTOR3 nextPosition = currentPosition + frameMove;
     bool collided = false;
 
-    const float totalMoveLength = D3DXVec3Length(&nextMoveVector);
+    const float totalMoveLength = D3DXVec3Length(&frameMove);
     if (totalMoveLength > 0.0001f)
     {
         RaycastHit nearestHit;
         if (FindNearestHit(currentPosition,
-                           nextMoveVector,
+                           frameMove,
                            shapeType,
                            radius,
                            height,
@@ -533,22 +535,23 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
         {
             collided = true;
 
-            const D3DXVECTOR3 moveDirection = nextMoveVector / totalMoveLength;
+            const D3DXVECTOR3 moveDirection = frameMove / totalMoveLength;
             const float safeDistance = std::max(0.0f, nearestHit.distance - kSkinWidth);
             nextPosition = currentPosition + moveDirection * safeDistance;
 
-            D3DXVECTOR3 remainingMove = nextMoveVector - moveDirection * nearestHit.distance;
-            nextMoveVector = ResolveSlide(remainingMove, nearestHit.normal);
+            D3DXVECTOR3 remainingMove = frameMove - moveDirection * nearestHit.distance;
+            D3DXVECTOR3 slideMove = ResolveSlide(remainingMove, nearestHit.normal);
 
             if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
             {
                 nextMoveVector.y = 0.0f;
+                slideMove.y = 0.0f;
             }
 
             RaycastHit secondHit;
-            if (D3DXVec3Length(&nextMoveVector) > 0.0001f &&
+            if (D3DXVec3Length(&slideMove) > 0.0001f &&
                 FindNearestHit(nextPosition,
-                               nextMoveVector,
+                               slideMove,
                                shapeType,
                                radius,
                                height,
@@ -556,24 +559,28 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                outSolidIds,
                                &secondHit))
             {
-                const float secondMoveLength = D3DXVec3Length(&nextMoveVector);
-                const D3DXVECTOR3 secondDirection = nextMoveVector / secondMoveLength;
+                const float secondMoveLength = D3DXVec3Length(&slideMove);
+                const D3DXVECTOR3 secondDirection = slideMove / secondMoveLength;
                 const float secondSafeDistance = std::max(0.0f, secondHit.distance - kSkinWidth);
                 nextPosition += secondDirection * secondSafeDistance;
 
                 if (secondHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
                 {
                     nextMoveVector.y = 0.0f;
+                    slideMove.y = 0.0f;
                 }
                 else
                 {
-                    nextMoveVector = D3DXVECTOR3(0.0f, nextMoveVector.y, 0.0f);
+                    slideMove = D3DXVECTOR3(0.0f, slideMove.y, 0.0f);
                 }
             }
             else
             {
-                nextPosition += nextMoveVector;
+                nextPosition += slideMove;
             }
+
+            nextMoveVector.x = slideMove.x / kDeltaSeconds;
+            nextMoveVector.z = slideMove.z / kDeltaSeconds;
         }
     }
 

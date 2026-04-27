@@ -20,8 +20,8 @@
 
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
-const float kPlayerSpeed = 0.18f;
-const float kJumpVelocity = 0.20f;
+const float kPlayerSpeed = 3.0f;
+const float kJumpVelocity = 4.5f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
 struct SceneObject
