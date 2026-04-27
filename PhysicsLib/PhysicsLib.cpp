@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
 #pragma comment(lib, "d3d9.lib")
@@ -21,21 +20,25 @@ namespace
 {
 constexpr float kGravityPerFrame = 9.8f / 3600.0f;
 constexpr float kHorizontalDamping = 0.5f;
-
-struct Aabb
-{
-    D3DXVECTOR3 min;
-    D3DXVECTOR3 max;
-};
+constexpr float kSkinWidth = 0.01f;
 
 struct LoadedObject
 {
     int id = 0;
     PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
     float friction = 0.0f;
-    D3DXVECTOR3 localMin = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    D3DXVECTOR3 localMax = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    LPD3DXMESH mesh = NULL;
     PhysicsLib::Transform transform;
+};
+
+struct RaycastHit
+{
+    bool hit = false;
+    float distance = 0.0f;
+    D3DXVECTOR3 point = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    D3DXVECTOR3 normal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
+    int objectId = -1;
+    PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
 };
 
 LPDIRECT3D9 g_direct3d = NULL;
@@ -50,6 +53,17 @@ void SafeRelease(IUnknown* object)
     {
         object->Release();
     }
+}
+
+void ReleaseLoadedObjects()
+{
+    for (size_t i = 0; i < g_objects.size(); ++i)
+    {
+        SafeRelease(g_objects[i].mesh);
+        g_objects[i].mesh = NULL;
+    }
+
+    g_objects.clear();
 }
 
 void EnsureInitialized()
@@ -67,19 +81,6 @@ LoadedObject& FindObject(int id)
         if (g_objects[i].id == id)
         {
             return g_objects[i];
-        }
-    }
-
-    throw std::out_of_range("Invalid collision object id.");
-}
-
-const LoadedObject& FindObject(int id, const std::vector<LoadedObject>& objects)
-{
-    for (size_t i = 0; i < objects.size(); ++i)
-    {
-        if (objects[i].id == id)
-        {
-            return objects[i];
         }
     }
 
@@ -105,142 +106,233 @@ D3DXMATRIX BuildWorldMatrix(const PhysicsLib::Transform& transform)
     return scaleMatrix * rotationMatrix * translationMatrix;
 }
 
-Aabb BuildWorldAabb(const LoadedObject& object)
+void GetShapeOffsets(PhysicsLib::ShapeType shapeType,
+                     float radius,
+                     float height,
+                     std::vector<D3DXVECTOR3>* offsets)
 {
-    const D3DXVECTOR3 corners[8] =
+    offsets->clear();
+    offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, 0.0f));
+
+    if (shapeType == PhysicsLib::ShapeType::Sphere)
     {
-        D3DXVECTOR3(object.localMin.x, object.localMin.y, object.localMin.z),
-        D3DXVECTOR3(object.localMax.x, object.localMin.y, object.localMin.z),
-        D3DXVECTOR3(object.localMin.x, object.localMax.y, object.localMin.z),
-        D3DXVECTOR3(object.localMax.x, object.localMax.y, object.localMin.z),
-        D3DXVECTOR3(object.localMin.x, object.localMin.y, object.localMax.z),
-        D3DXVECTOR3(object.localMax.x, object.localMin.y, object.localMax.z),
-        D3DXVECTOR3(object.localMin.x, object.localMax.y, object.localMax.z),
-        D3DXVECTOR3(object.localMax.x, object.localMax.y, object.localMax.z),
-    };
-
-    D3DXMATRIX worldMatrix = BuildWorldMatrix(object.transform);
-    Aabb worldAabb;
-    worldAabb.min = D3DXVECTOR3(std::numeric_limits<float>::max(),
-                                std::numeric_limits<float>::max(),
-                                std::numeric_limits<float>::max());
-    worldAabb.max = D3DXVECTOR3(-std::numeric_limits<float>::max(),
-                                -std::numeric_limits<float>::max(),
-                                -std::numeric_limits<float>::max());
-
-    for (size_t i = 0; i < 8; ++i)
-    {
-        D3DXVECTOR4 transformed;
-        D3DXVec3Transform(&transformed, &corners[i], &worldMatrix);
-
-        worldAabb.min.x = std::min(worldAabb.min.x, transformed.x);
-        worldAabb.min.y = std::min(worldAabb.min.y, transformed.y);
-        worldAabb.min.z = std::min(worldAabb.min.z, transformed.z);
-        worldAabb.max.x = std::max(worldAabb.max.x, transformed.x);
-        worldAabb.max.y = std::max(worldAabb.max.y, transformed.y);
-        worldAabb.max.z = std::max(worldAabb.max.z, transformed.z);
+        offsets->push_back(D3DXVECTOR3(radius, 0.0f, 0.0f));
+        offsets->push_back(D3DXVECTOR3(-radius, 0.0f, 0.0f));
+        offsets->push_back(D3DXVECTOR3(0.0f, radius, 0.0f));
+        offsets->push_back(D3DXVECTOR3(0.0f, -radius, 0.0f));
+        offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, radius));
+        offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, -radius));
     }
-
-    return worldAabb;
-}
-
-Aabb BuildActorAabb(const D3DXVECTOR3& position,
-                    PhysicsLib::ShapeType shapeType,
-                    float radius,
-                    float height)
-{
-    Aabb actor;
-    actor.min = position;
-    actor.max = position;
-
-    switch (shapeType)
-    {
-    case PhysicsLib::ShapeType::Point:
-        break;
-
-    case PhysicsLib::ShapeType::Sphere:
-        actor.min = position - D3DXVECTOR3(radius, radius, radius);
-        actor.max = position + D3DXVECTOR3(radius, radius, radius);
-        break;
-
-    case PhysicsLib::ShapeType::Cylinder:
+    else if (shapeType == PhysicsLib::ShapeType::Cylinder)
     {
         const float halfHeight = height * 0.5f;
-        actor.min = position - D3DXVECTOR3(radius, halfHeight, radius);
-        actor.max = position + D3DXVECTOR3(radius, halfHeight, radius);
-        break;
-    }
-    }
-
-    return actor;
-}
-
-bool OverlapAabb(const Aabb& lhs, const Aabb& rhs)
-{
-    return lhs.min.x <= rhs.max.x && lhs.max.x >= rhs.min.x &&
-           lhs.min.y <= rhs.max.y && lhs.max.y >= rhs.min.y &&
-           lhs.min.z <= rhs.max.z && lhs.max.z >= rhs.min.z;
-}
-
-void AppendUnique(std::vector<int>* values, int id)
-{
-    if (values == nullptr)
-    {
-        return;
-    }
-
-    if (std::find(values->begin(), values->end(), id) == values->end())
-    {
-        values->push_back(id);
+        offsets->push_back(D3DXVECTOR3(0.0f, halfHeight, 0.0f));
+        offsets->push_back(D3DXVECTOR3(0.0f, -halfHeight, 0.0f));
+        offsets->push_back(D3DXVECTOR3(radius, halfHeight, 0.0f));
+        offsets->push_back(D3DXVECTOR3(-radius, halfHeight, 0.0f));
+        offsets->push_back(D3DXVECTOR3(0.0f, halfHeight, radius));
+        offsets->push_back(D3DXVECTOR3(0.0f, halfHeight, -radius));
+        offsets->push_back(D3DXVECTOR3(radius, -halfHeight, 0.0f));
+        offsets->push_back(D3DXVECTOR3(-radius, -halfHeight, 0.0f));
+        offsets->push_back(D3DXVECTOR3(0.0f, -halfHeight, radius));
+        offsets->push_back(D3DXVECTOR3(0.0f, -halfHeight, -radius));
     }
 }
 
-bool ResolveSolidCollision(const LoadedObject& object,
-                           PhysicsLib::ShapeType shapeType,
-                           float radius,
-                           float height,
-                           D3DXVECTOR3 previousPosition,
-                           D3DXVECTOR3* position,
-                           bool* hitGround)
+bool ExtractFaceNormal(const LoadedObject& object, DWORD faceIndex, D3DXVECTOR3* outNormal)
 {
-    Aabb solid = BuildWorldAabb(object);
-    Aabb actor = BuildActorAabb(*position, shapeType, radius, height);
-
-    if (!OverlapAabb(actor, solid))
+    if (object.mesh == NULL)
     {
         return false;
     }
 
-    const float overlapX = std::min(actor.max.x, solid.max.x) - std::max(actor.min.x, solid.min.x);
-    const float overlapY = std::min(actor.max.y, solid.max.y) - std::max(actor.min.y, solid.min.y);
-    const float overlapZ = std::min(actor.max.z, solid.max.z) - std::max(actor.min.z, solid.min.z);
+    void* vertexBuffer = NULL;
+    void* indexBuffer = NULL;
+    const DWORD stride = object.mesh->GetNumBytesPerVertex();
 
-    const D3DXVECTOR3 actorCenter = (actor.min + actor.max) * 0.5f;
-    const D3DXVECTOR3 solidCenter = (solid.min + solid.max) * 0.5f;
-
-    if (overlapX <= overlapY && overlapX <= overlapZ)
+    HRESULT result = object.mesh->LockVertexBuffer(D3DLOCK_READONLY, &vertexBuffer);
+    if (FAILED(result))
     {
-        position->x += (actorCenter.x < solidCenter.x) ? -overlapX : overlapX;
-    }
-    else if (overlapY <= overlapX && overlapY <= overlapZ)
-    {
-        position->y += (actorCenter.y < solidCenter.y) ? -overlapY : overlapY;
-        if (hitGround != nullptr && previousPosition.y >= solid.max.y - 0.001f && actorCenter.y >= solidCenter.y)
-        {
-            *hitGround = true;
-        }
-    }
-    else
-    {
-        position->z += (actorCenter.z < solidCenter.z) ? -overlapZ : overlapZ;
+        return false;
     }
 
+    result = object.mesh->LockIndexBuffer(D3DLOCK_READONLY, &indexBuffer);
+    if (FAILED(result))
+    {
+        object.mesh->UnlockVertexBuffer();
+        return false;
+    }
+
+    const BYTE* vertices = static_cast<const BYTE*>(vertexBuffer);
+    const DWORD* indices32 = static_cast<const DWORD*>(indexBuffer);
+    const WORD* indices16 = static_cast<const WORD*>(indexBuffer);
+    const bool use32BitIndices = (object.mesh->GetOptions() & D3DXMESH_32BIT) != 0;
+
+    const DWORD i0 = use32BitIndices ? indices32[faceIndex * 3 + 0] : indices16[faceIndex * 3 + 0];
+    const DWORD i1 = use32BitIndices ? indices32[faceIndex * 3 + 1] : indices16[faceIndex * 3 + 1];
+    const DWORD i2 = use32BitIndices ? indices32[faceIndex * 3 + 2] : indices16[faceIndex * 3 + 2];
+
+    const D3DXVECTOR3* p0 = reinterpret_cast<const D3DXVECTOR3*>(vertices + i0 * stride);
+    const D3DXVECTOR3* p1 = reinterpret_cast<const D3DXVECTOR3*>(vertices + i1 * stride);
+    const D3DXVECTOR3* p2 = reinterpret_cast<const D3DXVECTOR3*>(vertices + i2 * stride);
+
+    D3DXVECTOR3 edge1 = *p1 - *p0;
+    D3DXVECTOR3 edge2 = *p2 - *p0;
+    D3DXVec3Cross(outNormal, &edge1, &edge2);
+    D3DXVec3Normalize(outNormal, outNormal);
+
+    object.mesh->UnlockIndexBuffer();
+    object.mesh->UnlockVertexBuffer();
     return true;
 }
 
-void LoadMeshBounds(const TCHAR* modelPath, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax)
+bool RaycastObject(const LoadedObject& object,
+                   const D3DXVECTOR3& rayOriginWorld,
+                   const D3DXVECTOR3& rayEndWorld,
+                   RaycastHit* outHit)
 {
-    LPD3DXMESH mesh = NULL;
+    if (object.mesh == NULL)
+    {
+        return false;
+    }
+
+    D3DXMATRIX worldMatrix = BuildWorldMatrix(object.transform);
+    D3DXMATRIX inverseWorldMatrix;
+    D3DXMatrixInverse(&inverseWorldMatrix, NULL, &worldMatrix);
+
+    D3DXVECTOR3 originLocal;
+    D3DXVECTOR3 endLocal;
+    D3DXVec3TransformCoord(&originLocal, &rayOriginWorld, &inverseWorldMatrix);
+    D3DXVec3TransformCoord(&endLocal, &rayEndWorld, &inverseWorldMatrix);
+
+    D3DXVECTOR3 rayVectorLocal = endLocal - originLocal;
+    const float maxDistanceLocal = D3DXVec3Length(&rayVectorLocal);
+    if (maxDistanceLocal <= 0.0001f)
+    {
+        return false;
+    }
+
+    D3DXVECTOR3 rayDirectionLocal = rayVectorLocal / maxDistanceLocal;
+
+    BOOL hit = FALSE;
+    DWORD faceIndex = 0;
+    FLOAT barycentricU = 0.0f;
+    FLOAT barycentricV = 0.0f;
+    FLOAT distanceLocal = 0.0f;
+    HRESULT result = D3DXIntersect(object.mesh,
+                                   &originLocal,
+                                   &rayDirectionLocal,
+                                   &hit,
+                                   &faceIndex,
+                                   &barycentricU,
+                                   &barycentricV,
+                                   &distanceLocal,
+                                   NULL,
+                                   NULL);
+
+    if (FAILED(result) || !hit || distanceLocal > maxDistanceLocal)
+    {
+        return false;
+    }
+
+    D3DXVECTOR3 localHitPoint = originLocal + rayDirectionLocal * distanceLocal;
+    D3DXVECTOR3 worldHitPoint;
+    D3DXVec3TransformCoord(&worldHitPoint, &localHitPoint, &worldMatrix);
+
+    D3DXVECTOR3 localNormal;
+    if (!ExtractFaceNormal(object, faceIndex, &localNormal))
+    {
+        return false;
+    }
+
+    D3DXMATRIX inverseTransposeWorld;
+    D3DXMatrixTranspose(&inverseTransposeWorld, &inverseWorldMatrix);
+    D3DXVECTOR3 worldNormal;
+    D3DXVec3TransformNormal(&worldNormal, &localNormal, &inverseTransposeWorld);
+    D3DXVec3Normalize(&worldNormal, &worldNormal);
+
+    D3DXVECTOR3 worldHitOffset = worldHitPoint - rayOriginWorld;
+
+    outHit->hit = true;
+    outHit->distance = D3DXVec3Length(&worldHitOffset);
+    outHit->point = worldHitPoint;
+    outHit->normal = worldNormal;
+    outHit->objectId = object.id;
+    outHit->objectType = object.objectType;
+    return true;
+}
+
+bool FindNearestHit(const D3DXVECTOR3& startPosition,
+                    const D3DXVECTOR3& moveVector,
+                    PhysicsLib::ShapeType shapeType,
+                    float radius,
+                    float height,
+                    std::vector<int>* outPassThroughIds,
+                    std::vector<int>* outSolidIds,
+                    RaycastHit* outNearestSolidHit)
+{
+    std::vector<D3DXVECTOR3> offsets;
+    GetShapeOffsets(shapeType, radius, height, &offsets);
+
+    const D3DXVECTOR3 endPosition = startPosition + moveVector;
+    bool foundSolid = false;
+    float nearestDistance = std::numeric_limits<float>::max();
+
+    for (size_t objectIndex = 0; objectIndex < g_objects.size(); ++objectIndex)
+    {
+        for (size_t offsetIndex = 0; offsetIndex < offsets.size(); ++offsetIndex)
+        {
+            const D3DXVECTOR3 rayStart = startPosition + offsets[offsetIndex];
+            const D3DXVECTOR3 rayEnd = endPosition + offsets[offsetIndex];
+
+            RaycastHit hit;
+            if (!RaycastObject(g_objects[objectIndex], rayStart, rayEnd, &hit))
+            {
+                continue;
+            }
+
+            if (hit.objectType == PhysicsLib::ObjectType::PassThrough)
+            {
+                if (outPassThroughIds != nullptr &&
+                    std::find(outPassThroughIds->begin(), outPassThroughIds->end(), hit.objectId) == outPassThroughIds->end())
+                {
+                    outPassThroughIds->push_back(hit.objectId);
+                }
+                continue;
+            }
+
+            if (outSolidIds != nullptr &&
+                std::find(outSolidIds->begin(), outSolidIds->end(), hit.objectId) == outSolidIds->end())
+            {
+                outSolidIds->push_back(hit.objectId);
+            }
+
+            if (hit.distance < nearestDistance)
+            {
+                nearestDistance = hit.distance;
+                *outNearestSolidHit = hit;
+                foundSolid = true;
+            }
+        }
+    }
+
+    return foundSolid;
+}
+
+D3DXVECTOR3 ResolveSlide(const D3DXVECTOR3& moveVector, const D3DXVECTOR3& normal)
+{
+    const float projection = D3DXVec3Dot(&moveVector, &normal);
+    D3DXVECTOR3 slideVector = moveVector;
+    if (projection < 0.0f)
+    {
+        slideVector -= normal * projection;
+    }
+
+    return slideVector;
+}
+
+void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
+{
     LPD3DXBUFFER materialBuffer = NULL;
     DWORD materialCount = 0;
 
@@ -251,35 +343,13 @@ void LoadMeshBounds(const TCHAR* modelPath, D3DXVECTOR3* outMin, D3DXVECTOR3* ou
                                        &materialBuffer,
                                        NULL,
                                        &materialCount,
-                                       &mesh);
+                                       outMesh);
 
-    if (FAILED(result))
+    SafeRelease(materialBuffer);
+
+    if (FAILED(result) || *outMesh == NULL)
     {
         throw std::runtime_error("Failed to load collision mesh.");
-    }
-
-    void* vertexData = NULL;
-    result = mesh->LockVertexBuffer(D3DLOCK_READONLY, &vertexData);
-    if (FAILED(result))
-    {
-        SafeRelease(materialBuffer);
-        SafeRelease(mesh);
-        throw std::runtime_error("Failed to read collision mesh vertex buffer.");
-    }
-
-    result = D3DXComputeBoundingBox(static_cast<const D3DXVECTOR3*>(vertexData),
-                                    mesh->GetNumVertices(),
-                                    mesh->GetNumBytesPerVertex(),
-                                    outMin,
-                                    outMax);
-
-    mesh->UnlockVertexBuffer();
-    SafeRelease(materialBuffer);
-    SafeRelease(mesh);
-
-    if (FAILED(result))
-    {
-        throw std::runtime_error("Failed to compute collision mesh bounds.");
     }
 }
 }
@@ -319,14 +389,14 @@ void PhysicsLib::Initialize()
         throw std::runtime_error("Failed to create internal Direct3D device.");
     }
 
-    g_objects.clear();
+    ReleaseLoadedObjects();
     g_nextId = 1;
     g_initialized = true;
 }
 
 void PhysicsLib::Finalize()
 {
-    g_objects.clear();
+    ReleaseLoadedObjects();
     g_nextId = 1;
     g_initialized = false;
 
@@ -368,7 +438,7 @@ int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float fricti
     object.objectType = objectType;
     object.friction = friction;
 
-    LoadMeshBounds(modelPath, &object.localMin, &object.localMax);
+    LoadMesh(modelPath, &object.mesh);
     g_objects.push_back(object);
     return object.id;
 }
@@ -446,58 +516,65 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     nextMoveVector.y -= kGravityPerFrame;
 
     D3DXVECTOR3 nextPosition = currentPosition + nextMoveVector;
-
-    for (size_t i = 0; i < g_objects.size(); ++i)
-    {
-        const Aabb objectAabb = BuildWorldAabb(g_objects[i]);
-        const Aabb actorAabb = BuildActorAabb(nextPosition, shapeType, radius, height);
-
-        if (g_objects[i].objectType == ObjectType::PassThrough)
-        {
-            if (OverlapAabb(actorAabb, objectAabb))
-            {
-                AppendUnique(outPassThroughIds, g_objects[i].id);
-            }
-        }
-    }
-
     bool collided = false;
-    bool hitGround = false;
 
-    for (size_t pass = 0; pass < 2; ++pass)
+    const float totalMoveLength = D3DXVec3Length(&nextMoveVector);
+    if (totalMoveLength > 0.0001f)
     {
-        bool resolvedOnThisPass = false;
-
-        for (size_t i = 0; i < g_objects.size(); ++i)
+        RaycastHit nearestHit;
+        if (FindNearestHit(currentPosition,
+                           nextMoveVector,
+                           shapeType,
+                           radius,
+                           height,
+                           outPassThroughIds,
+                           outSolidIds,
+                           &nearestHit))
         {
-            if (g_objects[i].objectType == ObjectType::PassThrough)
+            collided = true;
+
+            const D3DXVECTOR3 moveDirection = nextMoveVector / totalMoveLength;
+            const float safeDistance = std::max(0.0f, nearestHit.distance - kSkinWidth);
+            nextPosition = currentPosition + moveDirection * safeDistance;
+
+            D3DXVECTOR3 remainingMove = nextMoveVector - moveDirection * nearestHit.distance;
+            nextMoveVector = ResolveSlide(remainingMove, nearestHit.normal);
+
+            if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
             {
-                continue;
+                nextMoveVector.y = 0.0f;
             }
 
-            if (ResolveSolidCollision(g_objects[i],
-                                      shapeType,
-                                      radius,
-                                      height,
-                                      currentPosition,
-                                      &nextPosition,
-                                      &hitGround))
+            RaycastHit secondHit;
+            if (D3DXVec3Length(&nextMoveVector) > 0.0001f &&
+                FindNearestHit(nextPosition,
+                               nextMoveVector,
+                               shapeType,
+                               radius,
+                               height,
+                               outPassThroughIds,
+                               outSolidIds,
+                               &secondHit))
             {
-                AppendUnique(outSolidIds, g_objects[i].id);
-                collided = true;
-                resolvedOnThisPass = true;
+                const float secondMoveLength = D3DXVec3Length(&nextMoveVector);
+                const D3DXVECTOR3 secondDirection = nextMoveVector / secondMoveLength;
+                const float secondSafeDistance = std::max(0.0f, secondHit.distance - kSkinWidth);
+                nextPosition += secondDirection * secondSafeDistance;
+
+                if (secondHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
+                {
+                    nextMoveVector.y = 0.0f;
+                }
+                else
+                {
+                    nextMoveVector = D3DXVECTOR3(0.0f, nextMoveVector.y, 0.0f);
+                }
+            }
+            else
+            {
+                nextPosition += nextMoveVector;
             }
         }
-
-        if (!resolvedOnThisPass)
-        {
-            break;
-        }
-    }
-
-    if (hitGround && nextMoveVector.y < 0.0f)
-    {
-        nextMoveVector.y = 0.0f;
     }
 
     nextMoveVector.x *= kHorizontalDamping;

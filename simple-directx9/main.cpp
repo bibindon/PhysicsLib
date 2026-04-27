@@ -11,6 +11,7 @@
 #include <cassert>
 #include <crtdbg.h>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "..\PhysicsLib\PhysicsLib.h"
@@ -20,8 +21,8 @@
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
 const float kPlayerSpeed = 0.18f;
-const float kJumpVelocity = 0.10f;
-const D3DXVECTOR3 kPlayerStartPosition(0.0f, 0.0f, 0.0f);
+const float kJumpVelocity = 0.20f;
+const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
 struct SceneObject
 {
@@ -38,13 +39,12 @@ LPDIRECT3D9 g_pD3D = NULL;
 LPDIRECT3DDEVICE9 g_pd3dDevice = NULL;
 LPD3DXFONT g_pFont = NULL;
 LPD3DXMESH g_pCubeMesh = NULL;
-LPD3DXMESH g_pSphereMesh = NULL;
-LPD3DXMESH g_pBoxMesh = NULL;
 std::vector<D3DMATERIAL9> g_pMaterials;
 std::vector<LPDIRECT3DTEXTURE9> g_pTextures;
 DWORD g_dwNumMaterials = 0;
 LPD3DXEFFECT g_pEffect = NULL;
 bool g_bClose = false;
+std::vector<LPD3DXMESH> g_ownedSceneMeshes;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
 D3DXVECTOR3 g_playerPosition(0.0f, 0.0f, 0.0f);
@@ -60,6 +60,9 @@ static void InitScene();
 static void ResetPlayer();
 static void UpdatePlayer();
 static void SyncSceneFromPhysics();
+static LPD3DXMESH CreateBoxMesh(float width, float height, float depth);
+static LPD3DXMESH CreateSphereMesh(float radius);
+static void SaveCollisionMesh(LPD3DXMESH mesh, const TCHAR* path);
 static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXVECTOR3& position,
                      const D3DXVECTOR3& scale,
@@ -241,12 +244,6 @@ void InitD3D(HWND hWnd)
     hResult = pD3DXMtrlBuffer->Release();
     assert(hResult == S_OK);
 
-    hResult = D3DXCreateSphere(g_pd3dDevice, 0.5f, 24, 24, &g_pSphereMesh, NULL);
-    assert(hResult == S_OK);
-
-    hResult = D3DXCreateBox(g_pd3dDevice, 1.0f, 1.0f, 1.0f, &g_pBoxMesh, NULL);
-    assert(hResult == S_OK);
-
     hResult = D3DXCreateEffectFromFile(g_pd3dDevice,
                                        _T("simple.fx"),
                                        NULL,
@@ -263,52 +260,67 @@ void InitScene()
     g_worldObjects.clear();
     g_itemObjects.clear();
     g_collectedItemIds.clear();
+    for (size_t i = 0; i < g_ownedSceneMeshes.size(); ++i)
+    {
+        SAFE_RELEASE(g_ownedSceneMeshes[i]);
+    }
+    g_ownedSceneMeshes.clear();
 
-    const int groundId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+    LPD3DXMESH groundMesh = CreateBoxMesh(24.0f, 1.0f, 24.0f);
+    SaveCollisionMesh(groundMesh, _T("collision_ground.x"));
+    const int groundId = PhysicsLib::PhysicsLib::Load(_T("collision_ground.x"),
                                                       PhysicsLib::PhysicsLib::ObjectType::Slide,
                                                       0.8f);
     PhysicsLib::PhysicsLib::SetTransform(groundId,
                                          D3DXVECTOR3(0.0f, -0.5f, 0.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                         D3DXVECTOR3(24.0f, 1.0f, 24.0f));
-    g_worldObjects.push_back({ g_pBoxMesh, groundId, D3DXVECTOR3(0.0f, -0.5f, 0.0f), D3DXVECTOR3(24.0f, 1.0f, 24.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.35f, 0.70f, 0.35f, 1.0f), false });
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ groundMesh, groundId, D3DXVECTOR3(0.0f, -0.5f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.35f, 0.70f, 0.35f, 1.0f), false });
 
-    const int slopeId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+    LPD3DXMESH slopeMesh = CreateBoxMesh(6.0f, 0.8f, 4.0f);
+    SaveCollisionMesh(slopeMesh, _T("collision_slope.x"));
+    const int slopeId = PhysicsLib::PhysicsLib::Load(_T("collision_slope.x"),
                                                      PhysicsLib::PhysicsLib::ObjectType::Slide,
                                                      0.7f);
     PhysicsLib::PhysicsLib::SetTransform(slopeId,
                                          D3DXVECTOR3(4.0f, 0.75f, 0.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
-                                         D3DXVECTOR3(6.0f, 0.8f, 4.0f));
-    g_worldObjects.push_back({ g_pBoxMesh, slopeId, D3DXVECTOR3(4.0f, 0.75f, 0.0f), D3DXVECTOR3(6.0f, 0.8f, 4.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ slopeMesh, slopeId, D3DXVECTOR3(4.0f, 0.75f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
 
-    const int wallId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+    LPD3DXMESH wallMesh = CreateBoxMesh(1.0f, 3.0f, 8.0f);
+    SaveCollisionMesh(wallMesh, _T("collision_wall.x"));
+    const int wallId = PhysicsLib::PhysicsLib::Load(_T("collision_wall.x"),
                                                     PhysicsLib::PhysicsLib::ObjectType::Slide,
                                                     0.4f);
     PhysicsLib::PhysicsLib::SetTransform(wallId,
                                          D3DXVECTOR3(-6.0f, 1.5f, 0.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                         D3DXVECTOR3(1.0f, 3.0f, 8.0f));
-    g_worldObjects.push_back({ g_pBoxMesh, wallId, D3DXVECTOR3(-6.0f, 1.5f, 0.0f), D3DXVECTOR3(1.0f, 3.0f, 8.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ wallMesh, wallId, D3DXVECTOR3(-6.0f, 1.5f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
 
-    const int bigSphereId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+    LPD3DXMESH bigSphereMesh = CreateSphereMesh(2.0f);
+    SaveCollisionMesh(bigSphereMesh, _T("collision_big_sphere.x"));
+    const int bigSphereId = PhysicsLib::PhysicsLib::Load(_T("collision_big_sphere.x"),
                                                          PhysicsLib::PhysicsLib::ObjectType::Slide,
                                                          0.5f);
     PhysicsLib::PhysicsLib::SetTransform(bigSphereId,
                                          D3DXVECTOR3(6.5f, 2.0f, 4.5f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                         D3DXVECTOR3(4.0f, 4.0f, 4.0f));
-    g_worldObjects.push_back({ g_pSphereMesh, bigSphereId, D3DXVECTOR3(6.5f, 2.0f, 4.5f), D3DXVECTOR3(4.0f, 4.0f, 4.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.75f, 0.45f, 0.30f, 1.0f), false });
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ bigSphereMesh, bigSphereId, D3DXVECTOR3(6.5f, 2.0f, 4.5f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.75f, 0.45f, 0.30f, 1.0f), false });
 
-    g_movingPlatformId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+    LPD3DXMESH movingPlatformMesh = CreateBoxMesh(3.0f, 0.4f, 3.0f);
+    SaveCollisionMesh(movingPlatformMesh, _T("collision_moving_platform.x"));
+    g_movingPlatformId = PhysicsLib::PhysicsLib::Load(_T("collision_moving_platform.x"),
                                                       PhysicsLib::PhysicsLib::ObjectType::MovingSlide,
                                                       0.9f);
     PhysicsLib::PhysicsLib::SetTransform(g_movingPlatformId,
                                          D3DXVECTOR3(0.0f, 2.5f, 7.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                         D3DXVECTOR3(3.0f, 0.4f, 3.0f));
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
     PhysicsLib::PhysicsLib::SetVelocity(g_movingPlatformId, D3DXVECTOR3(1.5f, 0.0f, 0.0f));
-    g_worldObjects.push_back({ g_pBoxMesh, g_movingPlatformId, D3DXVECTOR3(0.0f, 2.5f, 7.0f), D3DXVECTOR3(3.0f, 0.4f, 3.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f), false });
+    g_worldObjects.push_back({ movingPlatformMesh, g_movingPlatformId, D3DXVECTOR3(0.0f, 2.5f, 7.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f), false });
 
     const D3DXVECTOR3 itemPositions[] =
     {
@@ -327,16 +339,19 @@ void InitScene()
         D3DXCOLOR(0.75f, 0.55f, 0.95f, 1.0f),
     };
 
+    LPD3DXMESH itemSphereMesh = CreateSphereMesh(0.25f);
+    SaveCollisionMesh(itemSphereMesh, _T("collision_item_sphere.x"));
+
     for (int i = 0; i < 5; ++i)
     {
-        const int itemId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+        const int itemId = PhysicsLib::PhysicsLib::Load(_T("collision_item_sphere.x"),
                                                         PhysicsLib::PhysicsLib::ObjectType::PassThrough,
                                                         0.0f);
         PhysicsLib::PhysicsLib::SetTransform(itemId,
                                              itemPositions[i],
                                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                             D3DXVECTOR3(0.5f, 0.5f, 0.5f));
-        g_itemObjects.push_back({ g_pSphereMesh, itemId, itemPositions[i], D3DXVECTOR3(0.5f, 0.5f, 0.5f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), itemColors[i], false });
+                                             D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+        g_itemObjects.push_back({ itemSphereMesh, itemId, itemPositions[i], D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), itemColors[i], false });
     }
 
     ResetPlayer();
@@ -474,6 +489,40 @@ void SyncSceneFromPhysics()
     }
 }
 
+LPD3DXMESH CreateBoxMesh(float width, float height, float depth)
+{
+    LPD3DXMESH mesh = NULL;
+    HRESULT hResult = D3DXCreateBox(g_pd3dDevice, width, height, depth, &mesh, NULL);
+    assert(hResult == S_OK);
+    g_ownedSceneMeshes.push_back(mesh);
+    return mesh;
+}
+
+LPD3DXMESH CreateSphereMesh(float radius)
+{
+    LPD3DXMESH mesh = NULL;
+    HRESULT hResult = D3DXCreateSphere(g_pd3dDevice, radius, 24, 24, &mesh, NULL);
+    assert(hResult == S_OK);
+    g_ownedSceneMeshes.push_back(mesh);
+    return mesh;
+}
+
+void SaveCollisionMesh(LPD3DXMESH mesh, const TCHAR* path)
+{
+    std::vector<DWORD> adjacency(mesh->GetNumFaces() * 3);
+    HRESULT hResult = mesh->GenerateAdjacency(0.0f, adjacency.data());
+    assert(hResult == S_OK);
+
+    hResult = D3DXSaveMeshToX(path,
+                              mesh,
+                              adjacency.data(),
+                              NULL,
+                              NULL,
+                              0,
+                              D3DXF_FILEFORMAT_TEXT);
+    assert(hResult == S_OK);
+}
+
 void DrawMesh(LPD3DXMESH mesh,
               const D3DXVECTOR3& position,
               const D3DXVECTOR3& scale,
@@ -558,8 +607,11 @@ void Cleanup()
     }
 
     PhysicsLib::PhysicsLib::Finalize();
-    SAFE_RELEASE(g_pBoxMesh);
-    SAFE_RELEASE(g_pSphereMesh);
+    for (size_t i = 0; i < g_ownedSceneMeshes.size(); ++i)
+    {
+        SAFE_RELEASE(g_ownedSceneMeshes[i]);
+    }
+    g_ownedSceneMeshes.clear();
     SAFE_RELEASE(g_pCubeMesh);
     SAFE_RELEASE(g_pEffect);
     SAFE_RELEASE(g_pFont);
