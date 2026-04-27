@@ -10,7 +10,10 @@
 #include <tchar.h>
 #include <cassert>
 #include <crtdbg.h>
+#include <set>
 #include <vector>
+
+#include "..\PhysicsLib\PhysicsLib.h"
 
 #define SAFE_RELEASE(p) { if (p) { (p)->Release(); (p) = NULL; } }
 
@@ -18,13 +21,12 @@ const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
 const float kPlayerSpeed = 0.18f;
 const float kJumpVelocity = 0.10f;
-const float kGravityPerFrame = 9.8f / 3600.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 0.0f, 0.0f);
-const size_t kMovingPlatformIndex = 4;
 
 struct SceneObject
 {
     LPD3DXMESH mesh;
+    int collisionId;
     D3DXVECTOR3 position;
     D3DXVECTOR3 scale;
     D3DXVECTOR3 rotation;
@@ -46,9 +48,10 @@ bool g_bClose = false;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
 D3DXVECTOR3 g_playerPosition(0.0f, 0.0f, 0.0f);
-float g_playerVelocityY = 0.0f;
+D3DXVECTOR3 g_playerMoveVector(0.0f, 0.0f, 0.0f);
 bool g_isGrounded = true;
-float g_movingPlatformPhase = 0.0f;
+int g_movingPlatformId = -1;
+std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
 
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
@@ -56,6 +59,7 @@ static void InitD3D(HWND hWnd);
 static void InitScene();
 static void ResetPlayer();
 static void UpdatePlayer();
+static void SyncSceneFromPhysics();
 static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXVECTOR3& position,
                      const D3DXVECTOR3& scale,
@@ -109,6 +113,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
                              NULL);
 
     InitD3D(hWnd);
+    PhysicsLib::PhysicsLib::Initialize();
     InitScene();
     ShowWindow(hWnd, SW_SHOWDEFAULT);
     UpdateWindow(hWnd);
@@ -257,94 +262,96 @@ void InitScene()
 {
     g_worldObjects.clear();
     g_itemObjects.clear();
-    g_movingPlatformPhase = 0.0f;
+    g_collectedItemIds.clear();
 
-    g_worldObjects.push_back({ g_pBoxMesh,
-                               D3DXVECTOR3(0.0f, -0.5f, 0.0f),
-                               D3DXVECTOR3(24.0f, 1.0f, 24.0f),
-                               D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                               D3DXCOLOR(0.35f, 0.70f, 0.35f, 1.0f),
-                               false });
+    const int groundId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+                                                      PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                      0.8f);
+    PhysicsLib::PhysicsLib::SetTransform(groundId,
+                                         D3DXVECTOR3(0.0f, -0.5f, 0.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                         D3DXVECTOR3(24.0f, 1.0f, 24.0f));
+    g_worldObjects.push_back({ g_pBoxMesh, groundId, D3DXVECTOR3(0.0f, -0.5f, 0.0f), D3DXVECTOR3(24.0f, 1.0f, 24.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.35f, 0.70f, 0.35f, 1.0f), false });
 
-    g_worldObjects.push_back({ g_pBoxMesh,
-                               D3DXVECTOR3(4.0f, 0.75f, 0.0f),
-                               D3DXVECTOR3(6.0f, 0.8f, 4.0f),
-                               D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
-                               D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f),
-                               false });
+    const int slopeId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+                                                     PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                     0.7f);
+    PhysicsLib::PhysicsLib::SetTransform(slopeId,
+                                         D3DXVECTOR3(4.0f, 0.75f, 0.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
+                                         D3DXVECTOR3(6.0f, 0.8f, 4.0f));
+    g_worldObjects.push_back({ g_pBoxMesh, slopeId, D3DXVECTOR3(4.0f, 0.75f, 0.0f), D3DXVECTOR3(6.0f, 0.8f, 4.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
 
-    g_worldObjects.push_back({ g_pBoxMesh,
-                               D3DXVECTOR3(-6.0f, 1.5f, 0.0f),
-                               D3DXVECTOR3(1.0f, 3.0f, 8.0f),
-                               D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                               D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f),
-                               false });
+    const int wallId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+                                                    PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                    0.4f);
+    PhysicsLib::PhysicsLib::SetTransform(wallId,
+                                         D3DXVECTOR3(-6.0f, 1.5f, 0.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                         D3DXVECTOR3(1.0f, 3.0f, 8.0f));
+    g_worldObjects.push_back({ g_pBoxMesh, wallId, D3DXVECTOR3(-6.0f, 1.5f, 0.0f), D3DXVECTOR3(1.0f, 3.0f, 8.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
 
-    g_worldObjects.push_back({ g_pSphereMesh,
-                               D3DXVECTOR3(6.5f, 2.0f, 4.5f),
-                               D3DXVECTOR3(4.0f, 4.0f, 4.0f),
-                               D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                               D3DXCOLOR(0.75f, 0.45f, 0.30f, 1.0f),
-                               false });
+    const int bigSphereId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+                                                         PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                         0.5f);
+    PhysicsLib::PhysicsLib::SetTransform(bigSphereId,
+                                         D3DXVECTOR3(6.5f, 2.0f, 4.5f),
+                                         D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                         D3DXVECTOR3(4.0f, 4.0f, 4.0f));
+    g_worldObjects.push_back({ g_pSphereMesh, bigSphereId, D3DXVECTOR3(6.5f, 2.0f, 4.5f), D3DXVECTOR3(4.0f, 4.0f, 4.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.75f, 0.45f, 0.30f, 1.0f), false });
 
-    g_worldObjects.push_back({ g_pBoxMesh,
-                               D3DXVECTOR3(0.0f, 2.5f, 7.0f),
-                               D3DXVECTOR3(3.0f, 0.4f, 3.0f),
-                               D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                               D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f),
-                               false });
+    g_movingPlatformId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+                                                      PhysicsLib::PhysicsLib::ObjectType::MovingSlide,
+                                                      0.9f);
+    PhysicsLib::PhysicsLib::SetTransform(g_movingPlatformId,
+                                         D3DXVECTOR3(0.0f, 2.5f, 7.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                         D3DXVECTOR3(3.0f, 0.4f, 3.0f));
+    PhysicsLib::PhysicsLib::SetVelocity(g_movingPlatformId, D3DXVECTOR3(1.5f, 0.0f, 0.0f));
+    g_worldObjects.push_back({ g_pBoxMesh, g_movingPlatformId, D3DXVECTOR3(0.0f, 2.5f, 7.0f), D3DXVECTOR3(3.0f, 0.4f, 3.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f), false });
 
-    g_itemObjects.push_back({ g_pSphereMesh,
-                              D3DXVECTOR3(-2.0f, 0.5f, 2.0f),
-                              D3DXVECTOR3(0.5f, 0.5f, 0.5f),
-                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                              D3DXCOLOR(0.95f, 0.86f, 0.30f, 1.0f),
-                              false });
-    g_itemObjects.push_back({ g_pSphereMesh,
-                              D3DXVECTOR3(0.5f, 0.5f, 3.5f),
-                              D3DXVECTOR3(0.5f, 0.5f, 0.5f),
-                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                              D3DXCOLOR(0.90f, 0.30f, 0.40f, 1.0f),
-                              false });
-    g_itemObjects.push_back({ g_pSphereMesh,
-                              D3DXVECTOR3(3.0f, 0.5f, -1.0f),
-                              D3DXVECTOR3(0.5f, 0.5f, 0.5f),
-                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                              D3DXCOLOR(0.30f, 0.75f, 0.95f, 1.0f),
-                              false });
-    g_itemObjects.push_back({ g_pSphereMesh,
-                              D3DXVECTOR3(5.0f, 0.8f, 1.5f),
-                              D3DXVECTOR3(0.5f, 0.5f, 0.5f),
-                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                              D3DXCOLOR(0.55f, 0.90f, 0.50f, 1.0f),
-                              false });
-    g_itemObjects.push_back({ g_pSphereMesh,
-                              D3DXVECTOR3(7.0f, 0.5f, -3.5f),
-                              D3DXVECTOR3(0.5f, 0.5f, 0.5f),
-                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                              D3DXCOLOR(0.75f, 0.55f, 0.95f, 1.0f),
-                              false });
+    const D3DXVECTOR3 itemPositions[] =
+    {
+        D3DXVECTOR3(-2.0f, 0.5f, 2.0f),
+        D3DXVECTOR3(0.5f, 0.5f, 3.5f),
+        D3DXVECTOR3(3.0f, 0.5f, -1.0f),
+        D3DXVECTOR3(5.0f, 0.8f, 1.5f),
+        D3DXVECTOR3(7.0f, 0.5f, -3.5f),
+    };
+    const D3DXCOLOR itemColors[] =
+    {
+        D3DXCOLOR(0.95f, 0.86f, 0.30f, 1.0f),
+        D3DXCOLOR(0.90f, 0.30f, 0.40f, 1.0f),
+        D3DXCOLOR(0.30f, 0.75f, 0.95f, 1.0f),
+        D3DXCOLOR(0.55f, 0.90f, 0.50f, 1.0f),
+        D3DXCOLOR(0.75f, 0.55f, 0.95f, 1.0f),
+    };
+
+    for (int i = 0; i < 5; ++i)
+    {
+        const int itemId = PhysicsLib::PhysicsLib::Load(_T("cube.x"),
+                                                        PhysicsLib::PhysicsLib::ObjectType::PassThrough,
+                                                        0.0f);
+        PhysicsLib::PhysicsLib::SetTransform(itemId,
+                                             itemPositions[i],
+                                             D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                             D3DXVECTOR3(0.5f, 0.5f, 0.5f));
+        g_itemObjects.push_back({ g_pSphereMesh, itemId, itemPositions[i], D3DXVECTOR3(0.5f, 0.5f, 0.5f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), itemColors[i], false });
+    }
 
     ResetPlayer();
+    SyncSceneFromPhysics();
 }
 
 void ResetPlayer()
 {
     g_playerPosition = kPlayerStartPosition;
-    g_playerVelocityY = 0.0f;
+    g_playerMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     g_isGrounded = true;
 }
 
 void UpdatePlayer()
 {
-    g_movingPlatformPhase += 0.03f;
-    if (g_worldObjects.size() > kMovingPlatformIndex)
-    {
-        g_worldObjects[kMovingPlatformIndex].position.x = sinf(g_movingPlatformPhase) * 4.0f;
-        g_worldObjects[kMovingPlatformIndex].position.y = 2.5f;
-        g_worldObjects[kMovingPlatformIndex].position.z = 7.0f;
-    }
-
     bool isF1Pressed = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
     if (isF1Pressed && !g_prevF1Pressed)
     {
@@ -352,46 +359,118 @@ void UpdatePlayer()
     }
     g_prevF1Pressed = isF1Pressed;
 
-    D3DXVECTOR3 move(0.0f, 0.0f, 0.0f);
+    PhysicsLib::PhysicsLib::Update();
+
+    if (g_movingPlatformId >= 0)
+    {
+        PhysicsLib::PhysicsLib::Transform platformTransform = PhysicsLib::PhysicsLib::GetTransform(g_movingPlatformId);
+        if (platformTransform.position.x > 4.0f)
+        {
+            PhysicsLib::PhysicsLib::SetVelocity(g_movingPlatformId, D3DXVECTOR3(-1.5f, 0.0f, 0.0f));
+        }
+        else if (platformTransform.position.x < -4.0f)
+        {
+            PhysicsLib::PhysicsLib::SetVelocity(g_movingPlatformId, D3DXVECTOR3(1.5f, 0.0f, 0.0f));
+        }
+    }
+
+    D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
 
     if (GetAsyncKeyState('W') & 0x8000)
     {
-        move.z += 1.0f;
+        inputMove.z += 1.0f;
     }
     if (GetAsyncKeyState('S') & 0x8000)
     {
-        move.z -= 1.0f;
+        inputMove.z -= 1.0f;
     }
     if (GetAsyncKeyState('A') & 0x8000)
     {
-        move.x -= 1.0f;
+        inputMove.x -= 1.0f;
     }
     if (GetAsyncKeyState('D') & 0x8000)
     {
-        move.x += 1.0f;
+        inputMove.x += 1.0f;
     }
 
-    if (move.x != 0.0f || move.z != 0.0f)
+    if (inputMove.x != 0.0f || inputMove.z != 0.0f)
     {
-        D3DXVec3Normalize(&move, &move);
-        move *= kPlayerSpeed;
+        D3DXVec3Normalize(&inputMove, &inputMove);
+        inputMove *= kPlayerSpeed;
     }
+
+    g_playerMoveVector.x += inputMove.x;
+    g_playerMoveVector.z += inputMove.z;
 
     if ((GetAsyncKeyState(VK_SPACE) & 0x8000) && g_isGrounded)
     {
-        g_playerVelocityY = kJumpVelocity;
+        g_playerMoveVector.y = kJumpVelocity;
         g_isGrounded = false;
     }
 
-    g_playerVelocityY -= kGravityPerFrame;
-    g_playerPosition += move;
-    g_playerPosition.y += g_playerVelocityY;
+    const D3DXVECTOR3 playerShapeOffset(0.0f, 0.8f, 0.0f);
+    const D3DXVECTOR3 playerShapePosition = g_playerPosition + playerShapeOffset;
+    D3DXVECTOR3 correctedPosition = playerShapePosition;
+    D3DXVECTOR3 nextMoveVector = g_playerMoveVector;
+    std::vector<int> passThroughIds;
+    std::vector<int> solidIds;
+    PhysicsLib::PhysicsLib::CheckCollide(playerShapePosition,
+                                         g_playerMoveVector,
+                                         PhysicsLib::PhysicsLib::ShapeType::Cylinder,
+                                         &correctedPosition,
+                                         &nextMoveVector,
+                                         &passThroughIds,
+                                         &solidIds,
+                                         0.35f,
+                                         1.6f);
 
-    if (g_playerPosition.y <= 0.0f)
+    if (nextMoveVector.y == 0.0f && correctedPosition.y <= playerShapePosition.y)
     {
-        g_playerPosition.y = 0.0f;
-        g_playerVelocityY = 0.0f;
         g_isGrounded = true;
+    }
+    else
+    {
+        g_isGrounded = false;
+    }
+
+    for (size_t i = 0; i < passThroughIds.size(); ++i)
+    {
+        g_collectedItemIds.insert(passThroughIds[i]);
+    }
+
+    g_playerPosition = correctedPosition - playerShapeOffset;
+    g_playerMoveVector = nextMoveVector;
+    SyncSceneFromPhysics();
+}
+
+void SyncSceneFromPhysics()
+{
+    for (size_t i = 0; i < g_worldObjects.size(); ++i)
+    {
+        if (g_worldObjects[i].collisionId < 0)
+        {
+            continue;
+        }
+
+        PhysicsLib::PhysicsLib::Transform transform =
+            PhysicsLib::PhysicsLib::GetTransform(g_worldObjects[i].collisionId);
+        g_worldObjects[i].position = transform.position;
+        g_worldObjects[i].rotation = transform.rotation;
+        g_worldObjects[i].scale = transform.scale;
+    }
+
+    for (size_t i = 0; i < g_itemObjects.size(); ++i)
+    {
+        if (g_itemObjects[i].collisionId < 0)
+        {
+            continue;
+        }
+
+        PhysicsLib::PhysicsLib::Transform transform =
+            PhysicsLib::PhysicsLib::GetTransform(g_itemObjects[i].collisionId);
+        g_itemObjects[i].position = transform.position;
+        g_itemObjects[i].rotation = transform.rotation;
+        g_itemObjects[i].scale = transform.scale;
     }
 }
 
@@ -478,6 +557,7 @@ void Cleanup()
         SAFE_RELEASE(texture);
     }
 
+    PhysicsLib::PhysicsLib::Finalize();
     SAFE_RELEASE(g_pBoxMesh);
     SAFE_RELEASE(g_pSphereMesh);
     SAFE_RELEASE(g_pCubeMesh);
@@ -504,7 +584,8 @@ void Render()
 
     TCHAR msg[256];
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  F1: reset  Player Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SPACE: jump  F1: reset  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                (int)g_collectedItemIds.size(),
                 g_playerPosition.x,
                 g_playerPosition.y,
                 g_playerPosition.z);
@@ -532,6 +613,11 @@ void Render()
 
     for (size_t i = 0; i < g_itemObjects.size(); i++)
     {
+        if (g_collectedItemIds.find(g_itemObjects[i].collisionId) != g_collectedItemIds.end())
+        {
+            continue;
+        }
+
         DrawMesh(g_itemObjects[i].mesh,
                  g_itemObjects[i].position,
                  g_itemObjects[i].scale,

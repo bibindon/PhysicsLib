@@ -20,6 +20,7 @@ namespace PhysicsLib
 namespace
 {
 constexpr float kGravityPerFrame = 9.8f / 3600.0f;
+constexpr float kHorizontalDamping = 0.5f;
 
 struct Aabb
 {
@@ -198,7 +199,9 @@ bool ResolveSolidCollision(const LoadedObject& object,
                            PhysicsLib::ShapeType shapeType,
                            float radius,
                            float height,
-                           D3DXVECTOR3* position)
+                           D3DXVECTOR3 previousPosition,
+                           D3DXVECTOR3* position,
+                           bool* hitGround)
 {
     Aabb solid = BuildWorldAabb(object);
     Aabb actor = BuildActorAabb(*position, shapeType, radius, height);
@@ -222,6 +225,10 @@ bool ResolveSolidCollision(const LoadedObject& object,
     else if (overlapY <= overlapX && overlapY <= overlapZ)
     {
         position->y += (actorCenter.y < solidCenter.y) ? -overlapY : overlapY;
+        if (hitGround != nullptr && previousPosition.y >= solid.max.y - 0.001f && actorCenter.y >= solidCenter.y)
+        {
+            *hitGround = true;
+        }
     }
     else
     {
@@ -397,6 +404,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               const D3DXVECTOR3& moveVector,
                               ShapeType shapeType,
                               D3DXVECTOR3* outPosition,
+                              D3DXVECTOR3* outNextMoveVector,
                               std::vector<int>* outPassThroughIds,
                               std::vector<int>* outSolidIds,
                               float radius,
@@ -407,6 +415,11 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     if (outPosition == nullptr)
     {
         throw std::invalid_argument("outPosition must not be null.");
+    }
+
+    if (outNextMoveVector == nullptr)
+    {
+        throw std::invalid_argument("outNextMoveVector must not be null.");
     }
 
     if (shapeType == ShapeType::Sphere && radius < 0.0f)
@@ -429,10 +442,10 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
         outSolidIds->clear();
     }
 
-    D3DXVECTOR3 correctedMove = moveVector;
-    correctedMove.y -= kGravityPerFrame;
+    D3DXVECTOR3 nextMoveVector = moveVector;
+    nextMoveVector.y -= kGravityPerFrame;
 
-    D3DXVECTOR3 nextPosition = currentPosition + correctedMove;
+    D3DXVECTOR3 nextPosition = currentPosition + nextMoveVector;
 
     for (size_t i = 0; i < g_objects.size(); ++i)
     {
@@ -449,6 +462,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     }
 
     bool collided = false;
+    bool hitGround = false;
 
     for (size_t pass = 0; pass < 2; ++pass)
     {
@@ -461,7 +475,13 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                 continue;
             }
 
-            if (ResolveSolidCollision(g_objects[i], shapeType, radius, height, &nextPosition))
+            if (ResolveSolidCollision(g_objects[i],
+                                      shapeType,
+                                      radius,
+                                      height,
+                                      currentPosition,
+                                      &nextPosition,
+                                      &hitGround))
             {
                 AppendUnique(outSolidIds, g_objects[i].id);
                 collided = true;
@@ -475,7 +495,16 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
         }
     }
 
+    if (hitGround && nextMoveVector.y < 0.0f)
+    {
+        nextMoveVector.y = 0.0f;
+    }
+
+    nextMoveVector.x *= kHorizontalDamping;
+    nextMoveVector.z *= kHorizontalDamping;
+
     *outPosition = nextPosition;
+    *outNextMoveVector = nextMoveVector;
     return collided;
 }
 }
