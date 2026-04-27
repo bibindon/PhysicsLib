@@ -377,7 +377,20 @@ void UpdatePlayer()
     }
     g_prevF1Pressed = isF1Pressed;
 
-    PhysicsLib::PhysicsLib::Update();
+    D3DXVECTOR3 movingPlatformDelta(0.0f, 0.0f, 0.0f);
+    if (g_movingPlatformId >= 0)
+    {
+        const PhysicsLib::PhysicsLib::Transform beforeUpdate =
+            PhysicsLib::PhysicsLib::GetTransform(g_movingPlatformId);
+        PhysicsLib::PhysicsLib::Update();
+        const PhysicsLib::PhysicsLib::Transform afterUpdate =
+            PhysicsLib::PhysicsLib::GetTransform(g_movingPlatformId);
+        movingPlatformDelta = afterUpdate.position - beforeUpdate.position;
+    }
+    else
+    {
+        PhysicsLib::PhysicsLib::Update();
+    }
 
     if (g_movingPlatformId >= 0)
     {
@@ -453,6 +466,12 @@ void UpdatePlayer()
     for (size_t i = 0; i < passThroughIds.size(); ++i)
     {
         g_collectedItemIds.insert(passThroughIds[i]);
+    }
+
+    if (g_movingPlatformId >= 0 &&
+        std::find(solidIds.begin(), solidIds.end(), g_movingPlatformId) != solidIds.end())
+    {
+        correctedPosition += movingPlatformDelta;
     }
 
     g_playerPosition = correctedPosition - playerShapeOffset;
