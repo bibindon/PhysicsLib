@@ -19,6 +19,8 @@ const int WINDOW_SIZE_H = 900;
 const float kPlayerSpeed = 0.18f;
 const float kJumpVelocity = 0.10f;
 const float kGravityPerFrame = 9.8f / 3600.0f;
+const D3DXVECTOR3 kPlayerStartPosition(0.0f, 0.0f, 0.0f);
+const size_t kMovingPlatformIndex = 4;
 
 struct SceneObject
 {
@@ -46,10 +48,13 @@ std::vector<SceneObject> g_itemObjects;
 D3DXVECTOR3 g_playerPosition(0.0f, 0.0f, 0.0f);
 float g_playerVelocityY = 0.0f;
 bool g_isGrounded = true;
+float g_movingPlatformPhase = 0.0f;
+bool g_prevF1Pressed = false;
 
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
 static void InitD3D(HWND hWnd);
 static void InitScene();
+static void ResetPlayer();
 static void UpdatePlayer();
 static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXVECTOR3& position,
@@ -252,6 +257,7 @@ void InitScene()
 {
     g_worldObjects.clear();
     g_itemObjects.clear();
+    g_movingPlatformPhase = 0.0f;
 
     g_worldObjects.push_back({ g_pBoxMesh,
                                D3DXVECTOR3(0.0f, -0.5f, 0.0f),
@@ -279,6 +285,13 @@ void InitScene()
                                D3DXVECTOR3(4.0f, 4.0f, 4.0f),
                                D3DXVECTOR3(0.0f, 0.0f, 0.0f),
                                D3DXCOLOR(0.75f, 0.45f, 0.30f, 1.0f),
+                               false });
+
+    g_worldObjects.push_back({ g_pBoxMesh,
+                               D3DXVECTOR3(0.0f, 2.5f, 7.0f),
+                               D3DXVECTOR3(3.0f, 0.4f, 3.0f),
+                               D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                               D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f),
                                false });
 
     g_itemObjects.push_back({ g_pSphereMesh,
@@ -311,10 +324,34 @@ void InitScene()
                               D3DXVECTOR3(0.0f, 0.0f, 0.0f),
                               D3DXCOLOR(0.75f, 0.55f, 0.95f, 1.0f),
                               false });
+
+    ResetPlayer();
+}
+
+void ResetPlayer()
+{
+    g_playerPosition = kPlayerStartPosition;
+    g_playerVelocityY = 0.0f;
+    g_isGrounded = true;
 }
 
 void UpdatePlayer()
 {
+    g_movingPlatformPhase += 0.03f;
+    if (g_worldObjects.size() > kMovingPlatformIndex)
+    {
+        g_worldObjects[kMovingPlatformIndex].position.x = sinf(g_movingPlatformPhase) * 4.0f;
+        g_worldObjects[kMovingPlatformIndex].position.y = 2.5f;
+        g_worldObjects[kMovingPlatformIndex].position.z = 7.0f;
+    }
+
+    bool isF1Pressed = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
+    if (isF1Pressed && !g_prevF1Pressed)
+    {
+        ResetPlayer();
+    }
+    g_prevF1Pressed = isF1Pressed;
+
     D3DXVECTOR3 move(0.0f, 0.0f, 0.0f);
 
     if (GetAsyncKeyState('W') & 0x8000)
@@ -467,7 +504,7 @@ void Render()
 
     TCHAR msg[256];
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  Player Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SPACE: jump  F1: reset  Player Pos(%.2f, %.2f, %.2f)"),
                 g_playerPosition.x,
                 g_playerPosition.y,
                 g_playerPosition.z);
