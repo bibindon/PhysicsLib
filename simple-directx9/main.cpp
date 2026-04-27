@@ -21,7 +21,7 @@
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
 const float kPlayerSpeed = 6.0f;
-const float kJumpVelocity = 4.5f;
+const float kJumpVelocity = 2.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
 struct SceneObject
@@ -297,9 +297,9 @@ void InitScene()
                                                     0.4f);
     PhysicsLib::PhysicsLib::SetTransform(wallId,
                                          D3DXVECTOR3(-6.0f, 1.5f, 0.0f),
-                                         D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                         D3DXVECTOR3(0.0f, D3DXToRadian(18.0f), 0.0f),
                                          D3DXVECTOR3(1.0f, 1.0f, 1.0f));
-    g_worldObjects.push_back({ wallMesh, wallId, D3DXVECTOR3(-6.0f, 1.5f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
+    g_worldObjects.push_back({ wallMesh, wallId, D3DXVECTOR3(-6.0f, 1.5f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, D3DXToRadian(18.0f), 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
 
     LPD3DXMESH bigSphereMesh = CreateSphereMesh(2.0f);
     SaveCollisionMesh(bigSphereMesh, _T("collision_big_sphere.x"));
@@ -552,7 +552,7 @@ void DrawMesh(LPD3DXMESH mesh,
 
     matWorld = matScale * matRotationX * matRotationY * matRotationZ * matTranslation;
 
-    D3DXVECTOR3 cameraPosition(0.0f, 14.0f, -22.0f);
+    D3DXVECTOR3 cameraPosition(0.0f, 7.0f, -16.0f);
     D3DXVECTOR3 cameraTarget(0.0f, 1.5f, 3.0f);
     D3DXVECTOR3 cameraUp(0.0f, 1.0f, 0.0f);
     D3DXMatrixLookAtLH(&matView, &cameraPosition, &cameraTarget, &cameraUp);
