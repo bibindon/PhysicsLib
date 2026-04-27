@@ -52,6 +52,7 @@ D3DXVECTOR3 g_playerPosition(0.0f, 0.0f, 0.0f);
 D3DXVECTOR3 g_playerMoveVector(0.0f, 0.0f, 0.0f);
 bool g_isGrounded = true;
 int g_movingPlatformId = -1;
+int g_supportObjectId = -1;
 std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
 
@@ -365,6 +366,7 @@ void ResetPlayer()
     g_playerPosition = kPlayerStartPosition;
     g_playerMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     g_isGrounded = true;
+    g_supportObjectId = -1;
 }
 
 void UpdatePlayer()
@@ -390,6 +392,11 @@ void UpdatePlayer()
     else
     {
         PhysicsLib::PhysicsLib::Update();
+    }
+
+    if (g_supportObjectId == g_movingPlatformId)
+    {
+        g_playerPosition += movingPlatformDelta;
     }
 
     if (g_movingPlatformId >= 0)
@@ -457,21 +464,17 @@ void UpdatePlayer()
     if (nextMoveVector.y == 0.0f && correctedPosition.y <= playerShapePosition.y)
     {
         g_isGrounded = true;
+        g_supportObjectId = solidIds.empty() ? -1 : solidIds.front();
     }
     else
     {
         g_isGrounded = false;
+        g_supportObjectId = -1;
     }
 
     for (size_t i = 0; i < passThroughIds.size(); ++i)
     {
         g_collectedItemIds.insert(passThroughIds[i]);
-    }
-
-    if (g_movingPlatformId >= 0 &&
-        std::find(solidIds.begin(), solidIds.end(), g_movingPlatformId) != solidIds.end())
-    {
-        correctedPosition += movingPlatformDelta;
     }
 
     g_playerPosition = correctedPosition - playerShapeOffset;

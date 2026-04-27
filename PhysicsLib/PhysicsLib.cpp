@@ -22,6 +22,7 @@ constexpr float kDeltaSeconds = 1.0f / 60.0f;
 constexpr float kGravityPerFrame = 9.8f * kDeltaSeconds;
 constexpr float kHorizontalDamping = 0.5f;
 constexpr float kSkinWidth = 0.01f;
+constexpr int kMaxSlideIterations = 3;
 
 struct LoadedObject
 {
@@ -520,68 +521,67 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     D3DXVECTOR3 nextPosition = currentPosition + frameMove;
     bool collided = false;
 
-    const float totalMoveLength = D3DXVec3Length(&frameMove);
-    if (totalMoveLength > 0.0001f)
+    D3DXVECTOR3 currentPositionForSlide = currentPosition;
+    D3DXVECTOR3 remainingMove = frameMove;
+
+    for (int iteration = 0; iteration < kMaxSlideIterations; ++iteration)
     {
-        RaycastHit nearestHit;
-        if (FindNearestHit(currentPosition,
-                           frameMove,
-                           shapeType,
-                           radius,
-                           height,
-                           outPassThroughIds,
-                           outSolidIds,
-                           &nearestHit))
+        const float totalMoveLength = D3DXVec3Length(&remainingMove);
+        if (totalMoveLength <= 0.0001f)
         {
-            collided = true;
-
-            const D3DXVECTOR3 moveDirection = frameMove / totalMoveLength;
-            const float safeDistance = std::max(0.0f, nearestHit.distance - kSkinWidth);
-            nextPosition = currentPosition + moveDirection * safeDistance;
-
-            D3DXVECTOR3 remainingMove = frameMove - moveDirection * nearestHit.distance;
-            D3DXVECTOR3 slideMove = ResolveSlide(remainingMove, nearestHit.normal);
-
-            if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
-            {
-                nextMoveVector.y = 0.0f;
-                slideMove.y = 0.0f;
-            }
-
-            RaycastHit secondHit;
-            if (D3DXVec3Length(&slideMove) > 0.0001f &&
-                FindNearestHit(nextPosition,
-                               slideMove,
-                               shapeType,
-                               radius,
-                               height,
-                               outPassThroughIds,
-                               outSolidIds,
-                               &secondHit))
-            {
-                const float secondMoveLength = D3DXVec3Length(&slideMove);
-                const D3DXVECTOR3 secondDirection = slideMove / secondMoveLength;
-                const float secondSafeDistance = std::max(0.0f, secondHit.distance - kSkinWidth);
-                nextPosition += secondDirection * secondSafeDistance;
-
-                if (secondHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
-                {
-                    nextMoveVector.y = 0.0f;
-                    slideMove.y = 0.0f;
-                }
-                else
-                {
-                    slideMove = D3DXVECTOR3(0.0f, slideMove.y, 0.0f);
-                }
-            }
-            else
-            {
-                nextPosition += slideMove;
-            }
-
-            nextMoveVector.x = slideMove.x / kDeltaSeconds;
-            nextMoveVector.z = slideMove.z / kDeltaSeconds;
+            break;
         }
+
+        RaycastHit nearestHit;
+        if (!FindNearestHit(currentPositionForSlide,
+                            remainingMove,
+                            shapeType,
+                            radius,
+                            height,
+                            outPassThroughIds,
+                            outSolidIds,
+                            &nearestHit))
+        {
+            nextPosition = currentPositionForSlide + remainingMove;
+            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+            break;
+        }
+
+        collided = true;
+
+        const D3DXVECTOR3 moveDirection = remainingMove / totalMoveLength;
+        const float safeDistance = std::max(0.0f, nearestHit.distance - kSkinWidth);
+        currentPositionForSlide += moveDirection * safeDistance;
+        nextPosition = currentPositionForSlide;
+
+        D3DXVECTOR3 unresolvedMove = remainingMove - moveDirection * nearestHit.distance;
+        D3DXVECTOR3 slideMove = ResolveSlide(unresolvedMove, nearestHit.normal);
+
+        if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
+        {
+            nextMoveVector.y = 0.0f;
+            slideMove.y = 0.0f;
+        }
+
+        if (iteration == kMaxSlideIterations - 1)
+        {
+            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+            break;
+        }
+
+        remainingMove = slideMove;
+    }
+
+    if (D3DXVec3Length(&remainingMove) > 0.0001f)
+    {
+        nextPosition = currentPositionForSlide + remainingMove;
+    }
+
+    if (D3DXVec3Length(&frameMove) > 0.0001f)
+    {
+        D3DXVECTOR3 actualFrameMove = nextPosition - currentPosition;
+        nextMoveVector.x = actualFrameMove.x / kDeltaSeconds;
+        nextMoveVector.z = actualFrameMove.z / kDeltaSeconds;
     }
 
     nextMoveVector.x *= kHorizontalDamping;
