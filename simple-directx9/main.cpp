@@ -20,7 +20,7 @@
 
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
-const float kPlayerSpeed = 3.0f;
+const float kPlayerSpeed = 6.0f;
 const float kJumpVelocity = 4.5f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
@@ -417,13 +417,13 @@ void UpdatePlayer()
     g_playerMoveVector.x += inputMove.x;
     g_playerMoveVector.z += inputMove.z;
 
-    if ((GetAsyncKeyState(VK_SPACE) & 0x8000) && g_isGrounded)
+    if (GetAsyncKeyState(VK_SPACE) & 0x8000)
     {
         g_playerMoveVector.y = kJumpVelocity;
-        g_isGrounded = false;
     }
 
-    const D3DXVECTOR3 playerShapeOffset(0.0f, 0.8f, 0.0f);
+    const float playerRadius = 0.5f;
+    const D3DXVECTOR3 playerShapeOffset(0.0f, playerRadius, 0.0f);
     const D3DXVECTOR3 playerShapePosition = g_playerPosition + playerShapeOffset;
     D3DXVECTOR3 correctedPosition = playerShapePosition;
     D3DXVECTOR3 nextMoveVector = g_playerMoveVector;
@@ -431,13 +431,12 @@ void UpdatePlayer()
     std::vector<int> solidIds;
     PhysicsLib::PhysicsLib::CheckCollide(playerShapePosition,
                                          g_playerMoveVector,
-                                         PhysicsLib::PhysicsLib::ShapeType::Cylinder,
+                                         PhysicsLib::PhysicsLib::ShapeType::Sphere,
                                          &correctedPosition,
                                          &nextMoveVector,
                                          &passThroughIds,
                                          &solidIds,
-                                         0.35f,
-                                         1.6f);
+                                         playerRadius);
 
     if (nextMoveVector.y == 0.0f && correctedPosition.y <= playerShapePosition.y)
     {
