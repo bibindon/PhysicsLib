@@ -1,4 +1,4 @@
-#pragma comment( lib, "d3d9.lib" )
+﻿#pragma comment( lib, "d3d9.lib" )
 #if defined(DEBUG) || defined(_DEBUG)
 #pragma comment( lib, "d3dx9d.lib" )
 #else
@@ -55,6 +55,7 @@ int g_movingPlatformId = -1;
 int g_supportObjectId = -1;
 std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
+bool g_prevF2Pressed = false;
 
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
 static void InitD3D(HWND hWnd);
@@ -120,6 +121,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
 
     InitD3D(hWnd);
     PhysicsLib::PhysicsLib::Initialize();
+    PhysicsLib::PhysicsLib::SetIntersectMultithreadEnabled(true);
     InitScene();
     ShowWindow(hWnd, SW_SHOWDEFAULT);
     UpdateWindow(hWnd);
@@ -378,6 +380,14 @@ void UpdatePlayer()
         ResetPlayer();
     }
     g_prevF1Pressed = isF1Pressed;
+
+    bool isF2Pressed = isWindowActive && ((GetAsyncKeyState(VK_F2) & 0x8000) != 0);
+    if (isF2Pressed && !g_prevF2Pressed)
+    {
+        const bool nextEnabled = !PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled();
+        PhysicsLib::PhysicsLib::SetIntersectMultithreadEnabled(nextEnabled);
+    }
+    g_prevF2Pressed = isF2Pressed;
 
     D3DXVECTOR3 movingPlatformDelta(0.0f, 0.0f, 0.0f);
     if (g_movingPlatformId >= 0)
@@ -682,7 +692,8 @@ void Render()
 
     TCHAR msg[256];
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  F1: reset  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SPACE: jump  F1: reset  F2: D3DXIntersect MT=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled() ? _T("ON") : _T("OFF"),
                 (int)g_collectedItemIds.size(),
                 g_playerPosition.x,
                 g_playerPosition.y,
