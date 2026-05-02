@@ -63,5 +63,7 @@ https://github.com/user-attachments/assets/292badbc-a9be-48cc-9c39-0369838ffa25
 ## TODO
 
 - ジャンプ中に `XZ` 軸方向の移動ができないモードの時、坂を上れなくなる
-- D3DXIntersect関数を複数スレッドで呼ぶことができるかもしれない。同じメッシュデータを触らなければ。
+- D3DXIntersect関数を複数スレッドで呼ぶことができるが内部でロックしているのか、速度は変わらない。
+- 4分木空間分割、8分木空間分割でD3DXIntersect関数の実行回数を減らす対策が必要。
+- もしくはD3DXIntersect関数のような交差判定関数を自作する。
 
