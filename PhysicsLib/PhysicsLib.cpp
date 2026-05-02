@@ -30,6 +30,9 @@ constexpr float kHorizontalDamping = 0.5f;
 constexpr float kSkinWidth = 0.01f;
 constexpr int kMaxSlideIterations = 3;
 
+// マルチスレッド化。ほぼ効果なし。やる価値なし。
+#define THREAD_NUM 2
+
 struct LoadedObject
 {
     int id = 0;
@@ -54,7 +57,7 @@ LPDIRECT3DDEVICE9 g_device = NULL;
 std::vector<LoadedObject> g_objects;
 int g_nextId = 1;
 bool g_initialized = false;
-bool g_intersectMultithreadEnabled = true;
+bool g_intersectMultithreadEnabled = false;
 
 struct HitCollection
 {
@@ -396,26 +399,30 @@ bool FindNearestHit(const D3DXVECTOR3& startPosition,
 #if defined(_OPENMP)
     if (g_intersectMultithreadEnabled && meshOrder.size() > 1)
     {
-#pragma omp parallel for schedule(static)
-        for (int meshGroupIndex = 0; meshGroupIndex < static_cast<int>(meshOrder.size()); ++meshGroupIndex)
+        std::vector<HitCollection> threadCollections(THREAD_NUM);
+#pragma omp parallel num_threads(THREAD_NUM)
         {
-            HitCollection localCollection;
-            const std::vector<size_t>& objectIndices = meshGroups[meshOrder[meshGroupIndex]];
-            for (size_t objectListIndex = 0; objectListIndex < objectIndices.size(); ++objectListIndex)
+            HitCollection& threadCollection = threadCollections[omp_get_thread_num()];
+#pragma omp for schedule(static)
+            for (int meshGroupIndex = 0; meshGroupIndex < static_cast<int>(meshOrder.size()); ++meshGroupIndex)
             {
-                const LoadedObject& object = g_objects[objectIndices[objectListIndex]];
-                AccumulateObjectHits(object, startPosition, endPosition, offsets, &localCollection);
+                const std::vector<size_t>& objectIndices = meshGroups[meshOrder[meshGroupIndex]];
+                for (size_t objectListIndex = 0; objectListIndex < objectIndices.size(); ++objectListIndex)
+                {
+                    const LoadedObject& object = g_objects[objectIndices[objectListIndex]];
+                    AccumulateObjectHits(object, startPosition, endPosition, offsets, &threadCollection);
+                }
             }
+        }
 
-#pragma omp critical(FindNearestHitMerge)
-            {
-                MergeHitCollection(localCollection,
-                                   outPassThroughIds,
-                                   outSolidIds,
-                                   &foundSolid,
-                                   &nearestDistance,
-                                   outNearestSolidHit);
-            }
+        for (size_t threadIndex = 0; threadIndex < threadCollections.size(); ++threadIndex)
+        {
+            MergeHitCollection(threadCollections[threadIndex],
+                               outPassThroughIds,
+                               outSolidIds,
+                               &foundSolid,
+                               &nearestDistance,
+                               outNearestSolidHit);
         }
 
         return foundSolid;
@@ -481,7 +488,7 @@ void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 void PhysicsLib::Initialize()
 {
 #if defined(_OPENMP)
-    omp_set_num_threads(2);
+    omp_set_num_threads(THREAD_NUM);
 #endif
 
     if (g_initialized)
