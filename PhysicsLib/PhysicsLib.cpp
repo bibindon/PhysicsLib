@@ -5,7 +5,13 @@
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
+
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
 
 #pragma comment(lib, "d3d9.lib")
 #if defined(DEBUG) || defined(_DEBUG)
@@ -48,6 +54,16 @@ LPDIRECT3DDEVICE9 g_device = NULL;
 std::vector<LoadedObject> g_objects;
 int g_nextId = 1;
 bool g_initialized = false;
+bool g_intersectMultithreadEnabled = true;
+
+struct HitCollection
+{
+    std::unordered_set<int> passThroughIds;
+    std::unordered_set<int> solidIds;
+    bool foundSolid = false;
+    float nearestDistance = std::numeric_limits<float>::max();
+    RaycastHit nearestHit;
+};
 
 void SafeRelease(IUnknown* object)
 {
@@ -264,6 +280,88 @@ bool RaycastObject(const LoadedObject& object,
     return true;
 }
 
+void AccumulateRaycast(const LoadedObject& object,
+                       const D3DXVECTOR3& rayStart,
+                       const D3DXVECTOR3& rayEnd,
+                       HitCollection* inOutCollection)
+{
+    RaycastHit hit;
+    if (!RaycastObject(object, rayStart, rayEnd, &hit))
+    {
+        return;
+    }
+
+    if (hit.objectType == PhysicsLib::ObjectType::PassThrough)
+    {
+        inOutCollection->passThroughIds.insert(hit.objectId);
+        return;
+    }
+
+    inOutCollection->solidIds.insert(hit.objectId);
+
+    if (!inOutCollection->foundSolid || hit.distance < inOutCollection->nearestDistance)
+    {
+        inOutCollection->foundSolid = true;
+        inOutCollection->nearestDistance = hit.distance;
+        inOutCollection->nearestHit = hit;
+    }
+}
+
+void AccumulateObjectHits(const LoadedObject& object,
+                          const D3DXVECTOR3& startPosition,
+                          const D3DXVECTOR3& endPosition,
+                          const std::vector<D3DXVECTOR3>& offsets,
+                          HitCollection* inOutCollection)
+{
+    for (size_t offsetIndex = 0; offsetIndex < offsets.size(); ++offsetIndex)
+    {
+        const D3DXVECTOR3 rayStart = startPosition + offsets[offsetIndex];
+        const D3DXVECTOR3 rayEnd = endPosition + offsets[offsetIndex];
+        AccumulateRaycast(object, rayStart, rayEnd, inOutCollection);
+    }
+}
+
+void MergeHitCollection(const HitCollection& source,
+                        std::vector<int>* outPassThroughIds,
+                        std::vector<int>* outSolidIds,
+                        bool* inOutFoundSolid,
+                        float* inOutNearestDistance,
+                        RaycastHit* outNearestSolidHit)
+{
+    if (outPassThroughIds != nullptr)
+    {
+        for (std::unordered_set<int>::const_iterator it = source.passThroughIds.begin();
+             it != source.passThroughIds.end();
+             ++it)
+        {
+            if (std::find(outPassThroughIds->begin(), outPassThroughIds->end(), *it) == outPassThroughIds->end())
+            {
+                outPassThroughIds->push_back(*it);
+            }
+        }
+    }
+
+    if (outSolidIds != nullptr)
+    {
+        for (std::unordered_set<int>::const_iterator it = source.solidIds.begin();
+             it != source.solidIds.end();
+             ++it)
+        {
+            if (std::find(outSolidIds->begin(), outSolidIds->end(), *it) == outSolidIds->end())
+            {
+                outSolidIds->push_back(*it);
+            }
+        }
+    }
+
+    if (source.foundSolid && source.nearestDistance < *inOutNearestDistance)
+    {
+        *inOutNearestDistance = source.nearestDistance;
+        *outNearestSolidHit = source.nearestHit;
+        *inOutFoundSolid = true;
+    }
+}
+
 bool FindNearestHit(const D3DXVECTOR3& startPosition,
                     const D3DXVECTOR3& moveVector,
                     PhysicsLib::ShapeType shapeType,
@@ -279,43 +377,67 @@ bool FindNearestHit(const D3DXVECTOR3& startPosition,
     const D3DXVECTOR3 endPosition = startPosition + moveVector;
     bool foundSolid = false;
     float nearestDistance = std::numeric_limits<float>::max();
+    std::unordered_map<LPD3DXMESH, std::vector<size_t> > meshGroups;
+    std::vector<LPD3DXMESH> meshOrder;
+    meshGroups.reserve(g_objects.size());
+    meshOrder.reserve(g_objects.size());
 
     for (size_t objectIndex = 0; objectIndex < g_objects.size(); ++objectIndex)
     {
-        for (size_t offsetIndex = 0; offsetIndex < offsets.size(); ++offsetIndex)
+        const LPD3DXMESH mesh = g_objects[objectIndex].mesh;
+        if (meshGroups.find(mesh) == meshGroups.end())
         {
-            const D3DXVECTOR3 rayStart = startPosition + offsets[offsetIndex];
-            const D3DXVECTOR3 rayEnd = endPosition + offsets[offsetIndex];
+            meshOrder.push_back(mesh);
+        }
 
-            RaycastHit hit;
-            if (!RaycastObject(g_objects[objectIndex], rayStart, rayEnd, &hit))
+        meshGroups[mesh].push_back(objectIndex);
+    }
+
+#if defined(_OPENMP)
+    if (g_intersectMultithreadEnabled && meshOrder.size() > 1)
+    {
+#pragma omp parallel for schedule(static)
+        for (int meshGroupIndex = 0; meshGroupIndex < static_cast<int>(meshOrder.size()); ++meshGroupIndex)
+        {
+            HitCollection localCollection;
+            const std::vector<size_t>& objectIndices = meshGroups[meshOrder[meshGroupIndex]];
+            for (size_t objectListIndex = 0; objectListIndex < objectIndices.size(); ++objectListIndex)
             {
-                continue;
+                const LoadedObject& object = g_objects[objectIndices[objectListIndex]];
+                AccumulateObjectHits(object, startPosition, endPosition, offsets, &localCollection);
             }
 
-            if (hit.objectType == PhysicsLib::ObjectType::PassThrough)
+#pragma omp critical(FindNearestHitMerge)
             {
-                if (outPassThroughIds != nullptr &&
-                    std::find(outPassThroughIds->begin(), outPassThroughIds->end(), hit.objectId) == outPassThroughIds->end())
-                {
-                    outPassThroughIds->push_back(hit.objectId);
-                }
-                continue;
-            }
-
-            if (outSolidIds != nullptr &&
-                std::find(outSolidIds->begin(), outSolidIds->end(), hit.objectId) == outSolidIds->end())
-            {
-                outSolidIds->push_back(hit.objectId);
-            }
-
-            if (hit.distance < nearestDistance)
-            {
-                nearestDistance = hit.distance;
-                *outNearestSolidHit = hit;
-                foundSolid = true;
+                MergeHitCollection(localCollection,
+                                   outPassThroughIds,
+                                   outSolidIds,
+                                   &foundSolid,
+                                   &nearestDistance,
+                                   outNearestSolidHit);
             }
         }
+
+        return foundSolid;
+    }
+#endif
+
+    for (size_t meshGroupIndex = 0; meshGroupIndex < meshOrder.size(); ++meshGroupIndex)
+    {
+        HitCollection localCollection;
+        const std::vector<size_t>& objectIndices = meshGroups[meshOrder[meshGroupIndex]];
+        for (size_t objectListIndex = 0; objectListIndex < objectIndices.size(); ++objectListIndex)
+        {
+            const LoadedObject& object = g_objects[objectIndices[objectListIndex]];
+            AccumulateObjectHits(object, startPosition, endPosition, offsets, &localCollection);
+        }
+
+        MergeHitCollection(localCollection,
+                           outPassThroughIds,
+                           outSolidIds,
+                           &foundSolid,
+                           &nearestDistance,
+                           outNearestSolidHit);
     }
 
     return foundSolid;
@@ -419,6 +541,16 @@ void PhysicsLib::Update(float deltaSeconds)
             g_objects[i].transform.position += g_objects[i].transform.velocity * deltaSeconds;
         }
     }
+}
+
+void PhysicsLib::SetIntersectMultithreadEnabled(bool enabled)
+{
+    g_intersectMultithreadEnabled = enabled;
+}
+
+bool PhysicsLib::IsIntersectMultithreadEnabled()
+{
+    return g_intersectMultithreadEnabled;
 }
 
 int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
