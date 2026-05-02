@@ -72,6 +72,7 @@ static void UpdatePlayer();
 static void SyncSceneFromPhysics();
 static LPD3DXMESH CreateBoxMesh(float width, float height, float depth);
 static LPD3DXMESH CreateSphereMesh(float radius);
+static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path);
 static void SaveCollisionMesh(LPD3DXMESH mesh, const TCHAR* path);
 static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXVECTOR3& position,
@@ -350,6 +351,36 @@ void InitScene()
     PhysicsLib::PhysicsLib::SetVelocity(g_movingPlatformId, D3DXVECTOR3(1.5f, 0.0f, 0.0f));
     g_worldObjects.push_back({ movingPlatformMesh, g_movingPlatformId, D3DXVECTOR3(0.0f, 2.5f, 7.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f), false });
 
+    LPD3DXMESH manyEdgesMesh = LoadSceneMeshFromX(_T("cubeManyEdges.x"));
+    const float manyEdgesSpacingX = 3.6f;
+    const float manyEdgesSpacingZ = 3.6f;
+    const D3DXVECTOR3 manyEdgesBase(-7.2f, 0.75f, -5.4f);
+    for (int row = 0; row < 34; ++row)
+    {
+        for (int col = 0; col < 5; ++col)
+        {
+            const D3DXVECTOR3 objectPosition(manyEdgesBase.x + col * manyEdgesSpacingX,
+                                             manyEdgesBase.y,
+                                             manyEdgesBase.z + row * manyEdgesSpacingZ);
+            const D3DXVECTOR3 objectRotation(0.0f,
+                                             (row * 5 + col) * (D3DX_PI / 10.0f),
+                                             0.0f);
+            const D3DXVECTOR3 objectScale(0.75f, 0.75f, 0.75f);
+            const D3DXCOLOR objectColor(0.30f + 0.12f * col,
+                                        0.35f + 0.10f * row,
+                                        0.85f - 0.10f * row,
+                                        1.0f);
+            const int objectId = PhysicsLib::PhysicsLib::Load(_T("cubeManyEdges.x"),
+                                                              PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                              0.6f);
+            PhysicsLib::PhysicsLib::SetTransform(objectId,
+                                                 objectPosition,
+                                                 objectRotation,
+                                                 objectScale);
+            g_worldObjects.push_back({ manyEdgesMesh, objectId, objectPosition, objectScale, objectRotation, objectColor, false });
+        }
+    }
+
     const D3DXVECTOR3 itemPositions[] =
     {
         D3DXVECTOR3(-2.0f, 0.5f, 2.0f),
@@ -581,6 +612,22 @@ LPD3DXMESH CreateSphereMesh(float radius)
 {
     LPD3DXMESH mesh = NULL;
     HRESULT hResult = D3DXCreateSphere(g_pd3dDevice, radius, 24, 24, &mesh, NULL);
+    assert(hResult == S_OK);
+    g_ownedSceneMeshes.push_back(mesh);
+    return mesh;
+}
+
+LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path)
+{
+    LPD3DXMESH mesh = NULL;
+    HRESULT hResult = D3DXLoadMeshFromX(path,
+                                        D3DXMESH_SYSTEMMEM,
+                                        g_pd3dDevice,
+                                        NULL,
+                                        NULL,
+                                        NULL,
+                                        NULL,
+                                        &mesh);
     assert(hResult == S_OK);
     g_ownedSceneMeshes.push_back(mesh);
     return mesh;

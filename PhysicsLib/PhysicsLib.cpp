@@ -480,6 +480,10 @@ void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 
 void PhysicsLib::Initialize()
 {
+#if defined(_OPENMP)
+    omp_set_num_threads(2);
+#endif
+
     if (g_initialized)
     {
         return;
