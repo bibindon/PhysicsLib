@@ -4,9 +4,11 @@
 #else
 #pragma comment( lib, "d3dx9.lib" )
 #endif
+#pragma comment( lib, "winmm.lib" )
 
 #include <d3d9.h>
 #include <d3dx9.h>
+#include <mmsystem.h>
 #include <tchar.h>
 #include <cassert>
 #include <crtdbg.h>
@@ -38,6 +40,7 @@ struct SceneObject
 LPDIRECT3D9 g_pD3D = NULL;
 LPDIRECT3DDEVICE9 g_pd3dDevice = NULL;
 LPD3DXFONT g_pFont = NULL;
+LPD3DXFONT g_pFpsFont = NULL;
 LPD3DXMESH g_pCubeMesh = NULL;
 std::vector<D3DMATERIAL9> g_pMaterials;
 std::vector<LPDIRECT3DTEXTURE9> g_pTextures;
@@ -56,6 +59,10 @@ int g_supportObjectId = -1;
 std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
 bool g_prevF2Pressed = false;
+float g_displayFps = 0.0f;
+int g_fpsFrameCount = 0;
+ULONGLONG g_fpsLastUpdateTick = 0;
+bool g_timerPeriodEnabled = false;
 
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
 static void InitD3D(HWND hWnd);
@@ -118,6 +125,8 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
                              wc.hInstance,
                              NULL);
     g_mainWindow = hWnd;
+
+    g_timerPeriodEnabled = (timeBeginPeriod(1) == TIMERR_NOERROR);
 
     InitD3D(hWnd);
     PhysicsLib::PhysicsLib::Initialize();
@@ -182,7 +191,7 @@ void InitD3D(HWND hWnd)
     d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
     d3dpp.hDeviceWindow = hWnd;
     d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
-    d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
+    d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 
     hResult = g_pD3D->CreateDevice(D3DADAPTER_DEFAULT,
                                    D3DDEVTYPE_HAL,
@@ -214,6 +223,20 @@ void InitD3D(HWND hWnd)
                              FF_DONTCARE,
                              _T("ＭＳ ゴシック"),
                              &g_pFont);
+    assert(hResult == S_OK);
+
+    hResult = D3DXCreateFont(g_pd3dDevice,
+                             48,
+                             0,
+                             FW_BOLD,
+                             1,
+                             FALSE,
+                             SHIFTJIS_CHARSET,
+                             OUT_TT_ONLY_PRECIS,
+                             CLEARTYPE_NATURAL_QUALITY,
+                             FF_DONTCARE,
+                             _T("ＭＳ ゴシック"),
+                             &g_pFpsFont);
     assert(hResult == S_OK);
 
     LPD3DXBUFFER pD3DXMtrlBuffer = NULL;
@@ -670,13 +693,37 @@ void Cleanup()
     g_ownedSceneMeshes.clear();
     SAFE_RELEASE(g_pCubeMesh);
     SAFE_RELEASE(g_pEffect);
+    SAFE_RELEASE(g_pFpsFont);
     SAFE_RELEASE(g_pFont);
     SAFE_RELEASE(g_pd3dDevice);
     SAFE_RELEASE(g_pD3D);
+
+    if (g_timerPeriodEnabled)
+    {
+        timeEndPeriod(1);
+        g_timerPeriodEnabled = false;
+    }
 }
 
 void Render()
 {
+    ++g_fpsFrameCount;
+    const ULONGLONG currentTick = GetTickCount64();
+    if (g_fpsLastUpdateTick == 0)
+    {
+        g_fpsLastUpdateTick = currentTick;
+    }
+    else
+    {
+        const ULONGLONG elapsedTick = currentTick - g_fpsLastUpdateTick;
+        if (elapsedTick >= 1000)
+        {
+            g_displayFps = static_cast<float>(g_fpsFrameCount) * 1000.0f / static_cast<float>(elapsedTick);
+            g_fpsFrameCount = 0;
+            g_fpsLastUpdateTick = currentTick;
+        }
+    }
+
     HRESULT hResult = E_FAIL;
 
     hResult = g_pd3dDevice->Clear(0,
@@ -690,6 +737,10 @@ void Render()
     hResult = g_pd3dDevice->BeginScene();
     assert(hResult == S_OK);
 
+    TCHAR fpsText[64];
+    _stprintf_s(fpsText, _T("FPS %.1f"), g_displayFps);
+    TextDraw(g_pFpsFont, fpsText, 20, 16);
+
     TCHAR msg[256];
     _stprintf_s(msg,
                 _T("WASD: move  SPACE: jump  F1: reset  F2: D3DXIntersect MT=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
@@ -698,7 +749,7 @@ void Render()
                 g_playerPosition.x,
                 g_playerPosition.y,
                 g_playerPosition.z);
-    TextDraw(g_pFont, msg, 20, 20);
+    TextDraw(g_pFont, msg, 20, 72);
 
     hResult = g_pEffect->SetTechnique("Technique1");
     assert(hResult == S_OK);
