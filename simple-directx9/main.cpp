@@ -365,7 +365,7 @@ void InitScene()
     const float manyEdgesSpacingX = 7.2f;
     const float manyEdgesSpacingZ = 7.2f;
     const D3DXVECTOR3 manyEdgesBase(-7.2f, 0.75f, -5.4f);
-    for (int row = 0; row < 34; ++row)
+    for (int row = 0; row < 10; ++row)
     {
         for (int col = 0; col < 5; ++col)
         {
@@ -855,7 +855,7 @@ void OnMouseMove(LPARAM lParam)
         const LONG deltaX = currentPosition.x - g_lastMousePosition.x;
         const LONG deltaY = currentPosition.y - g_lastMousePosition.y;
         g_cameraYaw -= deltaX * 0.005f;
-        g_cameraPitch -= deltaY * 0.005f;
+        g_cameraPitch += deltaY * 0.005f;
         g_cameraPitch = ClampFloat(g_cameraPitch, D3DXToRadian(-20.0f), D3DXToRadian(70.0f));
     }
 
