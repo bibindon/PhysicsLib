@@ -319,7 +319,7 @@ void InitScene()
     SaveCollisionMesh(groundMesh, _T("collision_ground.x"));
     const int groundId = PhysicsLib::PhysicsLib::Load(_T("collision_ground.x"),
                                                       PhysicsLib::PhysicsLib::ObjectType::Slide,
-                                                      0.8f);
+                                                      0.0f);
     PhysicsLib::PhysicsLib::SetTransform(groundId,
                                          D3DXVECTOR3(0.0f, -0.5f, 0.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
@@ -330,7 +330,7 @@ void InitScene()
     SaveCollisionMesh(slopeMesh, _T("collision_slope.x"));
     const int slopeId = PhysicsLib::PhysicsLib::Load(_T("collision_slope.x"),
                                                      PhysicsLib::PhysicsLib::ObjectType::Slide,
-                                                     0.7f);
+                                                     0.0f);
     PhysicsLib::PhysicsLib::SetTransform(slopeId,
                                          D3DXVECTOR3(4.0f, 0.75f, 0.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
@@ -341,7 +341,7 @@ void InitScene()
     SaveCollisionMesh(wallMesh, _T("collision_wall.x"));
     const int wallId = PhysicsLib::PhysicsLib::Load(_T("collision_wall.x"),
                                                     PhysicsLib::PhysicsLib::ObjectType::Slide,
-                                                    0.4f);
+                                                    0.0f);
     PhysicsLib::PhysicsLib::SetTransform(wallId,
                                          D3DXVECTOR3(-6.0f, 1.5f, 0.0f),
                                          D3DXVECTOR3(0.0f, D3DXToRadian(18.0f), 0.0f),
@@ -352,7 +352,7 @@ void InitScene()
     SaveCollisionMesh(bigSphereMesh, _T("collision_big_sphere.x"));
     const int bigSphereId = PhysicsLib::PhysicsLib::Load(_T("collision_big_sphere.x"),
                                                          PhysicsLib::PhysicsLib::ObjectType::Slide,
-                                                         0.5f);
+                                                         0.0f);
     PhysicsLib::PhysicsLib::SetTransform(bigSphereId,
                                          D3DXVECTOR3(6.5f, 2.0f, 4.5f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
@@ -363,7 +363,7 @@ void InitScene()
     SaveCollisionMesh(movingPlatformMesh, _T("collision_moving_platform.x"));
     g_movingPlatformId = PhysicsLib::PhysicsLib::Load(_T("collision_moving_platform.x"),
                                                       PhysicsLib::PhysicsLib::ObjectType::MovingSlide,
-                                                      0.9f);
+                                                      0.0f);
     PhysicsLib::PhysicsLib::SetTransform(g_movingPlatformId,
                                          D3DXVECTOR3(0.0f, 2.5f, 7.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
@@ -392,7 +392,7 @@ void InitScene()
                                         1.0f);
             const int objectId = PhysicsLib::PhysicsLib::Load(_T("cubeManyEdges.x"),
                                                               PhysicsLib::PhysicsLib::ObjectType::Slide,
-                                                              0.6f);
+                                                              0.0f);
             PhysicsLib::PhysicsLib::SetTransform(objectId,
                                                  objectPosition,
                                                  objectRotation,

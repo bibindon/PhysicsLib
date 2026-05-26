@@ -27,8 +27,9 @@ namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
 constexpr float kGravityPerFrame = 9.8f * kDeltaSeconds;
-constexpr float kHorizontalDamping = 0.5f;
+constexpr float kHorizontalDamping = 1.0f;
 constexpr float kSkinWidth = 0.01f;
+constexpr float kGroundNormalY = 0.5f;
 constexpr int kMaxSlideIterations = 3;
 constexpr int kQuadTreeLevel = 6;
 
@@ -567,6 +568,15 @@ void AccumulateRaycast(const LoadedObject& object,
         return;
     }
 
+    const D3DXVECTOR3 rayMove = rayEnd - rayStart;
+    const float normalMove = D3DXVec3Dot(&rayMove, &hit.normal);
+    const bool isGroundContact = hit.normal.y > kGroundNormalY && hit.distance <= kSkinWidth;
+    if (isGroundContact && normalMove >= -0.0001f)
+    {
+        inOutCollection->solidIds.insert(hit.objectId);
+        return;
+    }
+
     inOutCollection->solidIds.insert(hit.objectId);
 
     if (!inOutCollection->foundSolid || hit.distance < inOutCollection->nearestDistance)
@@ -889,13 +899,13 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 
         D3DXVECTOR3 unresolvedMove = remainingMove - moveDirection * nearestHit.distance;
         D3DXVECTOR3 slideMove = ResolveSlide(unresolvedMove, nearestHit.normal);
-        if (stopOnNonGroundHit && nearestHit.normal.y <= 0.5f)
+        if (stopOnNonGroundHit && nearestHit.normal.y <= kGroundNormalY)
         {
             remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
             break;
         }
 
-        if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
+        if (nearestHit.normal.y > kGroundNormalY && nextMoveVector.y < 0.0f)
         {
             nextMoveVector.y = 0.0f;
             slideMove.y = 0.0f;
