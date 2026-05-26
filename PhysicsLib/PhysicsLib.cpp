@@ -892,6 +892,20 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 
         collided = true;
 
+        const bool isGroundContact = nearestHit.normal.y > kGroundNormalY && nearestHit.distance <= kSkinWidth;
+        if (isGroundContact)
+        {
+            D3DXVECTOR3 slideMove = ResolveSlide(remainingMove, nearestHit.normal);
+            if (nextMoveVector.y < 0.0f)
+            {
+                nextMoveVector.y = 0.0f;
+                slideMove.y = 0.0f;
+            }
+
+            remainingMove = slideMove;
+            continue;
+        }
+
         const D3DXVECTOR3 moveDirection = remainingMove / totalMoveLength;
         const float safeDistance = std::max(0.0f, nearestHit.distance - kSkinWidth);
         currentPositionForSlide += moveDirection * safeDistance;
