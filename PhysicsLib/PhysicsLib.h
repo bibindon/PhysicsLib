@@ -98,6 +98,7 @@ public:
     D3DXVECTOR3 GetVelocity() const;
 
     bool IsGrounded() const;
+    bool IsTouchingWall() const;
     int GetSupportObjectId() const;
 
     bool Update(const D3DXVECTOR3& inputDirection,
@@ -110,6 +111,7 @@ private:
     D3DXVECTOR3 m_position;
     D3DXVECTOR3 m_velocity;
     bool m_isGrounded;
+    bool m_isTouchingWall;
     int m_supportObjectId;
     int m_remainingAirJumps;
 };

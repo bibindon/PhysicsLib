@@ -839,7 +839,9 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
                           float radius,
                           float height,
                           bool applyHorizontalDamping,
-                          bool stopOnNonGroundHit)
+                          bool stopOnNonGroundHit,
+                          bool* outGroundContact,
+                          bool* outWallContact)
 {
     EnsureInitialized();
 
@@ -882,6 +884,8 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 
     D3DXVECTOR3 currentPositionForSlide = currentPosition;
     D3DXVECTOR3 remainingMove = frameMove;
+    bool groundContact = false;
+    bool wallContact = false;
 
     for (int iteration = 0; iteration < kMaxSlideIterations; ++iteration)
     {
@@ -911,6 +915,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         const bool isGroundContact = nearestHit.normal.y > kGroundNormalY && nearestHit.distance <= kSkinWidth;
         if (isGroundContact)
         {
+            groundContact = true;
             D3DXVECTOR3 slideMove = ResolveSlide(remainingMove, nearestHit.normal);
             nextPosition = currentPositionForSlide;
             if (nextMoveVector.y < 0.0f)
@@ -932,14 +937,20 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         D3DXVECTOR3 slideMove = ResolveSlide(unresolvedMove, nearestHit.normal);
         if (stopOnNonGroundHit && nearestHit.normal.y <= kGroundNormalY)
         {
+            wallContact = true;
             remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
             break;
         }
 
         if (nearestHit.normal.y > kGroundNormalY && nextMoveVector.y < 0.0f)
         {
+            groundContact = true;
             nextMoveVector.y = 0.0f;
             slideMove.y = 0.0f;
+        }
+        else if (nearestHit.normal.y <= kGroundNormalY)
+        {
+            wallContact = true;
         }
 
         if (iteration == kMaxSlideIterations - 1)
@@ -971,6 +982,14 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 
     *outPosition = nextPosition;
     *outNextMoveVector = nextMoveVector;
+    if (outGroundContact != nullptr)
+    {
+        *outGroundContact = groundContact;
+    }
+    if (outWallContact != nullptr)
+    {
+        *outWallContact = wallContact;
+    }
     return collided;
 }
 }
@@ -1131,13 +1150,16 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 radius,
                                 height,
                                 true,
-                                false);
+                                false,
+                                nullptr,
+                                nullptr);
 }
 
 CharacterMover::CharacterMover()
     : m_position(0.0f, 0.0f, 0.0f),
       m_velocity(0.0f, 0.0f, 0.0f),
       m_isGrounded(true),
+      m_isTouchingWall(false),
       m_supportObjectId(-1),
       m_remainingAirJumps(0)
 {
@@ -1147,6 +1169,7 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
     : m_position(position),
       m_velocity(0.0f, 0.0f, 0.0f),
       m_isGrounded(true),
+      m_isTouchingWall(false),
       m_supportObjectId(-1),
       m_remainingAirJumps(0)
 {
@@ -1187,6 +1210,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_position = position;
     m_velocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     m_isGrounded = true;
+    m_isTouchingWall = false;
     m_supportObjectId = -1;
     m_remainingAirJumps = 0;
 }
@@ -1214,6 +1238,11 @@ D3DXVECTOR3 CharacterMover::GetVelocity() const
 bool CharacterMover::IsGrounded() const
 {
     return m_isGrounded;
+}
+
+bool CharacterMover::IsTouchingWall() const
+{
+    return m_isTouchingWall;
 }
 
 int CharacterMover::GetSupportObjectId() const
@@ -1273,6 +1302,8 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     D3DXVECTOR3 nextVelocity = m_velocity;
 
     const bool wasGrounded = m_isGrounded;
+    bool groundContact = false;
+    bool wallContact = false;
     const bool collided = CheckCollideInternal(shapePosition,
                                               m_velocity,
                                               m_settings.shapeType,
@@ -1283,9 +1314,12 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                               m_settings.radius,
                                               m_settings.height,
                                               false,
-                                              !wasGrounded);
+                                              !wasGrounded,
+                                              &groundContact,
+                                              &wallContact);
 
     m_isGrounded = nextVelocity.y == 0.0f;
+    m_isTouchingWall = wallContact;
     m_supportObjectId = -1;
     if (m_isGrounded && outSolidIds != nullptr && !outSolidIds->empty())
     {

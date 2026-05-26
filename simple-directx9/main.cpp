@@ -11,6 +11,7 @@
 #include <mmsystem.h>
 #include <tchar.h>
 #include <cassert>
+#include <cmath>
 #include <crtdbg.h>
 #include <set>
 #include <string>
@@ -848,6 +849,20 @@ void Render()
                 playerPosition.y,
                 playerPosition.z);
     TextDraw(g_pFont, msg, 20, 72);
+
+    TCHAR contactText[256];
+    const D3DXVECTOR3 playerVelocity = g_playerMover.GetVelocity();
+    const float playerSpeed = sqrtf(playerVelocity.x * playerVelocity.x +
+                                    playerVelocity.z * playerVelocity.z);
+    _stprintf_s(contactText,
+                _T("Ground=%s  Wall=%s  Velocity(%.2f, %.2f, %.2f)  Speed=%.2f"),
+                g_playerMover.IsGrounded() ? _T("ON") : _T("OFF"),
+                g_playerMover.IsTouchingWall() ? _T("ON") : _T("OFF"),
+                playerVelocity.x,
+                playerVelocity.y,
+                playerVelocity.z,
+                playerSpeed);
+    TextDraw(g_pFont, contactText, 20, 100);
 
     hResult = g_pEffect->SetTechnique("Technique1");
     assert(hResult == S_OK);
