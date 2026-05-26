@@ -967,7 +967,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         nextPosition = currentPositionForSlide + remainingMove;
     }
 
-    if (D3DXVec3Length(&frameMove) > 0.0001f)
+    if (D3DXVec3Length(&frameMove) > 0.0001f && (!groundContact || wallContact))
     {
         D3DXVECTOR3 actualFrameMove = nextPosition - currentPosition;
         nextMoveVector.x = actualFrameMove.x / kDeltaSeconds;

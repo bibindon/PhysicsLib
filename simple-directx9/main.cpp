@@ -316,7 +316,7 @@ void InitScene()
     }
     g_ownedSceneMeshes.clear();
 
-    LPD3DXMESH groundMesh = CreateBoxMesh(24.0f, 1.0f, 24.0f);
+    LPD3DXMESH groundMesh = CreateBoxMesh(120.0f, 1.0f, 120.0f);
     SaveCollisionMesh(groundMesh, _T("collision_ground.x"));
     const int groundId = PhysicsLib::PhysicsLib::Load(_T("collision_ground.x"),
                                                       PhysicsLib::PhysicsLib::ObjectType::Slide,
