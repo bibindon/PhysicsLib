@@ -24,7 +24,7 @@
 const int IDC_DOUBLE_JUMP_CHECKBOX = 1001;
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
-const float kPlayerSpeed = 18.0f;
+const float kPlayerSpeed = 5.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
