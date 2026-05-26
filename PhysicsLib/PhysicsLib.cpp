@@ -3,6 +3,7 @@
 #include <d3d9.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -540,6 +541,21 @@ bool RaycastObject(const LoadedObject& object,
     D3DXVec3TransformNormal(&worldNormal, &localNormal, &inverseTransposeWorld);
     D3DXVec3Normalize(&worldNormal, &worldNormal);
 
+    const D3DXVECTOR3 rayVectorWorld = rayEndWorld - rayOriginWorld;
+    D3DXVECTOR3 rayDirectionWorld = rayVectorWorld;
+    D3DXVec3Normalize(&rayDirectionWorld, &rayDirectionWorld);
+    const float normalDirection = D3DXVec3Dot(&worldNormal, &rayDirectionWorld);
+    if (normalDirection > 0.0f)
+    {
+        worldNormal = -worldNormal;
+    }
+    else if (std::abs(normalDirection) <= 0.0001f &&
+             std::abs(worldNormal.y) > kGroundNormalY &&
+             worldNormal.y < 0.0f)
+    {
+        worldNormal = -worldNormal;
+    }
+
     D3DXVECTOR3 worldHitOffset = worldHitPoint - rayOriginWorld;
 
     outHit->hit = true;
@@ -896,6 +912,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         if (isGroundContact)
         {
             D3DXVECTOR3 slideMove = ResolveSlide(remainingMove, nearestHit.normal);
+            nextPosition = currentPositionForSlide;
             if (nextMoveVector.y < 0.0f)
             {
                 nextMoveVector.y = 0.0f;
