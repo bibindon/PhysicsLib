@@ -51,12 +51,8 @@ HWND g_mainWindow = NULL;
 std::vector<LPD3DXMESH> g_ownedSceneMeshes;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
-D3DXVECTOR3 g_playerPosition(0.0f, 0.0f, 0.0f);
-D3DXVECTOR3 g_playerMoveVector(0.0f, 0.0f, 0.0f);
-bool g_isGrounded = true;
-bool g_airControlEnabled = false;
+PhysicsLib::CharacterMover g_playerMover(kPlayerStartPosition);
 int g_movingPlatformId = -1;
-int g_supportObjectId = -1;
 std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
 bool g_prevF2Pressed = false;
@@ -421,10 +417,18 @@ void InitScene()
 
 void ResetPlayer()
 {
-    g_playerPosition = kPlayerStartPosition;
-    g_playerMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    g_isGrounded = true;
-    g_supportObjectId = -1;
+    PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
+    settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Sphere;
+    settings.shapeOffset = D3DXVECTOR3(0.0f, 0.5f, 0.0f);
+    settings.radius = 0.5f;
+    settings.height = 0.0f;
+    settings.moveSpeed = kPlayerSpeed;
+    settings.jumpVelocity = kJumpVelocity;
+    settings.keepHorizontalVelocityOnJump = true;
+    settings.groundDamping = 0.5f;
+    settings.airDamping = 1.0f;
+    g_playerMover.SetSettings(settings);
+    g_playerMover.Reset(kPlayerStartPosition);
 }
 
 void UpdatePlayer()
@@ -448,7 +452,9 @@ void UpdatePlayer()
     bool isF3Pressed = isWindowActive && ((GetAsyncKeyState(VK_F3) & 0x8000) != 0);
     if (isF3Pressed && !g_prevF3Pressed)
     {
-        g_airControlEnabled = !g_airControlEnabled;
+        PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
+        settings.airControlEnabled = !settings.airControlEnabled;
+        g_playerMover.SetSettings(settings);
     }
     g_prevF3Pressed = isF3Pressed;
 
@@ -467,9 +473,9 @@ void UpdatePlayer()
         PhysicsLib::PhysicsLib::Update();
     }
 
-    if (g_supportObjectId == g_movingPlatformId)
+    if (g_playerMover.GetSupportObjectId() == g_movingPlatformId)
     {
-        g_playerPosition += movingPlatformDelta;
+        g_playerMover.SetPosition(g_playerMover.GetPosition() + movingPlatformDelta);
     }
 
     if (g_movingPlatformId >= 0)
@@ -486,73 +492,34 @@ void UpdatePlayer()
     }
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
-    const bool canApplyMoveInput = g_airControlEnabled || g_isGrounded;
 
-    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('W') & 0x8000))
+    if (isWindowActive && (GetAsyncKeyState('W') & 0x8000))
     {
         inputMove.z += 1.0f;
     }
-    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('S') & 0x8000))
+    if (isWindowActive && (GetAsyncKeyState('S') & 0x8000))
     {
         inputMove.z -= 1.0f;
     }
-    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('A') & 0x8000))
+    if (isWindowActive && (GetAsyncKeyState('A') & 0x8000))
     {
         inputMove.x -= 1.0f;
     }
-    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('D') & 0x8000))
+    if (isWindowActive && (GetAsyncKeyState('D') & 0x8000))
     {
         inputMove.x += 1.0f;
     }
 
-    if (inputMove.x != 0.0f || inputMove.z != 0.0f)
-    {
-        D3DXVec3Normalize(&inputMove, &inputMove);
-        inputMove *= kPlayerSpeed;
-    }
-
-    g_playerMoveVector.x += inputMove.x;
-    g_playerMoveVector.z += inputMove.z;
-
-    if (isWindowActive && (GetAsyncKeyState(VK_SPACE) & 0x8000))
-    {
-        g_playerMoveVector.y = kJumpVelocity;
-    }
-
-    const float playerRadius = 0.5f;
-    const D3DXVECTOR3 playerShapeOffset(0.0f, playerRadius, 0.0f);
-    const D3DXVECTOR3 playerShapePosition = g_playerPosition + playerShapeOffset;
-    D3DXVECTOR3 correctedPosition = playerShapePosition;
-    D3DXVECTOR3 nextMoveVector = g_playerMoveVector;
     std::vector<int> passThroughIds;
     std::vector<int> solidIds;
-    PhysicsLib::PhysicsLib::CheckCollide(playerShapePosition,
-                                         g_playerMoveVector,
-                                         PhysicsLib::PhysicsLib::ShapeType::Sphere,
-                                         &correctedPosition,
-                                         &nextMoveVector,
-                                         &passThroughIds,
-                                         &solidIds,
-                                         playerRadius);
-
-    if (nextMoveVector.y == 0.0f)
-    {
-        g_isGrounded = true;
-        g_supportObjectId = solidIds.empty() ? -1 : solidIds.front();
-    }
-    else
-    {
-        g_isGrounded = false;
-        g_supportObjectId = -1;
-    }
+    const bool jump = isWindowActive && ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0);
+    g_playerMover.Update(inputMove, jump, &passThroughIds, &solidIds);
 
     for (size_t i = 0; i < passThroughIds.size(); ++i)
     {
         g_collectedItemIds.insert(passThroughIds[i]);
     }
 
-    g_playerPosition = correctedPosition - playerShapeOffset;
-    g_playerMoveVector = nextMoveVector;
     SyncSceneFromPhysics();
 }
 
@@ -777,14 +744,16 @@ void Render()
     TextDraw(g_pFpsFont, fpsText, 20, 16);
 
     TCHAR msg[256];
+    const D3DXVECTOR3 playerPosition = g_playerMover.GetPosition();
+    const bool airControlEnabled = g_playerMover.GetSettings().airControlEnabled;
     _stprintf_s(msg,
                 _T("WASD: move  SPACE: jump  F1: reset  F2: D3DXIntersect MT=%s  F3: AirControl=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
                 PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled() ? _T("ON") : _T("OFF"),
-                g_airControlEnabled ? _T("ON") : _T("OFF"),
+                airControlEnabled ? _T("ON") : _T("OFF"),
                 (int)g_collectedItemIds.size(),
-                g_playerPosition.x,
-                g_playerPosition.y,
-                g_playerPosition.z);
+                playerPosition.x,
+                playerPosition.y,
+                playerPosition.z);
     TextDraw(g_pFont, msg, 20, 72);
 
     hResult = g_pEffect->SetTechnique("Technique1");
@@ -823,7 +792,7 @@ void Render()
     }
 
     DrawMesh(g_pCubeMesh,
-             g_playerPosition + D3DXVECTOR3(0.0f, 0.5f, 0.0f),
+             g_playerMover.GetPosition() + D3DXVECTOR3(0.0f, 0.5f, 0.0f),
              D3DXVECTOR3(1.0f, 1.0f, 1.0f),
              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
              D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f),

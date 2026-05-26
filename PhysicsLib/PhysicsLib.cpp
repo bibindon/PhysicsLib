@@ -769,6 +769,130 @@ void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
         throw std::runtime_error("Failed to load collision mesh.");
     }
 }
+
+bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
+                          const D3DXVECTOR3& moveVector,
+                          PhysicsLib::ShapeType shapeType,
+                          D3DXVECTOR3* outPosition,
+                          D3DXVECTOR3* outNextMoveVector,
+                          std::vector<int>* outPassThroughIds,
+                          std::vector<int>* outSolidIds,
+                          float radius,
+                          float height,
+                          bool applyHorizontalDamping)
+{
+    EnsureInitialized();
+
+    if (outPosition == nullptr)
+    {
+        throw std::invalid_argument("outPosition must not be null.");
+    }
+
+    if (outNextMoveVector == nullptr)
+    {
+        throw std::invalid_argument("outNextMoveVector must not be null.");
+    }
+
+    if (shapeType == PhysicsLib::ShapeType::Sphere && radius < 0.0f)
+    {
+        throw std::out_of_range("Sphere radius must not be negative.");
+    }
+
+    if (shapeType == PhysicsLib::ShapeType::Cylinder && (radius < 0.0f || height < 0.0f))
+    {
+        throw std::out_of_range("Cylinder radius and height must not be negative.");
+    }
+
+    if (outPassThroughIds != nullptr)
+    {
+        outPassThroughIds->clear();
+    }
+
+    if (outSolidIds != nullptr)
+    {
+        outSolidIds->clear();
+    }
+
+    D3DXVECTOR3 nextMoveVector = moveVector;
+    nextMoveVector.y -= kGravityPerFrame;
+
+    D3DXVECTOR3 frameMove = nextMoveVector * kDeltaSeconds;
+    D3DXVECTOR3 nextPosition = currentPosition + frameMove;
+    bool collided = false;
+
+    D3DXVECTOR3 currentPositionForSlide = currentPosition;
+    D3DXVECTOR3 remainingMove = frameMove;
+
+    for (int iteration = 0; iteration < kMaxSlideIterations; ++iteration)
+    {
+        const float totalMoveLength = D3DXVec3Length(&remainingMove);
+        if (totalMoveLength <= 0.0001f)
+        {
+            break;
+        }
+
+        RaycastHit nearestHit;
+        if (!FindNearestHit(currentPositionForSlide,
+                            remainingMove,
+                            shapeType,
+                            radius,
+                            height,
+                            outPassThroughIds,
+                            outSolidIds,
+                            &nearestHit))
+        {
+            nextPosition = currentPositionForSlide + remainingMove;
+            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+            break;
+        }
+
+        collided = true;
+
+        const D3DXVECTOR3 moveDirection = remainingMove / totalMoveLength;
+        const float safeDistance = std::max(0.0f, nearestHit.distance - kSkinWidth);
+        currentPositionForSlide += moveDirection * safeDistance;
+        nextPosition = currentPositionForSlide;
+
+        D3DXVECTOR3 unresolvedMove = remainingMove - moveDirection * nearestHit.distance;
+        D3DXVECTOR3 slideMove = ResolveSlide(unresolvedMove, nearestHit.normal);
+
+        if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
+        {
+            nextMoveVector.y = 0.0f;
+            slideMove.y = 0.0f;
+        }
+
+        if (iteration == kMaxSlideIterations - 1)
+        {
+            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+            break;
+        }
+
+        remainingMove = slideMove;
+    }
+
+    if (D3DXVec3Length(&remainingMove) > 0.0001f)
+    {
+        nextPosition = currentPositionForSlide + remainingMove;
+    }
+
+    if (D3DXVec3Length(&frameMove) > 0.0001f)
+    {
+        D3DXVECTOR3 actualFrameMove = nextPosition - currentPosition;
+        nextMoveVector.x = actualFrameMove.x / kDeltaSeconds;
+        nextMoveVector.z = actualFrameMove.z / kDeltaSeconds;
+    }
+
+    if (applyHorizontalDamping)
+    {
+        nextMoveVector.x *= kHorizontalDamping;
+        nextMoveVector.z *= kHorizontalDamping;
+    }
+
+    *outPosition = nextPosition;
+    *outNextMoveVector = nextMoveVector;
+    return collided;
+}
 }
 
 void PhysicsLib::Initialize()
@@ -917,113 +1041,156 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               float radius,
                               float height)
 {
-    EnsureInitialized();
+    return CheckCollideInternal(currentPosition,
+                                moveVector,
+                                shapeType,
+                                outPosition,
+                                outNextMoveVector,
+                                outPassThroughIds,
+                                outSolidIds,
+                                radius,
+                                height,
+                                true);
+}
 
-    if (outPosition == nullptr)
+CharacterMover::CharacterMover()
+    : m_position(0.0f, 0.0f, 0.0f),
+      m_velocity(0.0f, 0.0f, 0.0f),
+      m_isGrounded(true),
+      m_supportObjectId(-1)
+{
+}
+
+CharacterMover::CharacterMover(const D3DXVECTOR3& position)
+    : m_position(position),
+      m_velocity(0.0f, 0.0f, 0.0f),
+      m_isGrounded(true),
+      m_supportObjectId(-1)
+{
+}
+
+void CharacterMover::SetSettings(const Settings& settings)
+{
+    if (settings.radius < 0.0f)
     {
-        throw std::invalid_argument("outPosition must not be null.");
+        throw std::out_of_range("CharacterMover radius must not be negative.");
     }
 
-    if (outNextMoveVector == nullptr)
+    if (settings.height < 0.0f)
     {
-        throw std::invalid_argument("outNextMoveVector must not be null.");
+        throw std::out_of_range("CharacterMover height must not be negative.");
     }
 
-    if (shapeType == ShapeType::Sphere && radius < 0.0f)
+    if (settings.groundDamping < 0.0f || settings.airDamping < 0.0f)
     {
-        throw std::out_of_range("Sphere radius must not be negative.");
+        throw std::out_of_range("CharacterMover damping must not be negative.");
     }
 
-    if (shapeType == ShapeType::Cylinder && (radius < 0.0f || height < 0.0f))
+    m_settings = settings;
+}
+
+CharacterMover::Settings CharacterMover::GetSettings() const
+{
+    return m_settings;
+}
+
+void CharacterMover::Reset(const D3DXVECTOR3& position)
+{
+    m_position = position;
+    m_velocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    m_isGrounded = true;
+    m_supportObjectId = -1;
+}
+
+void CharacterMover::SetPosition(const D3DXVECTOR3& position)
+{
+    m_position = position;
+}
+
+D3DXVECTOR3 CharacterMover::GetPosition() const
+{
+    return m_position;
+}
+
+void CharacterMover::SetVelocity(const D3DXVECTOR3& velocity)
+{
+    m_velocity = velocity;
+}
+
+D3DXVECTOR3 CharacterMover::GetVelocity() const
+{
+    return m_velocity;
+}
+
+bool CharacterMover::IsGrounded() const
+{
+    return m_isGrounded;
+}
+
+int CharacterMover::GetSupportObjectId() const
+{
+    return m_supportObjectId;
+}
+
+bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
+                            bool jump,
+                            std::vector<int>* outPassThroughIds,
+                            std::vector<int>* outSolidIds)
+{
+    D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
+    if (D3DXVec3Length(&inputMove) > 0.0001f)
     {
-        throw std::out_of_range("Cylinder radius and height must not be negative.");
+        D3DXVec3Normalize(&inputMove, &inputMove);
+        inputMove *= m_settings.moveSpeed;
     }
 
-    if (outPassThroughIds != nullptr)
+    if (m_settings.airControlEnabled || m_isGrounded)
     {
-        outPassThroughIds->clear();
+        m_velocity.x += inputMove.x;
+        m_velocity.z += inputMove.z;
     }
 
-    if (outSolidIds != nullptr)
+    if (jump && m_isGrounded)
     {
-        outSolidIds->clear();
-    }
-
-    D3DXVECTOR3 nextMoveVector = moveVector;
-    nextMoveVector.y -= kGravityPerFrame;
-
-    D3DXVECTOR3 frameMove = nextMoveVector * kDeltaSeconds;
-    D3DXVECTOR3 nextPosition = currentPosition + frameMove;
-    bool collided = false;
-
-    D3DXVECTOR3 currentPositionForSlide = currentPosition;
-    D3DXVECTOR3 remainingMove = frameMove;
-
-    for (int iteration = 0; iteration < kMaxSlideIterations; ++iteration)
-    {
-        const float totalMoveLength = D3DXVec3Length(&remainingMove);
-        if (totalMoveLength <= 0.0001f)
+        if (!m_settings.keepHorizontalVelocityOnJump)
         {
-            break;
+            m_velocity.x = inputMove.x;
+            m_velocity.z = inputMove.z;
         }
 
-        RaycastHit nearestHit;
-        if (!FindNearestHit(currentPositionForSlide,
-                            remainingMove,
-                            shapeType,
-                            radius,
-                            height,
-                            outPassThroughIds,
-                            outSolidIds,
-                            &nearestHit))
-        {
-            nextPosition = currentPositionForSlide + remainingMove;
-            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-            break;
-        }
-
-        collided = true;
-
-        const D3DXVECTOR3 moveDirection = remainingMove / totalMoveLength;
-        const float safeDistance = std::max(0.0f, nearestHit.distance - kSkinWidth);
-        currentPositionForSlide += moveDirection * safeDistance;
-        nextPosition = currentPositionForSlide;
-
-        D3DXVECTOR3 unresolvedMove = remainingMove - moveDirection * nearestHit.distance;
-        D3DXVECTOR3 slideMove = ResolveSlide(unresolvedMove, nearestHit.normal);
-
-        if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
-        {
-            nextMoveVector.y = 0.0f;
-            slideMove.y = 0.0f;
-        }
-
-        if (iteration == kMaxSlideIterations - 1)
-        {
-            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-            break;
-        }
-
-        remainingMove = slideMove;
+        m_velocity.y = m_settings.jumpVelocity;
+        m_isGrounded = false;
+        m_supportObjectId = -1;
     }
 
-    if (D3DXVec3Length(&remainingMove) > 0.0001f)
+    const D3DXVECTOR3 shapePosition = m_position + m_settings.shapeOffset;
+    D3DXVECTOR3 correctedShapePosition = shapePosition;
+    D3DXVECTOR3 nextVelocity = m_velocity;
+
+    const bool collided = CheckCollideInternal(shapePosition,
+                                              m_velocity,
+                                              m_settings.shapeType,
+                                              &correctedShapePosition,
+                                              &nextVelocity,
+                                              outPassThroughIds,
+                                              outSolidIds,
+                                              m_settings.radius,
+                                              m_settings.height,
+                                              false);
+
+    m_isGrounded = nextVelocity.y == 0.0f;
+    m_supportObjectId = -1;
+    if (m_isGrounded && outSolidIds != nullptr && !outSolidIds->empty())
     {
-        nextPosition = currentPositionForSlide + remainingMove;
+        m_supportObjectId = outSolidIds->front();
     }
 
-    if (D3DXVec3Length(&frameMove) > 0.0001f)
-    {
-        D3DXVECTOR3 actualFrameMove = nextPosition - currentPosition;
-        nextMoveVector.x = actualFrameMove.x / kDeltaSeconds;
-        nextMoveVector.z = actualFrameMove.z / kDeltaSeconds;
-    }
+    const float damping = m_isGrounded ? m_settings.groundDamping : m_settings.airDamping;
+    nextVelocity.x *= damping;
+    nextVelocity.z *= damping;
 
-    nextMoveVector.x *= kHorizontalDamping;
-    nextMoveVector.z *= kHorizontalDamping;
-
-    *outPosition = nextPosition;
-    *outNextMoveVector = nextMoveVector;
+    m_position = correctedShapePosition - m_settings.shapeOffset;
+    m_velocity = nextVelocity;
     return collided;
 }
 }
