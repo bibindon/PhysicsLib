@@ -66,7 +66,8 @@ D3DXMATRIX g_cameraProjection;
 float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
 float g_cameraDistance = 12.0f;
-bool g_isCameraDragging = false;
+bool g_isMouseCursorVisible = true;
+bool g_prevEscPressed = false;
 POINT g_lastMousePosition = { 0, 0 };
 
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
@@ -89,6 +90,7 @@ static void DrawMesh(LPD3DXMESH mesh,
 static void Cleanup();
 static void Render();
 static void OnMouseMove(LPARAM lParam);
+static void SetMouseCursorVisible(bool visible);
 static float ClampFloat(float value, float minValue, float maxValue);
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -468,6 +470,13 @@ void UpdatePlayer()
     }
     g_prevF3Pressed = isF3Pressed;
 
+    bool isEscPressed = isWindowActive && ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);
+    if (isEscPressed && !g_prevEscPressed)
+    {
+        SetMouseCursorVisible(!g_isMouseCursorVisible);
+    }
+    g_prevEscPressed = isEscPressed;
+
     D3DXVECTOR3 movingPlatformDelta(0.0f, 0.0f, 0.0f);
     if (g_movingPlatformId >= 0)
     {
@@ -518,6 +527,13 @@ void UpdatePlayer()
     if (isWindowActive && (GetAsyncKeyState('D') & 0x8000))
     {
         inputMove.x += 1.0f;
+    }
+
+    if (inputMove.x != 0.0f || inputMove.z != 0.0f)
+    {
+        const D3DXVECTOR3 cameraForward(-sinf(g_cameraYaw), 0.0f, cosf(g_cameraYaw));
+        const D3DXVECTOR3 cameraRight(cosf(g_cameraYaw), 0.0f, sinf(g_cameraYaw));
+        inputMove = cameraRight * inputMove.x + cameraForward * inputMove.z;
     }
 
     std::vector<int> passThroughIds;
@@ -765,7 +781,8 @@ void Render()
     const D3DXVECTOR3 playerPosition = g_playerMover.GetPosition();
     const bool airControlEnabled = g_playerMover.GetSettings().airControlEnabled;
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  F1: reset  F2: D3DXIntersect MT=%s  F3: AirControl=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SPACE: jump  ESC: cursor=%s  F1: reset  F2: D3DXIntersect MT=%s  F3: AirControl=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                g_isMouseCursorVisible ? _T("ON") : _T("OFF"),
                 PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled() ? _T("ON") : _T("OFF"),
                 airControlEnabled ? _T("ON") : _T("OFF"),
                 (int)g_collectedItemIds.size(),
@@ -833,16 +850,34 @@ void OnMouseMove(LPARAM lParam)
 {
     const POINT currentPosition = { static_cast<short>(LOWORD(lParam)),
                                     static_cast<short>(HIWORD(lParam)) };
-    if (g_isCameraDragging)
+    if (!g_isMouseCursorVisible)
     {
         const LONG deltaX = currentPosition.x - g_lastMousePosition.x;
         const LONG deltaY = currentPosition.y - g_lastMousePosition.y;
-        g_cameraYaw += deltaX * 0.005f;
-        g_cameraPitch += deltaY * 0.005f;
+        g_cameraYaw -= deltaX * 0.005f;
+        g_cameraPitch -= deltaY * 0.005f;
         g_cameraPitch = ClampFloat(g_cameraPitch, D3DXToRadian(-20.0f), D3DXToRadian(70.0f));
     }
 
     g_lastMousePosition = currentPosition;
+}
+
+void SetMouseCursorVisible(bool visible)
+{
+    g_isMouseCursorVisible = visible;
+    ShowCursor(visible ? TRUE : FALSE);
+    if (visible)
+    {
+        ReleaseCapture();
+    }
+    else
+    {
+        SetCapture(g_mainWindow);
+        POINT cursorPosition;
+        GetCursorPos(&cursorPosition);
+        ScreenToClient(g_mainWindow, &cursorPosition);
+        g_lastMousePosition = cursorPosition;
+    }
 }
 
 float ClampFloat(float value, float minValue, float maxValue)
@@ -864,18 +899,6 @@ LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
-    case WM_LBUTTONDOWN:
-        g_isCameraDragging = true;
-        g_lastMousePosition.x = static_cast<short>(LOWORD(lParam));
-        g_lastMousePosition.y = static_cast<short>(HIWORD(lParam));
-        SetCapture(hWnd);
-        return 0;
-
-    case WM_LBUTTONUP:
-        g_isCameraDragging = false;
-        ReleaseCapture();
-        return 0;
-
     case WM_MOUSEMOVE:
         OnMouseMove(lParam);
         return 0;
