@@ -748,6 +748,39 @@ D3DXVECTOR3 ResolveSlide(const D3DXVECTOR3& moveVector, const D3DXVECTOR3& norma
     return slideVector;
 }
 
+void MoveHorizontalVelocityToward(D3DXVECTOR3* velocity,
+                                  const D3DXVECTOR3& targetVelocity,
+                                  float acceleration)
+{
+    if (velocity == nullptr || acceleration <= 0.0f)
+    {
+        return;
+    }
+
+    D3DXVECTOR3 currentVelocity(velocity->x, 0.0f, velocity->z);
+    D3DXVECTOR3 difference = targetVelocity - currentVelocity;
+    const float differenceLength = D3DXVec3Length(&difference);
+    if (differenceLength <= 0.0001f)
+    {
+        velocity->x = targetVelocity.x;
+        velocity->z = targetVelocity.z;
+        return;
+    }
+
+    const float maxDelta = acceleration * kDeltaSeconds;
+    if (differenceLength <= maxDelta)
+    {
+        velocity->x = targetVelocity.x;
+        velocity->z = targetVelocity.z;
+        return;
+    }
+
+    difference /= differenceLength;
+    difference *= maxDelta;
+    velocity->x += difference.x;
+    velocity->z += difference.z;
+}
+
 void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 {
     LPD3DXBUFFER materialBuffer = NULL;
@@ -1093,6 +1126,11 @@ void CharacterMover::SetSettings(const Settings& settings)
         throw std::out_of_range("CharacterMover damping must not be negative.");
     }
 
+    if (settings.groundAcceleration < 0.0f || settings.airAcceleration < 0.0f)
+    {
+        throw std::out_of_range("CharacterMover acceleration must not be negative.");
+    }
+
     m_settings = settings;
 }
 
@@ -1153,8 +1191,13 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
 
     if (m_settings.airControlEnabled || m_isGrounded)
     {
-        m_velocity.x += inputMove.x;
-        m_velocity.z += inputMove.z;
+        float acceleration = m_settings.groundAcceleration;
+        if (!m_isGrounded)
+        {
+            acceleration = m_settings.airAcceleration;
+        }
+
+        MoveHorizontalVelocityToward(&m_velocity, inputMove, acceleration);
     }
 
     if (jump && m_isGrounded)
@@ -1199,7 +1242,12 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         nextVelocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     }
 
-    const float damping = m_isGrounded ? m_settings.groundDamping : m_settings.airDamping;
+    float damping = m_settings.groundDamping;
+    if (!m_isGrounded)
+    {
+        damping = m_settings.airDamping;
+    }
+
     nextVelocity.x *= damping;
     nextVelocity.z *= damping;
 

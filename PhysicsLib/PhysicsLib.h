@@ -73,10 +73,12 @@ public:
         float radius = 0.5f;
         float height = 0.0f;
         float moveSpeed = 6.0f;
+        float groundAcceleration = 6.0f;
+        float airAcceleration = 2.0f;
         float jumpVelocity = 2.0f;
         bool airControlEnabled = false;
         bool keepHorizontalVelocityOnJump = true;
-        float groundDamping = 0.5f;
+        float groundDamping = 1.0f;
         float airDamping = 1.0f;
     };
 
