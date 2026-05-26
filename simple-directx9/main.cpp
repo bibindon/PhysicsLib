@@ -54,11 +54,13 @@ std::vector<SceneObject> g_itemObjects;
 D3DXVECTOR3 g_playerPosition(0.0f, 0.0f, 0.0f);
 D3DXVECTOR3 g_playerMoveVector(0.0f, 0.0f, 0.0f);
 bool g_isGrounded = true;
+bool g_airControlEnabled = false;
 int g_movingPlatformId = -1;
 int g_supportObjectId = -1;
 std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
 bool g_prevF2Pressed = false;
+bool g_prevF3Pressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
 ULONGLONG g_fpsLastUpdateTick = 0;
@@ -443,6 +445,13 @@ void UpdatePlayer()
     }
     g_prevF2Pressed = isF2Pressed;
 
+    bool isF3Pressed = isWindowActive && ((GetAsyncKeyState(VK_F3) & 0x8000) != 0);
+    if (isF3Pressed && !g_prevF3Pressed)
+    {
+        g_airControlEnabled = !g_airControlEnabled;
+    }
+    g_prevF3Pressed = isF3Pressed;
+
     D3DXVECTOR3 movingPlatformDelta(0.0f, 0.0f, 0.0f);
     if (g_movingPlatformId >= 0)
     {
@@ -477,44 +486,23 @@ void UpdatePlayer()
     }
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
+    const bool canApplyMoveInput = g_airControlEnabled || g_isGrounded;
 
-    if (false)
+    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('W') & 0x8000))
     {
-        if (g_isGrounded && isWindowActive && (GetAsyncKeyState('W') & 0x8000))
-        {
-            inputMove.z += 1.0f;
-        }
-        if (g_isGrounded && isWindowActive && (GetAsyncKeyState('S') & 0x8000))
-        {
-            inputMove.z -= 1.0f;
-        }
-        if (g_isGrounded && isWindowActive && (GetAsyncKeyState('A') & 0x8000))
-        {
-            inputMove.x -= 1.0f;
-        }
-        if (g_isGrounded && isWindowActive && (GetAsyncKeyState('D') & 0x8000))
-        {
-            inputMove.x += 1.0f;
-        }
+        inputMove.z += 1.0f;
     }
-    else
+    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('S') & 0x8000))
     {
-        if (isWindowActive && (GetAsyncKeyState('W') & 0x8000))
-        {
-            inputMove.z += 1.0f;
-        }
-        if (isWindowActive && (GetAsyncKeyState('S') & 0x8000))
-        {
-            inputMove.z -= 1.0f;
-        }
-        if (isWindowActive && (GetAsyncKeyState('A') & 0x8000))
-        {
-            inputMove.x -= 1.0f;
-        }
-        if (isWindowActive && (GetAsyncKeyState('D') & 0x8000))
-        {
-            inputMove.x += 1.0f;
-        }
+        inputMove.z -= 1.0f;
+    }
+    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('A') & 0x8000))
+    {
+        inputMove.x -= 1.0f;
+    }
+    if (canApplyMoveInput && isWindowActive && (GetAsyncKeyState('D') & 0x8000))
+    {
+        inputMove.x += 1.0f;
     }
 
     if (inputMove.x != 0.0f || inputMove.z != 0.0f)
@@ -547,7 +535,7 @@ void UpdatePlayer()
                                          &solidIds,
                                          playerRadius);
 
-    if (nextMoveVector.y == 0.0f && correctedPosition.y <= playerShapePosition.y)
+    if (nextMoveVector.y == 0.0f)
     {
         g_isGrounded = true;
         g_supportObjectId = solidIds.empty() ? -1 : solidIds.front();
@@ -790,8 +778,9 @@ void Render()
 
     TCHAR msg[256];
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  F1: reset  F2: D3DXIntersect MT=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SPACE: jump  F1: reset  F2: D3DXIntersect MT=%s  F3: AirControl=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
                 PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled() ? _T("ON") : _T("OFF"),
+                g_airControlEnabled ? _T("ON") : _T("OFF"),
                 (int)g_collectedItemIds.size(),
                 g_playerPosition.x,
                 g_playerPosition.y,
