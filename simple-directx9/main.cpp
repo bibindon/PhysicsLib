@@ -61,12 +61,20 @@ float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
 ULONGLONG g_fpsLastUpdateTick = 0;
 bool g_timerPeriodEnabled = false;
+D3DXMATRIX g_cameraView;
+D3DXMATRIX g_cameraProjection;
+float g_cameraYaw = 0.0f;
+float g_cameraPitch = D3DXToRadian(18.0f);
+float g_cameraDistance = 12.0f;
+bool g_isCameraDragging = false;
+POINT g_lastMousePosition = { 0, 0 };
 
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
 static void InitD3D(HWND hWnd);
 static void InitScene();
 static void ResetPlayer();
 static void UpdatePlayer();
+static void UpdateCamera();
 static void SyncSceneFromPhysics();
 static LPD3DXMESH CreateBoxMesh(float width, float height, float depth);
 static LPD3DXMESH CreateSphereMesh(float radius);
@@ -80,6 +88,8 @@ static void DrawMesh(LPD3DXMESH mesh,
                      bool useTexture);
 static void Cleanup();
 static void Render();
+static void OnMouseMove(LPARAM lParam);
+static float ClampFloat(float value, float minValue, float maxValue);
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 extern int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
@@ -350,8 +360,8 @@ void InitScene()
     g_worldObjects.push_back({ movingPlatformMesh, g_movingPlatformId, D3DXVECTOR3(0.0f, 2.5f, 7.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f), false });
 
     LPD3DXMESH manyEdgesMesh = LoadSceneMeshFromX(_T("cubeManyEdges.x"));
-    const float manyEdgesSpacingX = 3.6f;
-    const float manyEdgesSpacingZ = 3.6f;
+    const float manyEdgesSpacingX = 7.2f;
+    const float manyEdgesSpacingZ = 7.2f;
     const D3DXVECTOR3 manyEdgesBase(-7.2f, 0.75f, -5.4f);
     for (int row = 0; row < 34; ++row)
     {
@@ -523,6 +533,25 @@ void UpdatePlayer()
     SyncSceneFromPhysics();
 }
 
+void UpdateCamera()
+{
+    const D3DXVECTOR3 playerPosition = g_playerMover.GetPosition();
+    const D3DXVECTOR3 cameraTarget = playerPosition + D3DXVECTOR3(0.0f, 1.2f, 0.0f);
+    const float horizontalDistance = g_cameraDistance * cosf(g_cameraPitch);
+    const D3DXVECTOR3 offset(sinf(g_cameraYaw) * horizontalDistance,
+                             sinf(g_cameraPitch) * g_cameraDistance,
+                             -cosf(g_cameraYaw) * horizontalDistance);
+    const D3DXVECTOR3 cameraPosition = cameraTarget + offset;
+    const D3DXVECTOR3 cameraUp(0.0f, 1.0f, 0.0f);
+
+    D3DXMatrixLookAtLH(&g_cameraView, &cameraPosition, &cameraTarget, &cameraUp);
+    D3DXMatrixPerspectiveFovLH(&g_cameraProjection,
+                               D3DXToRadian(45.0f),
+                               (float)WINDOW_SIZE_W / WINDOW_SIZE_H,
+                               0.1f,
+                               1000.0f);
+}
+
 void SyncSceneFromPhysics()
 {
     for (size_t i = 0; i < g_worldObjects.size(); ++i)
@@ -619,8 +648,6 @@ void DrawMesh(LPD3DXMESH mesh,
     D3DXMATRIX matRotationZ;
     D3DXMATRIX matTranslation;
     D3DXMATRIX matWorld;
-    D3DXMATRIX matView;
-    D3DXMATRIX matProj;
     D3DXMATRIX matWorldViewProj;
 
     D3DXMatrixScaling(&matScale, scale.x, scale.y, scale.z);
@@ -631,18 +658,7 @@ void DrawMesh(LPD3DXMESH mesh,
 
     matWorld = matScale * matRotationX * matRotationY * matRotationZ * matTranslation;
 
-    D3DXVECTOR3 cameraPosition(0.0f, 7.0f, -16.0f);
-    D3DXVECTOR3 cameraTarget(0.0f, 1.5f, 3.0f);
-    D3DXVECTOR3 cameraUp(0.0f, 1.0f, 0.0f);
-    D3DXMatrixLookAtLH(&matView, &cameraPosition, &cameraTarget, &cameraUp);
-
-    D3DXMatrixPerspectiveFovLH(&matProj,
-                               D3DXToRadian(45.0f),
-                               (float)WINDOW_SIZE_W / WINDOW_SIZE_H,
-                               0.1f,
-                               1000.0f);
-
-    matWorldViewProj = matWorld * matView * matProj;
+    matWorldViewProj = matWorld * g_cameraView * g_cameraProjection;
 
     hResult = g_pEffect->SetMatrix("g_matWorldViewProj", &matWorldViewProj);
     assert(hResult == S_OK);
@@ -739,6 +755,8 @@ void Render()
     hResult = g_pd3dDevice->BeginScene();
     assert(hResult == S_OK);
 
+    UpdateCamera();
+
     TCHAR fpsText[64];
     _stprintf_s(fpsText, _T("FPS %.1f"), g_displayFps);
     TextDraw(g_pFpsFont, fpsText, 20, 16);
@@ -811,10 +829,62 @@ void Render()
     assert(hResult == S_OK);
 }
 
+void OnMouseMove(LPARAM lParam)
+{
+    const POINT currentPosition = { static_cast<short>(LOWORD(lParam)),
+                                    static_cast<short>(HIWORD(lParam)) };
+    if (g_isCameraDragging)
+    {
+        const LONG deltaX = currentPosition.x - g_lastMousePosition.x;
+        const LONG deltaY = currentPosition.y - g_lastMousePosition.y;
+        g_cameraYaw += deltaX * 0.005f;
+        g_cameraPitch += deltaY * 0.005f;
+        g_cameraPitch = ClampFloat(g_cameraPitch, D3DXToRadian(-20.0f), D3DXToRadian(70.0f));
+    }
+
+    g_lastMousePosition = currentPosition;
+}
+
+float ClampFloat(float value, float minValue, float maxValue)
+{
+    if (value < minValue)
+    {
+        return minValue;
+    }
+
+    if (value > maxValue)
+    {
+        return maxValue;
+    }
+
+    return value;
+}
+
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
+    case WM_LBUTTONDOWN:
+        g_isCameraDragging = true;
+        g_lastMousePosition.x = static_cast<short>(LOWORD(lParam));
+        g_lastMousePosition.y = static_cast<short>(HIWORD(lParam));
+        SetCapture(hWnd);
+        return 0;
+
+    case WM_LBUTTONUP:
+        g_isCameraDragging = false;
+        ReleaseCapture();
+        return 0;
+
+    case WM_MOUSEMOVE:
+        OnMouseMove(lParam);
+        return 0;
+
+    case WM_MOUSEWHEEL:
+        g_cameraDistance -= static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA;
+        g_cameraDistance = ClampFloat(g_cameraDistance, 4.0f, 30.0f);
+        return 0;
+
     case WM_DESTROY:
         PostQuitMessage(0);
         g_bClose = true;

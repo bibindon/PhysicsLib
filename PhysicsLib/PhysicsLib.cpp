@@ -779,7 +779,8 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
                           std::vector<int>* outSolidIds,
                           float radius,
                           float height,
-                          bool applyHorizontalDamping)
+                          bool applyHorizontalDamping,
+                          bool stopOnNonGroundHit)
 {
     EnsureInitialized();
 
@@ -855,6 +856,11 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 
         D3DXVECTOR3 unresolvedMove = remainingMove - moveDirection * nearestHit.distance;
         D3DXVECTOR3 slideMove = ResolveSlide(unresolvedMove, nearestHit.normal);
+        if (stopOnNonGroundHit && nearestHit.normal.y <= 0.5f)
+        {
+            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+            break;
+        }
 
         if (nearestHit.normal.y > 0.5f && nextMoveVector.y < 0.0f)
         {
@@ -1050,7 +1056,8 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 outSolidIds,
                                 radius,
                                 height,
-                                true);
+                                true,
+                                false);
 }
 
 CharacterMover::CharacterMover()
@@ -1167,6 +1174,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     D3DXVECTOR3 correctedShapePosition = shapePosition;
     D3DXVECTOR3 nextVelocity = m_velocity;
 
+    const bool wasGrounded = m_isGrounded;
     const bool collided = CheckCollideInternal(shapePosition,
                                               m_velocity,
                                               m_settings.shapeType,
@@ -1176,13 +1184,19 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                               outSolidIds,
                                               m_settings.radius,
                                               m_settings.height,
-                                              false);
+                                              false,
+                                              !wasGrounded);
 
     m_isGrounded = nextVelocity.y == 0.0f;
     m_supportObjectId = -1;
     if (m_isGrounded && outSolidIds != nullptr && !outSolidIds->empty())
     {
         m_supportObjectId = outSolidIds->front();
+    }
+
+    if (!wasGrounded && collided && !m_isGrounded)
+    {
+        nextVelocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     }
 
     const float damping = m_isGrounded ? m_settings.groundDamping : m_settings.airDamping;
