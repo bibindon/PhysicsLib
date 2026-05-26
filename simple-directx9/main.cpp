@@ -20,10 +20,11 @@
 
 #define SAFE_RELEASE(p) { if (p) { (p)->Release(); (p) = NULL; } }
 
+const int IDC_DOUBLE_JUMP_CHECKBOX = 1001;
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
-const float kPlayerSpeed = 8.0f;
-const float kJumpVelocity = 2.0f;
+const float kPlayerSpeed = 18.0f;
+const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
 struct SceneObject
@@ -48,6 +49,8 @@ DWORD g_dwNumMaterials = 0;
 LPD3DXEFFECT g_pEffect = NULL;
 bool g_bClose = false;
 HWND g_mainWindow = NULL;
+HWND g_settingsWindow = NULL;
+HWND g_doubleJumpCheckBox = NULL;
 std::vector<LPD3DXMESH> g_ownedSceneMeshes;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
@@ -57,6 +60,8 @@ std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
 bool g_prevF2Pressed = false;
 bool g_prevF3Pressed = false;
+bool g_prevF4Pressed = false;
+bool g_prevSpacePressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
 ULONGLONG g_fpsLastUpdateTick = 0;
@@ -73,6 +78,7 @@ POINT g_lastMousePosition = { 0, 0 };
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
 static void InitD3D(HWND hWnd);
 static void InitScene();
+static void InitSettingsDialog(HWND ownerWindow);
 static void ResetPlayer();
 static void UpdatePlayer();
 static void UpdateCamera();
@@ -91,6 +97,8 @@ static void Cleanup();
 static void Render();
 static void OnMouseMove(LPARAM lParam);
 static void SetMouseCursorVisible(bool visible);
+static void SetDoubleJumpEnabled(bool enabled);
+static void SyncSettingsDialog();
 static float ClampFloat(float value, float minValue, float maxValue);
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -111,6 +119,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
     wc.style = CS_CLASSDC;
     wc.lpfnWndProc = MsgProc;
     wc.hInstance = GetModuleHandle(NULL);
+    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
     wc.lpszClassName = _T("Window1");
 
     ATOM atom = RegisterClassEx(&wc);
@@ -143,6 +152,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
     PhysicsLib::PhysicsLib::Initialize();
     PhysicsLib::PhysicsLib::SetIntersectMultithreadEnabled(false);
     InitScene();
+    InitSettingsDialog(hWnd);
     ShowWindow(hWnd, SW_SHOWDEFAULT);
     UpdateWindow(hWnd);
 
@@ -427,6 +437,37 @@ void InitScene()
     SyncSceneFromPhysics();
 }
 
+void InitSettingsDialog(HWND ownerWindow)
+{
+    g_settingsWindow = CreateWindowEx(WS_EX_TOOLWINDOW,
+                                      _T("Window1"),
+                                      _T("Settings"),
+                                      WS_CAPTION | WS_BORDER | WS_VISIBLE,
+                                      40,
+                                      40,
+                                      240,
+                                      90,
+                                      ownerWindow,
+                                      NULL,
+                                      GetModuleHandle(NULL),
+                                      NULL);
+    assert(g_settingsWindow != NULL);
+
+    g_doubleJumpCheckBox = CreateWindow(_T("BUTTON"),
+                                        _T("Enable double jump"),
+                                        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                                        16,
+                                        18,
+                                        190,
+                                        28,
+                                        g_settingsWindow,
+                                        reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_DOUBLE_JUMP_CHECKBOX)),
+                                        GetModuleHandle(NULL),
+                                        NULL);
+    assert(g_doubleJumpCheckBox != NULL);
+    SyncSettingsDialog();
+}
+
 void ResetPlayer()
 {
     PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
@@ -438,11 +479,13 @@ void ResetPlayer()
     settings.groundAcceleration = kPlayerSpeed;
     settings.airAcceleration = kPlayerSpeed * 0.35f;
     settings.jumpVelocity = kJumpVelocity;
+    settings.doubleJumpEnabled = false;
     settings.keepHorizontalVelocityOnJump = true;
     settings.groundDamping = 1.0f;
     settings.airDamping = 1.0f;
     g_playerMover.SetSettings(settings);
     g_playerMover.Reset(kPlayerStartPosition);
+    SyncSettingsDialog();
 }
 
 void UpdatePlayer()
@@ -471,6 +514,14 @@ void UpdatePlayer()
         g_playerMover.SetSettings(settings);
     }
     g_prevF3Pressed = isF3Pressed;
+
+    bool isF4Pressed = isWindowActive && ((GetAsyncKeyState(VK_F4) & 0x8000) != 0);
+    if (isF4Pressed && !g_prevF4Pressed)
+    {
+        PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
+        SetDoubleJumpEnabled(!settings.doubleJumpEnabled);
+    }
+    g_prevF4Pressed = isF4Pressed;
 
     bool isEscPressed = isWindowActive && ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);
     if (isEscPressed && !g_prevEscPressed)
@@ -540,7 +591,9 @@ void UpdatePlayer()
 
     std::vector<int> passThroughIds;
     std::vector<int> solidIds;
-    const bool jump = isWindowActive && ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0);
+    const bool isSpacePressed = isWindowActive && ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0);
+    const bool jump = isSpacePressed && !g_prevSpacePressed;
+    g_prevSpacePressed = isSpacePressed;
     g_playerMover.Update(inputMove, jump, &passThroughIds, &solidIds);
 
     for (size_t i = 0; i < passThroughIds.size(); ++i)
@@ -781,12 +834,15 @@ void Render()
 
     TCHAR msg[256];
     const D3DXVECTOR3 playerPosition = g_playerMover.GetPosition();
-    const bool airControlEnabled = g_playerMover.GetSettings().airControlEnabled;
+    const PhysicsLib::CharacterMover::Settings moverSettings = g_playerMover.GetSettings();
+    const bool airControlEnabled = moverSettings.airControlEnabled;
+    const bool doubleJumpEnabled = moverSettings.doubleJumpEnabled;
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  ESC: cursor=%s  F1: reset  F2: D3DXIntersect MT=%s  F3: AirControl=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SPACE: jump  ESC: cursor=%s  F1: reset  F2: D3DXIntersect MT=%s  F3: AirControl=%s  F4: DoubleJump=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
                 g_isMouseCursorVisible ? _T("ON") : _T("OFF"),
                 PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled() ? _T("ON") : _T("OFF"),
                 airControlEnabled ? _T("ON") : _T("OFF"),
+                doubleJumpEnabled ? _T("ON") : _T("OFF"),
                 (int)g_collectedItemIds.size(),
                 playerPosition.x,
                 playerPosition.y,
@@ -882,6 +938,31 @@ void SetMouseCursorVisible(bool visible)
     }
 }
 
+void SetDoubleJumpEnabled(bool enabled)
+{
+    PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
+    settings.doubleJumpEnabled = enabled;
+    g_playerMover.SetSettings(settings);
+    SyncSettingsDialog();
+}
+
+void SyncSettingsDialog()
+{
+    if (g_doubleJumpCheckBox == NULL)
+    {
+        return;
+    }
+
+    PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
+    WPARAM checkState = BST_UNCHECKED;
+    if (settings.doubleJumpEnabled)
+    {
+        checkState = BST_CHECKED;
+    }
+
+    SendMessage(g_doubleJumpCheckBox, BM_SETCHECK, checkState, 0);
+}
+
 float ClampFloat(float value, float minValue, float maxValue)
 {
     if (value < minValue)
@@ -901,6 +982,15 @@ LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDC_DOUBLE_JUMP_CHECKBOX && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(g_doubleJumpCheckBox, BM_GETCHECK, 0, 0);
+            SetDoubleJumpEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+        break;
+
     case WM_MOUSEMOVE:
         OnMouseMove(lParam);
         return 0;
@@ -911,8 +1001,11 @@ LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         return 0;
 
     case WM_DESTROY:
-        PostQuitMessage(0);
-        g_bClose = true;
+        if (hWnd == g_mainWindow)
+        {
+            PostQuitMessage(0);
+            g_bClose = true;
+        }
         return 0;
     }
 

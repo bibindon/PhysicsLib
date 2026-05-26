@@ -77,6 +77,7 @@ public:
         float airAcceleration = 2.0f;
         float jumpVelocity = 2.0f;
         bool airControlEnabled = false;
+        bool doubleJumpEnabled = false;
         bool keepHorizontalVelocityOnJump = true;
         float groundDamping = 1.0f;
         float airDamping = 1.0f;
@@ -110,5 +111,6 @@ private:
     D3DXVECTOR3 m_velocity;
     bool m_isGrounded;
     int m_supportObjectId;
+    int m_remainingAirJumps;
 };
 }

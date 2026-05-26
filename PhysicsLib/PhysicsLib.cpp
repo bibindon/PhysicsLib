@@ -1097,7 +1097,8 @@ CharacterMover::CharacterMover()
     : m_position(0.0f, 0.0f, 0.0f),
       m_velocity(0.0f, 0.0f, 0.0f),
       m_isGrounded(true),
-      m_supportObjectId(-1)
+      m_supportObjectId(-1),
+      m_remainingAirJumps(0)
 {
 }
 
@@ -1105,7 +1106,8 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
     : m_position(position),
       m_velocity(0.0f, 0.0f, 0.0f),
       m_isGrounded(true),
-      m_supportObjectId(-1)
+      m_supportObjectId(-1),
+      m_remainingAirJumps(0)
 {
 }
 
@@ -1145,6 +1147,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_velocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     m_isGrounded = true;
     m_supportObjectId = -1;
+    m_remainingAirJumps = 0;
 }
 
 void CharacterMover::SetPosition(const D3DXVECTOR3& position)
@@ -1200,7 +1203,18 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         MoveHorizontalVelocityToward(&m_velocity, inputMove, acceleration);
     }
 
+    bool canJump = false;
     if (jump && m_isGrounded)
+    {
+        canJump = true;
+    }
+    else if (jump && m_settings.doubleJumpEnabled && m_remainingAirJumps > 0)
+    {
+        canJump = true;
+        --m_remainingAirJumps;
+    }
+
+    if (canJump)
     {
         if (!m_settings.keepHorizontalVelocityOnJump)
         {
@@ -1235,6 +1249,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     if (m_isGrounded && outSolidIds != nullptr && !outSolidIds->empty())
     {
         m_supportObjectId = outSolidIds->front();
+    }
+
+    if (m_isGrounded)
+    {
+        m_remainingAirJumps = 1;
     }
 
     if (!wasGrounded && collided && !m_isGrounded)
