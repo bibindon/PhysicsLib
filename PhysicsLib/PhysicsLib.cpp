@@ -3,6 +3,7 @@
 #include <d3d9.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
@@ -29,6 +30,7 @@ constexpr float kGravityPerFrame = 9.8f * kDeltaSeconds;
 constexpr float kHorizontalDamping = 0.5f;
 constexpr float kSkinWidth = 0.01f;
 constexpr int kMaxSlideIterations = 3;
+constexpr int kQuadTreeLevel = 6;
 
 // マルチスレッド化。ほぼ効果なし。やる価値なし。
 #define THREAD_NUM 2
@@ -39,6 +41,8 @@ struct LoadedObject
     PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
     float friction = 0.0f;
     LPD3DXMESH mesh = NULL;
+    D3DXVECTOR3 localBoundsMin = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    D3DXVECTOR3 localBoundsMax = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     PhysicsLib::Transform transform;
 };
 
@@ -66,6 +70,204 @@ struct HitCollection
     bool foundSolid = false;
     float nearestDistance = std::numeric_limits<float>::max();
     RaycastHit nearestHit;
+};
+
+struct XzBounds
+{
+    float minX = std::numeric_limits<float>::max();
+    float minZ = std::numeric_limits<float>::max();
+    float maxX = -std::numeric_limits<float>::max();
+    float maxZ = -std::numeric_limits<float>::max();
+};
+
+void IncludePoint(XzBounds* bounds, float x, float z)
+{
+    bounds->minX = std::min(bounds->minX, x);
+    bounds->minZ = std::min(bounds->minZ, z);
+    bounds->maxX = std::max(bounds->maxX, x);
+    bounds->maxZ = std::max(bounds->maxZ, z);
+}
+
+void IncludeBounds(XzBounds* bounds, const XzBounds& other)
+{
+    IncludePoint(bounds, other.minX, other.minZ);
+    IncludePoint(bounds, other.maxX, other.maxZ);
+}
+
+void ExpandBounds(XzBounds* bounds, float amount)
+{
+    bounds->minX -= amount;
+    bounds->minZ -= amount;
+    bounds->maxX += amount;
+    bounds->maxZ += amount;
+}
+
+bool Intersects(const XzBounds& a, const XzBounds& b)
+{
+    return a.minX <= b.maxX &&
+           a.maxX >= b.minX &&
+           a.minZ <= b.maxZ &&
+           a.maxZ >= b.minZ;
+}
+
+uint32_t BitSeparate32(uint32_t value)
+{
+    value = (value | (value << 8)) & 0x00ff00ff;
+    value = (value | (value << 4)) & 0x0f0f0f0f;
+    value = (value | (value << 2)) & 0x33333333;
+    return (value | (value << 1)) & 0x55555555;
+}
+
+uint32_t GetMortonNumber(uint32_t x, uint32_t z)
+{
+    return BitSeparate32(x) | (BitSeparate32(z) << 1);
+}
+
+uint32_t GetLevelStartElement(int level)
+{
+    uint32_t result = 0;
+    uint32_t pow4 = 1;
+    for (int i = 0; i < level; ++i)
+    {
+        result += pow4;
+        pow4 *= 4;
+    }
+
+    return result;
+}
+
+class LinearQuadTree
+{
+public:
+    void Build(const std::vector<XzBounds>& objectBounds, const XzBounds& queryBounds)
+    {
+        rootBounds = queryBounds;
+        for (size_t i = 0; i < objectBounds.size(); ++i)
+        {
+            IncludeBounds(&rootBounds, objectBounds[i]);
+        }
+
+        const float width = rootBounds.maxX - rootBounds.minX;
+        const float depth = rootBounds.maxZ - rootBounds.minZ;
+        const float size = std::max(std::max(width, depth), 1.0f);
+        rootBounds.maxX = rootBounds.minX + size;
+        rootBounds.maxZ = rootBounds.minZ + size;
+        ExpandBounds(&rootBounds, kSkinWidth);
+
+        cells.clear();
+        cells.resize(GetLevelStartElement(kQuadTreeLevel + 1));
+
+        for (size_t i = 0; i < objectBounds.size(); ++i)
+        {
+            RegisterObject(objectBounds[i], i);
+        }
+    }
+
+    void Query(const XzBounds& bounds, std::vector<size_t>* outObjectIndices) const
+    {
+        outObjectIndices->clear();
+        if (cells.empty() || !Intersects(rootBounds, bounds))
+        {
+            return;
+        }
+
+        QueryNode(0, 0, rootBounds, bounds, outObjectIndices);
+    }
+
+private:
+    struct Cell
+    {
+        std::vector<size_t> objectIndices;
+        size_t subtreeObjectCount = 0;
+    };
+
+    uint32_t CoordinateToCell(float value, float minValue, float unitSize) const
+    {
+        const int cellCount = 1 << kQuadTreeLevel;
+        int cell = static_cast<int>((value - minValue) / unitSize);
+        cell = std::max(0, std::min(cell, cellCount - 1));
+        return static_cast<uint32_t>(cell);
+    }
+
+    uint32_t GetElementIndex(const XzBounds& bounds) const
+    {
+        const float unitX = (rootBounds.maxX - rootBounds.minX) / static_cast<float>(1 << kQuadTreeLevel);
+        const float unitZ = (rootBounds.maxZ - rootBounds.minZ) / static_cast<float>(1 << kQuadTreeLevel);
+        const uint32_t minMorton = GetMortonNumber(CoordinateToCell(bounds.minX, rootBounds.minX, unitX),
+                                                   CoordinateToCell(bounds.minZ, rootBounds.minZ, unitZ));
+        const uint32_t maxMorton = GetMortonNumber(CoordinateToCell(bounds.maxX, rootBounds.minX, unitX),
+                                                   CoordinateToCell(bounds.maxZ, rootBounds.minZ, unitZ));
+        const uint32_t xored = minMorton ^ maxMorton;
+
+        int shift = 0;
+        for (int bitPair = 0; bitPair < kQuadTreeLevel; ++bitPair)
+        {
+            if (((xored >> (bitPair * 2)) & 0x3) != 0)
+            {
+                shift = (bitPair + 1) * 2;
+            }
+        }
+
+        const int level = kQuadTreeLevel - shift / 2;
+        const uint32_t mortonAtLevel = maxMorton >> shift;
+        return GetLevelStartElement(level) + mortonAtLevel;
+    }
+
+    void RegisterObject(const XzBounds& bounds, size_t objectIndex)
+    {
+        uint32_t element = GetElementIndex(bounds);
+        cells[element].objectIndices.push_back(objectIndex);
+
+        while (true)
+        {
+            ++cells[element].subtreeObjectCount;
+            if (element == 0)
+            {
+                break;
+            }
+
+            element = (element - 1) >> 2;
+        }
+    }
+
+    void QueryNode(uint32_t element,
+                   int level,
+                   const XzBounds& nodeBounds,
+                   const XzBounds& queryBounds,
+                   std::vector<size_t>* outObjectIndices) const
+    {
+        if (element >= cells.size() ||
+            cells[element].subtreeObjectCount == 0 ||
+            !Intersects(nodeBounds, queryBounds))
+        {
+            return;
+        }
+
+        const Cell& cell = cells[element];
+        outObjectIndices->insert(outObjectIndices->end(),
+                                 cell.objectIndices.begin(),
+                                 cell.objectIndices.end());
+
+        if (level >= kQuadTreeLevel)
+        {
+            return;
+        }
+
+        const float midX = (nodeBounds.minX + nodeBounds.maxX) * 0.5f;
+        const float midZ = (nodeBounds.minZ + nodeBounds.maxZ) * 0.5f;
+        for (uint32_t child = 0; child < 4; ++child)
+        {
+            XzBounds childBounds;
+            childBounds.minX = (child & 0x1) ? midX : nodeBounds.minX;
+            childBounds.maxX = (child & 0x1) ? nodeBounds.maxX : midX;
+            childBounds.minZ = (child & 0x2) ? midZ : nodeBounds.minZ;
+            childBounds.maxZ = (child & 0x2) ? nodeBounds.maxZ : midZ;
+            QueryNode(element * 4 + 1 + child, level + 1, childBounds, queryBounds, outObjectIndices);
+        }
+    }
+
+    XzBounds rootBounds;
+    std::vector<Cell> cells;
 };
 
 void SafeRelease(IUnknown* object)
@@ -125,6 +327,71 @@ D3DXMATRIX BuildWorldMatrix(const PhysicsLib::Transform& transform)
                           transform.position.z);
 
     return scaleMatrix * rotationMatrix * translationMatrix;
+}
+
+bool ComputeMeshBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax)
+{
+    if (mesh == NULL || outMin == nullptr || outMax == nullptr)
+    {
+        return false;
+    }
+
+    void* vertexBuffer = NULL;
+    HRESULT result = mesh->LockVertexBuffer(D3DLOCK_READONLY, &vertexBuffer);
+    if (FAILED(result))
+    {
+        return false;
+    }
+
+    result = D3DXComputeBoundingBox(static_cast<D3DXVECTOR3*>(vertexBuffer),
+                                    mesh->GetNumVertices(),
+                                    mesh->GetNumBytesPerVertex(),
+                                    outMin,
+                                    outMax);
+
+    mesh->UnlockVertexBuffer();
+    return SUCCEEDED(result);
+}
+
+XzBounds ComputeWorldXzBounds(const LoadedObject& object)
+{
+    XzBounds bounds;
+    const D3DXMATRIX worldMatrix = BuildWorldMatrix(object.transform);
+
+    for (int x = 0; x < 2; ++x)
+    {
+        for (int y = 0; y < 2; ++y)
+        {
+            for (int z = 0; z < 2; ++z)
+            {
+                const D3DXVECTOR3 localCorner(x == 0 ? object.localBoundsMin.x : object.localBoundsMax.x,
+                                              y == 0 ? object.localBoundsMin.y : object.localBoundsMax.y,
+                                              z == 0 ? object.localBoundsMin.z : object.localBoundsMax.z);
+                D3DXVECTOR3 worldCorner;
+                D3DXVec3TransformCoord(&worldCorner, &localCorner, &worldMatrix);
+                IncludePoint(&bounds, worldCorner.x, worldCorner.z);
+            }
+        }
+    }
+
+    return bounds;
+}
+
+XzBounds ComputeSweptShapeXzBounds(const D3DXVECTOR3& startPosition,
+                                   const D3DXVECTOR3& endPosition,
+                                   const std::vector<D3DXVECTOR3>& offsets)
+{
+    XzBounds bounds;
+    for (size_t i = 0; i < offsets.size(); ++i)
+    {
+        const D3DXVECTOR3 rayStart = startPosition + offsets[i];
+        const D3DXVECTOR3 rayEnd = endPosition + offsets[i];
+        IncludePoint(&bounds, rayStart.x, rayStart.z);
+        IncludePoint(&bounds, rayEnd.x, rayEnd.z);
+    }
+
+    ExpandBounds(&bounds, kSkinWidth);
+    return bounds;
 }
 
 void GetShapeOffsets(PhysicsLib::ShapeType shapeType,
@@ -378,15 +645,34 @@ bool FindNearestHit(const D3DXVECTOR3& startPosition,
     GetShapeOffsets(shapeType, radius, height, &offsets);
 
     const D3DXVECTOR3 endPosition = startPosition + moveVector;
+    const XzBounds sweptShapeBounds = ComputeSweptShapeXzBounds(startPosition, endPosition, offsets);
+    std::vector<XzBounds> objectBounds;
+    objectBounds.reserve(g_objects.size());
+    for (size_t objectIndex = 0; objectIndex < g_objects.size(); ++objectIndex)
+    {
+        objectBounds.push_back(ComputeWorldXzBounds(g_objects[objectIndex]));
+    }
+
+    LinearQuadTree quadTree;
+    quadTree.Build(objectBounds, sweptShapeBounds);
+
+    std::vector<size_t> candidateObjectIndices;
+    quadTree.Query(sweptShapeBounds, &candidateObjectIndices);
+    if (candidateObjectIndices.empty())
+    {
+        return false;
+    }
+
     bool foundSolid = false;
     float nearestDistance = std::numeric_limits<float>::max();
     std::unordered_map<LPD3DXMESH, std::vector<size_t> > meshGroups;
     std::vector<LPD3DXMESH> meshOrder;
-    meshGroups.reserve(g_objects.size());
-    meshOrder.reserve(g_objects.size());
+    meshGroups.reserve(candidateObjectIndices.size());
+    meshOrder.reserve(candidateObjectIndices.size());
 
-    for (size_t objectIndex = 0; objectIndex < g_objects.size(); ++objectIndex)
+    for (size_t candidateIndex = 0; candidateIndex < candidateObjectIndices.size(); ++candidateIndex)
     {
+        const size_t objectIndex = candidateObjectIndices[candidateIndex];
         const LPD3DXMESH mesh = g_objects[objectIndex].mesh;
         if (meshGroups.find(mesh) == meshGroups.end())
         {
@@ -584,6 +870,12 @@ int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float fricti
     object.friction = friction;
 
     LoadMesh(modelPath, &object.mesh);
+    if (!ComputeMeshBounds(object.mesh, &object.localBoundsMin, &object.localBoundsMax))
+    {
+        SafeRelease(object.mesh);
+        throw std::runtime_error("Failed to compute collision mesh bounds.");
+    }
+
     g_objects.push_back(object);
     return object.id;
 }
