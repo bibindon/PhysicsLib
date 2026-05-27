@@ -16,12 +16,12 @@ const int kInfiniteJumpCheckboxId = kSettingsCheckboxStartId + 1;
 const int kGravityCheckboxId = kSettingsCheckboxStartId + 2;
 const int kSlideCheckboxId = kSettingsCheckboxStartId + 3;
 const int kOptimizationCheckboxId = kSettingsCheckboxStartId + 4;
-const int kTangentMoveCheckboxId = kSettingsCheckboxStartId + 9;
-const int kAirMoveCheckboxId = kSettingsCheckboxStartId + 10;
-const int kMovingFloorCheckboxId = kSettingsCheckboxStartId + 11;
-const int kInertiaCheckboxId = kSettingsCheckboxStartId + 6;
-const int kContactCheckboxId = kSettingsCheckboxStartId + 7;
-const int kSurfaceContactCheckboxId = kSettingsCheckboxStartId + 8;
+const int kInertiaCheckboxId = kSettingsCheckboxStartId + 5;
+const int kContactCheckboxId = kSettingsCheckboxStartId + 6;
+const int kSurfaceContactCheckboxId = kSettingsCheckboxStartId + 7;
+const int kTangentMoveCheckboxId = kSettingsCheckboxStartId + 8;
+const int kAirMoveCheckboxId = kSettingsCheckboxStartId + 9;
+const int kMovingFloorCheckboxId = kSettingsCheckboxStartId + 10;
 const int kSettingsResetButtonId = 4200;
 
 const TCHAR* kSettingsCheckboxLabels[] =
@@ -31,7 +31,6 @@ const TCHAR* kSettingsCheckboxLabels[] =
     _T("重力"),
     _T("スライド"),
     _T("高速化"),
-    _T("初期化"),
     _T("慣性"),
     _T("接触判定"),
     _T("接面判定"),
@@ -170,7 +169,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                       40,
                                       40,
                                       340,
-                                      480,
+                                      450,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -298,7 +297,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 390,
+                 360,
                  130,
                  32,
                  g_settingsDialog,
