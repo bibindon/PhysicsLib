@@ -1021,6 +1021,22 @@ void Render()
                 playerSpeed);
     TextDraw(g_pFont, contactText, 20, 100);
 
+    TCHAR collisionDebugText[256];
+    const PhysicsLib::CharacterMover::DebugInfo debugInfo = g_playerMover.GetDebugInfo();
+    _stprintf_s(collisionDebugText,
+                _T("CollideChecks=%d  Hits=%d  Slides=%d  HitDist=%.3f  HitN(%.2f, %.2f, %.2f)  Slide(%.3f, %.3f, %.3f)"),
+                debugInfo.collideCheckCount,
+                debugInfo.hitCount,
+                debugInfo.slideCount,
+                debugInfo.lastHitDistance,
+                debugInfo.lastHitNormal.x,
+                debugInfo.lastHitNormal.y,
+                debugInfo.lastHitNormal.z,
+                debugInfo.lastSlideMove.x,
+                debugInfo.lastSlideMove.y,
+                debugInfo.lastSlideMove.z);
+    TextDraw(g_pFont, collisionDebugText, 20, 128);
+
     hResult = g_pEffect->SetTechnique("Technique1");
     assert(hResult == S_OK);
 

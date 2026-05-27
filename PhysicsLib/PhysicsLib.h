@@ -66,6 +66,16 @@ public:
 class CharacterMover
 {
 public:
+    struct DebugInfo
+    {
+        int collideCheckCount = 0;
+        int hitCount = 0;
+        int slideCount = 0;
+        D3DXVECTOR3 lastHitNormal = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        D3DXVECTOR3 lastSlideMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        float lastHitDistance = 0.0f;
+    };
+
     struct Settings
     {
         PhysicsLib::ShapeType shapeType = PhysicsLib::ShapeType::Sphere;
@@ -100,6 +110,7 @@ public:
     bool IsGrounded() const;
     bool IsTouchingWall() const;
     int GetSupportObjectId() const;
+    DebugInfo GetDebugInfo() const;
 
     bool Update(const D3DXVECTOR3& inputDirection,
                 bool jump,
@@ -114,6 +125,7 @@ private:
     bool m_isTouchingWall;
     int m_supportObjectId;
     int m_remainingAirJumps;
+    DebugInfo m_debugInfo;
 };
 
 class CameraMover
