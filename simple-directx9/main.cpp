@@ -31,6 +31,8 @@ const float kPlayerSpeed = 5.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
+const int kCubeNumber = 1;
+
 struct SceneObject
 {
     LPD3DXMESH mesh;
@@ -456,9 +458,9 @@ void InitScene()
     const float manyEdgesSpacingX = 7.2f;
     const float manyEdgesSpacingZ = 7.2f;
     const D3DXVECTOR3 manyEdgesBase(-7.2f, 0.75f, -5.4f);
-    for (int row = 0; row < 5; ++row)
+    for (int row = 0; row < kCubeNumber; ++row)
     {
-        for (int col = 0; col < 5; ++col)
+        for (int col = 0; col < kCubeNumber; ++col)
         {
             const D3DXVECTOR3 objectPosition(manyEdgesBase.x + col * manyEdgesSpacingX,
                                              manyEdgesBase.y,
