@@ -105,7 +105,6 @@ public:
     void SetPosition(const D3DXVECTOR3& position);
     D3DXVECTOR3 GetPosition() const;
 
-    void SetVelocity(const D3DXVECTOR3& velocity);
     D3DXVECTOR3 GetVelocity() const;
 
     bool IsGrounded() const;
@@ -139,9 +138,6 @@ public:
     };
 
     CameraMover();
-
-    void SetSettings(const Settings& settings);
-    Settings GetSettings() const;
 
     D3DXVECTOR3 ResolvePosition(const D3DXVECTOR3& targetPosition,
                                 const D3DXVECTOR3& desiredCameraPosition) const;
