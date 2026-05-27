@@ -46,6 +46,7 @@ bool g_infiniteJumpEnabled = true;
 bool g_gravityEnabled = true;
 bool g_inertiaEnabled = true;
 bool g_slideEnabled = true;
+bool g_slideCheckEnabled = true;
 bool g_tangentMoveEnabled = true;
 bool g_airMoveEnabled = true;
 bool g_optimizationEnabled = true;
@@ -720,6 +721,16 @@ void SettingsState::SetSlideEnabled(bool enabled)
     g_slideEnabled = enabled;
 }
 
+bool SettingsState::IsSlideCheckEnabled()
+{
+    return g_slideCheckEnabled;
+}
+
+void SettingsState::SetSlideCheckEnabled(bool enabled)
+{
+    g_slideCheckEnabled = enabled;
+}
+
 bool SettingsState::IsTangentMoveEnabled()
 {
     return g_tangentMoveEnabled;
@@ -1078,7 +1089,62 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                         }
                         else
                         {
-                            nextPosition = slideEndPosition;
+                            if (SettingsState::IsSlideCheckEnabled())
+                            {
+                                D3DXVECTOR3 secondSlideHitPoint;
+                                D3DXVECTOR3 secondSlideHitNormal;
+                                float secondSlideHitDistance = 0.0f;
+                                bool secondSlideBlocked = false;
+                                D3DXVECTOR3 nearestSecondSlidePoint = slideEndPosition;
+                                D3DXVECTOR3 nearestSecondSlideNormal(0.0f, 1.0f, 0.0f);
+                                float nearestSecondSlideDistance = std::numeric_limits<float>::max();
+                                const std::vector<size_t> secondSlideCandidateIndices =
+                                    BuildCollisionCandidateIndices(nextPosition, slideEndPosition);
+                                for (size_t candidateIndex = 0; candidateIndex < secondSlideCandidateIndices.size(); ++candidateIndex)
+                                {
+                                    const size_t i = secondSlideCandidateIndices[candidateIndex];
+                                    if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
+                                    {
+                                        continue;
+                                    }
+
+                                    if (RayCastObject(g_simpleObjects[i].mesh,
+                                                      g_simpleObjects[i].transform,
+                                                      nextPosition,
+                                                      slideEndPosition,
+                                                      &secondSlideHitPoint,
+                                                      &secondSlideHitNormal,
+                                                      &secondSlideHitDistance))
+                                    {
+                                        if (secondSlideHitDistance >= nearestSecondSlideDistance)
+                                        {
+                                            continue;
+                                        }
+
+                                        nearestSecondSlidePoint = secondSlideHitPoint;
+                                        nearestSecondSlideNormal = secondSlideHitNormal;
+                                        nearestSecondSlideDistance = secondSlideHitDistance;
+                                        secondSlideBlocked = true;
+                                    }
+                                }
+
+                                ++slideCount;
+                                if (secondSlideBlocked)
+                                {
+                                    nextPosition = nearestSecondSlidePoint + nearestSecondSlideNormal * kGroundContactOffset;
+                                    nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                                    lastHitNormal = nearestSecondSlideNormal;
+                                    lastHitDistance = nearestSecondSlideDistance;
+                                }
+                                else
+                                {
+                                    nextPosition = slideEndPosition;
+                                }
+                            }
+                            else
+                            {
+                                nextPosition = slideEndPosition;
+                            }
                         }
                     }
                 }

@@ -17,6 +17,8 @@ public:
     static void SetInertiaEnabled(bool enabled);
     static bool IsSlideEnabled();
     static void SetSlideEnabled(bool enabled);
+    static bool IsSlideCheckEnabled();
+    static void SetSlideCheckEnabled(bool enabled);
     static bool IsTangentMoveEnabled();
     static void SetTangentMoveEnabled(bool enabled);
     static bool IsAirMoveEnabled();
