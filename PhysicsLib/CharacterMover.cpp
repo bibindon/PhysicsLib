@@ -290,7 +290,6 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     float lastHitDistance = 0.0f;
     D3DXVECTOR3 lastSlideMove(0.0f, 0.0f, 0.0f);
     int slideCount = 0;
-    const D3DXVECTOR3 attemptedVelocity = m_velocity;
     const bool collided = PhysicsLib::CheckCollide(m_position,
                                                    m_velocity,
                                                    m_settings.shapeType,
@@ -312,15 +311,12 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_isGrounded = false;
         m_groundNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     }
-    if (collided && attemptedVelocity.y <= 0.0f)
+    if (collided && lastHitNormal.y > 0.0f)
     {
         m_isGrounded = true;
         m_remainingAirJumps = 1;
-        if (lastHitNormal.y > 0.0f)
-        {
-            m_groundNormal = lastHitNormal;
-            D3DXVec3Normalize(&m_groundNormal, &m_groundNormal);
-        }
+        m_groundNormal = lastHitNormal;
+        D3DXVec3Normalize(&m_groundNormal, &m_groundNormal);
     }
     m_isTouchingWall = false;
     m_supportObjectId = -1;
