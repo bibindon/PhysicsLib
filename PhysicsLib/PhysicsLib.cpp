@@ -76,8 +76,10 @@ std::vector<SimpleObject> g_simpleObjects;
 int g_simpleNextId = 1;
 bool g_simpleIntersectMultithreadEnabled = false;
 HWND g_settingsDialog = NULL;
+void (*g_resetCallback)() = nullptr;
 
 const int kSettingsCheckboxStartId = 4100;
+const int kSettingsResetButtonId = 4200;
 const TCHAR* kSettingsCheckboxLabels[] =
 {
     _T("2段ジャンプ"),
@@ -90,8 +92,19 @@ const TCHAR* kSettingsCheckboxLabels[] =
 
 LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    UNREFERENCED_PARAMETER(wParam);
     UNREFERENCED_PARAMETER(lParam);
+
+    if (message == WM_COMMAND)
+    {
+        if (LOWORD(wParam) == kSettingsResetButtonId && HIWORD(wParam) == BN_CLICKED)
+        {
+            if (g_resetCallback != nullptr)
+            {
+                g_resetCallback();
+            }
+            return 0;
+        }
+    }
 
     if (message == WM_CLOSE)
     {
@@ -1294,8 +1307,8 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                       WS_CAPTION | WS_BORDER | WS_VISIBLE,
                                       40,
                                       40,
-                                      260,
-                                      220,
+                                      340,
+                                      300,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -1320,6 +1333,23 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                      instance,
                      NULL);
     }
+
+    CreateWindow(_T("BUTTON"),
+                 _T("リセット"),
+                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                 16,
+                 210,
+                 130,
+                 32,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsResetButtonId)),
+                 instance,
+                 NULL);
+}
+
+void PhysicsLib::SetResetCallback(void (*callback)())
+{
+    g_resetCallback = callback;
 }
 
 int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
@@ -1565,9 +1595,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         inputMove *= m_settings.moveSpeed;
     }
 
-    m_velocity = inputMove;
+    m_velocity.x = inputMove.x;
+    m_velocity.z = inputMove.z;
+    m_velocity.y -= 9.8f * kDeltaSeconds;
     m_position += m_velocity * kDeltaSeconds;
-    m_isGrounded = true;
+    m_isGrounded = false;
     m_isTouchingWall = false;
     m_supportObjectId = -1;
     m_remainingAirJumps = 1;

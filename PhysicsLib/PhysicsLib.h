@@ -94,6 +94,7 @@ public:
     static void SetIntersectMultithreadEnabled(bool enabled);
     static bool IsIntersectMultithreadEnabled();
     static void ShowSettingsDialog(HWND ownerWindow);
+    static void SetResetCallback(void (*callback)());
 
     static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
 

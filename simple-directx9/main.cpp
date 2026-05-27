@@ -194,6 +194,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
     InitD3D(hWnd);
     PhysicsLib::PhysicsLib::Initialize();
     PhysicsLib::PhysicsLib::SetIntersectMultithreadEnabled(false);
+    PhysicsLib::PhysicsLib::SetResetCallback(ResetPlayer);
     InitScene();
     PhysicsLib::PhysicsLib::ShowSettingsDialog(hWnd);
     ShowWindow(hWnd, SW_SHOWDEFAULT);
