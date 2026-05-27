@@ -14,6 +14,7 @@ constexpr float kDeltaSeconds = 1.0f / 60.0f;
 CharacterMover::CharacterMover()
     : m_position(0.0f, 0.0f, 0.0f),
       m_velocity(0.0f, 0.0f, 0.0f),
+      m_groundNormal(0.0f, 1.0f, 0.0f),
       m_isGrounded(true),
       m_isTouchingWall(false),
       m_supportObjectId(-1),
@@ -24,6 +25,7 @@ CharacterMover::CharacterMover()
 CharacterMover::CharacterMover(const D3DXVECTOR3& position)
     : m_position(position),
       m_velocity(0.0f, 0.0f, 0.0f),
+      m_groundNormal(0.0f, 1.0f, 0.0f),
       m_isGrounded(true),
       m_isTouchingWall(false),
       m_supportObjectId(-1),
@@ -65,6 +67,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
 {
     m_position = position;
     m_velocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    m_groundNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     m_isGrounded = true;
     m_isTouchingWall = false;
     m_supportObjectId = -1;
@@ -140,6 +143,49 @@ void CharacterMover::MoveHorizontalVelocityToward(D3DXVECTOR3* velocity,
     velocity->z += difference.z;
 }
 
+void CharacterMover::MoveVelocityToward(D3DXVECTOR3* velocity,
+                                         const D3DXVECTOR3& targetVelocity,
+                                         float acceleration)
+{
+    if (velocity == nullptr || acceleration <= 0.0f)
+    {
+        return;
+    }
+
+    D3DXVECTOR3 difference = targetVelocity - *velocity;
+    const float differenceLength = D3DXVec3Length(&difference);
+    if (differenceLength <= 0.0001f)
+    {
+        *velocity = targetVelocity;
+        return;
+    }
+
+    const float maxDelta = acceleration * kDeltaSeconds;
+    if (differenceLength <= maxDelta)
+    {
+        *velocity = targetVelocity;
+        return;
+    }
+
+    difference /= differenceLength;
+    difference *= maxDelta;
+    *velocity += difference;
+}
+
+D3DXVECTOR3 CharacterMover::ProjectVectorOnPlane(const D3DXVECTOR3& vector,
+                                                 const D3DXVECTOR3& normal)
+{
+    D3DXVECTOR3 normalizedNormal = normal;
+    if (D3DXVec3Length(&normalizedNormal) <= 0.0001f)
+    {
+        return vector;
+    }
+
+    D3DXVec3Normalize(&normalizedNormal, &normalizedNormal);
+    const float normalAmount = D3DXVec3Dot(&vector, &normalizedNormal);
+    return vector - normalizedNormal * normalAmount;
+}
+
 bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                             bool jump,
                             std::vector<int>* outPassThroughIds,
@@ -157,7 +203,15 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
     if (D3DXVec3Length(&inputMove) > 0.0001f)
     {
-        D3DXVec3Normalize(&inputMove, &inputMove);
+        if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
+        {
+            inputMove = ProjectVectorOnPlane(inputMove, m_groundNormal);
+        }
+
+        if (D3DXVec3Length(&inputMove) > 0.0001f)
+        {
+            D3DXVec3Normalize(&inputMove, &inputMove);
+        }
         inputMove *= m_settings.moveSpeed;
     }
 
@@ -165,12 +219,23 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     {
         if (D3DXVec3Length(&inputMove) > 0.0001f)
         {
-            MoveHorizontalVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
+            if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
+            {
+                MoveVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
+            }
+            else
+            {
+                MoveHorizontalVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
+            }
         }
     }
     else
     {
         m_velocity.x = inputMove.x;
+        if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
+        {
+            m_velocity.y = inputMove.y;
+        }
         m_velocity.z = inputMove.z;
     }
 
@@ -237,11 +302,17 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     if (SettingsState::IsGravityEnabled())
     {
         m_isGrounded = false;
+        m_groundNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     }
     if (collided && attemptedVelocity.y <= 0.0f)
     {
         m_isGrounded = true;
         m_remainingAirJumps = 1;
+        if (lastHitNormal.y > 0.0f)
+        {
+            m_groundNormal = lastHitNormal;
+            D3DXVec3Normalize(&m_groundNormal, &m_groundNormal);
+        }
     }
     m_isTouchingWall = false;
     m_supportObjectId = -1;

@@ -218,9 +218,21 @@ private:
                                              const D3DXVECTOR3& targetVelocity,
                                              float acceleration);
 
+    // 速度を3次元の目標速度へ近づける補助関数である。
+    static void MoveVelocityToward(D3DXVECTOR3* velocity,
+                                   const D3DXVECTOR3& targetVelocity,
+                                   float acceleration);
+
+    // ベクトルを指定法線の接平面へ投影する補助関数である。
+    static D3DXVECTOR3 ProjectVectorOnPlane(const D3DXVECTOR3& vector,
+                                            const D3DXVECTOR3& normal);
+
     Settings m_settings;
     D3DXVECTOR3 m_position;
     D3DXVECTOR3 m_velocity;
+
+    // 接地中の面法線である。
+    D3DXVECTOR3 m_groundNormal;
     bool m_isGrounded;
     bool m_isTouchingWall;
     int m_supportObjectId;
