@@ -94,6 +94,19 @@ public:
 
     // 指定IDのオブジェクトと position の距離が distance 以下かを判定する。
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
+
+private:
+    static void SafeRelease(IUnknown* object);
+    static D3DXMATRIX BuildWorldMatrix(const Transform& transform);
+    static bool ExtractFaceNormal(LPD3DXMESH mesh, DWORD faceIndex, D3DXVECTOR3* outNormal);
+    static bool RayCastObject(LPD3DXMESH mesh,
+                              const Transform& transform,
+                              const D3DXVECTOR3& rayOriginWorld,
+                              const D3DXVECTOR3& rayEndWorld,
+                              D3DXVECTOR3* outPoint,
+                              D3DXVECTOR3* outSurfaceNormal,
+                              float* outDistance);
+    static void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh);
 };
 
 
