@@ -39,22 +39,6 @@ struct SimpleObject
     D3DXVECTOR3 localBoundsMax = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
 };
 
-struct Aabb2D
-{
-    float minX = 0.0f;
-    float minZ = 0.0f;
-    float maxX = 0.0f;
-    float maxZ = 0.0f;
-};
-
-struct QuadTreeNode
-{
-    Aabb2D bounds;
-    int depth = 0;
-    std::vector<size_t> objectIndices;
-    std::vector<QuadTreeNode> children;
-};
-
 std::vector<SimpleObject> g_simpleObjects;
 int g_simpleNextId = 1;
 bool g_doubleJumpEnabled = false;
@@ -65,11 +49,13 @@ bool g_slideEnabled = true;
 bool g_tangentMoveEnabled = true;
 bool g_airMoveEnabled = true;
 bool g_optimizationEnabled = false;
-bool g_movingFloorEnabled = false;
+bool g_movingFloorEnabled = true;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 
-bool IntersectsAabb2D(const Aabb2D& a, const Aabb2D& b)
+}
+
+bool PhysicsLib::IntersectsAabb2D(const Aabb2D& a, const Aabb2D& b)
 {
     if (a.maxX < b.minX || b.maxX < a.minX)
     {
@@ -84,7 +70,7 @@ bool IntersectsAabb2D(const Aabb2D& a, const Aabb2D& b)
     return true;
 }
 
-bool ContainsAabb2D(const Aabb2D& outer, const Aabb2D& inner)
+bool PhysicsLib::ContainsAabb2D(const Aabb2D& outer, const Aabb2D& inner)
 {
     return inner.minX >= outer.minX &&
            inner.maxX <= outer.maxX &&
@@ -92,7 +78,7 @@ bool ContainsAabb2D(const Aabb2D& outer, const Aabb2D& inner)
            inner.maxZ <= outer.maxZ;
 }
 
-Aabb2D MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
+PhysicsLib::Aabb2D PhysicsLib::MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
 {
     Aabb2D bounds;
     bounds.minX = std::min(start.x, end.x) - kGroundContactOffset;
@@ -102,36 +88,38 @@ Aabb2D MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
     return bounds;
 }
 
-Aabb2D MakeWorldAabb2D(const SimpleObject& object)
+PhysicsLib::Aabb2D PhysicsLib::MakeWorldAabb2D(const D3DXVECTOR3& localBoundsMin,
+                                               const D3DXVECTOR3& localBoundsMax,
+                                               const Transform& transform)
 {
     D3DXMATRIX scaleMatrix;
     D3DXMATRIX rotationMatrix;
     D3DXMATRIX translationMatrix;
 
     D3DXMatrixScaling(&scaleMatrix,
-                      object.transform.scale.x,
-                      object.transform.scale.y,
-                      object.transform.scale.z);
+                      transform.scale.x,
+                      transform.scale.y,
+                      transform.scale.z);
     D3DXMatrixRotationYawPitchRoll(&rotationMatrix,
-                                   object.transform.rotation.y,
-                                   object.transform.rotation.x,
-                                   object.transform.rotation.z);
+                                   transform.rotation.y,
+                                   transform.rotation.x,
+                                   transform.rotation.z);
     D3DXMatrixTranslation(&translationMatrix,
-                          object.transform.position.x,
-                          object.transform.position.y,
-                          object.transform.position.z);
+                          transform.position.x,
+                          transform.position.y,
+                          transform.position.z);
 
     const D3DXMATRIX worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
     const D3DXVECTOR3 corners[8] =
     {
-        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMin.y, object.localBoundsMin.z),
-        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMin.y, object.localBoundsMin.z),
-        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMax.y, object.localBoundsMin.z),
-        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMax.y, object.localBoundsMin.z),
-        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMin.y, object.localBoundsMax.z),
-        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMin.y, object.localBoundsMax.z),
-        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMax.y, object.localBoundsMax.z),
-        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMax.y, object.localBoundsMax.z),
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMin.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMin.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMax.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMax.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMin.y, localBoundsMax.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMin.y, localBoundsMax.z),
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMax.y, localBoundsMax.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMax.y, localBoundsMax.z),
     };
 
     Aabb2D bounds;
@@ -153,7 +141,7 @@ Aabb2D MakeWorldAabb2D(const SimpleObject& object)
     return bounds;
 }
 
-bool ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax)
+bool PhysicsLib::ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax)
 {
     if (mesh == NULL || outMin == nullptr || outMax == nullptr)
     {
@@ -192,7 +180,7 @@ bool ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* o
     return vertexCount > 0;
 }
 
-void SplitQuadTreeNode(QuadTreeNode* node)
+void PhysicsLib::SplitQuadTreeNode(QuadTreeNode* node)
 {
     if (node == nullptr || !node->children.empty())
     {
@@ -213,15 +201,10 @@ void SplitQuadTreeNode(QuadTreeNode* node)
     }
 }
 
-bool InsertIntoChildIfContained(QuadTreeNode* node,
-                                size_t objectIndex,
-                                const Aabb2D& objectBounds,
-                                const std::vector<Aabb2D>& allBounds);
-
-void InsertQuadTreeObject(QuadTreeNode* node,
-                          size_t objectIndex,
-                          const Aabb2D& objectBounds,
-                          const std::vector<Aabb2D>& allBounds)
+void PhysicsLib::InsertQuadTreeObject(QuadTreeNode* node,
+                                      size_t objectIndex,
+                                      const Aabb2D& objectBounds,
+                                      const std::vector<Aabb2D>& allBounds)
 {
     if (node == nullptr)
     {
@@ -254,10 +237,10 @@ void InsertQuadTreeObject(QuadTreeNode* node,
     }
 }
 
-bool InsertIntoChildIfContained(QuadTreeNode* node,
-                                size_t objectIndex,
-                                const Aabb2D& objectBounds,
-                                const std::vector<Aabb2D>& allBounds)
+bool PhysicsLib::InsertIntoChildIfContained(QuadTreeNode* node,
+                                            size_t objectIndex,
+                                            const Aabb2D& objectBounds,
+                                            const std::vector<Aabb2D>& allBounds)
 {
     if (node == nullptr || node->children.empty())
     {
@@ -276,7 +259,9 @@ bool InsertIntoChildIfContained(QuadTreeNode* node,
     return false;
 }
 
-void QueryQuadTree(const QuadTreeNode& node, const Aabb2D& queryBounds, std::vector<size_t>* outIndices)
+void PhysicsLib::QueryQuadTree(const QuadTreeNode& node,
+                               const Aabb2D& queryBounds,
+                               std::vector<size_t>* outIndices)
 {
     if (outIndices == nullptr || !IntersectsAabb2D(node.bounds, queryBounds))
     {
@@ -294,7 +279,7 @@ void QueryQuadTree(const QuadTreeNode& node, const Aabb2D& queryBounds, std::vec
     }
 }
 
-std::vector<size_t> BuildCollisionCandidateIndices(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
+std::vector<size_t> PhysicsLib::BuildCollisionCandidateIndices(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
 {
     std::vector<size_t> candidates;
     if (!SettingsState::IsOptimizationEnabled())
@@ -311,7 +296,9 @@ std::vector<size_t> BuildCollisionCandidateIndices(const D3DXVECTOR3& start, con
     Aabb2D rootBounds;
     for (size_t i = 0; i < g_simpleObjects.size(); ++i)
     {
-        objectBounds[i] = MakeWorldAabb2D(g_simpleObjects[i]);
+        objectBounds[i] = MakeWorldAabb2D(g_simpleObjects[i].localBoundsMin,
+                                          g_simpleObjects[i].localBoundsMax,
+                                          g_simpleObjects[i].transform);
         if (g_simpleObjects[i].objectType == PhysicsLib::ObjectType::PassThrough ||
             g_simpleObjects[i].mesh == NULL)
         {
@@ -357,8 +344,6 @@ std::vector<size_t> BuildCollisionCandidateIndices(const D3DXVECTOR3& start, con
 
     QueryQuadTree(root, MakeSegmentAabb2D(start, end), &candidates);
     return candidates;
-}
-
 }
 
 // COMオブジェクトを安全に解放する処理である。

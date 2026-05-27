@@ -103,6 +103,21 @@ public:
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
 
 private:
+    struct Aabb2D
+    {
+        float minX = 0.0f;
+        float minZ = 0.0f;
+        float maxX = 0.0f;
+        float maxZ = 0.0f;
+    };
+
+    struct QuadTreeNode
+    {
+        Aabb2D bounds;
+        int depth = 0;
+        std::vector<size_t> objectIndices;
+        std::vector<QuadTreeNode> children;
+    };
 
     // COMオブジェクトを安全に解放するための補助関数である。
     static void SafeRelease(IUnknown* object);
@@ -125,6 +140,28 @@ private:
     // 速度から接触面へ向かう成分だけを取り除く補助関数である。
     static D3DXVECTOR3 RemoveIntoSurfaceVelocity(const D3DXVECTOR3& velocity,
                                                  const D3DXVECTOR3& surfaceNormal);
+
+    static bool IntersectsAabb2D(const Aabb2D& a, const Aabb2D& b);
+    static bool ContainsAabb2D(const Aabb2D& outer, const Aabb2D& inner);
+    static Aabb2D MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end);
+    static Aabb2D MakeWorldAabb2D(const D3DXVECTOR3& localBoundsMin,
+                                  const D3DXVECTOR3& localBoundsMax,
+                                  const Transform& transform);
+    static bool ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax);
+    static void SplitQuadTreeNode(QuadTreeNode* node);
+    static bool InsertIntoChildIfContained(QuadTreeNode* node,
+                                           size_t objectIndex,
+                                           const Aabb2D& objectBounds,
+                                           const std::vector<Aabb2D>& allBounds);
+    static void InsertQuadTreeObject(QuadTreeNode* node,
+                                     size_t objectIndex,
+                                     const Aabb2D& objectBounds,
+                                     const std::vector<Aabb2D>& allBounds);
+    static void QueryQuadTree(const QuadTreeNode& node,
+                              const Aabb2D& queryBounds,
+                              std::vector<size_t>* outIndices);
+    static std::vector<size_t> BuildCollisionCandidateIndices(const D3DXVECTOR3& start,
+                                                              const D3DXVECTOR3& end);
 
     // Xファイルからメッシュを読み込む補助関数である。
     static void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh);
