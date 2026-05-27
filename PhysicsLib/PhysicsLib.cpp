@@ -134,88 +134,202 @@ bool PhysicsLib::ExtractFaceNormal(LPD3DXMESH mesh, DWORD faceIndex, D3DXVECTOR3
 }
 
 // 線分と単一メッシュの接面判定をワールド座標系で行う処理である。
+
+// 判定対象のメッシュを受け取る。
 bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
+
+                               // 判定対象の位置、回転、拡大率を受け取る。
                                const Transform& transform,
+
+                               // ワールド座標系での線分の始点を受け取る。
                                const D3DXVECTOR3& rayOriginWorld,
+
+                               // ワールド座標系での線分の終点を受け取る。
                                const D3DXVECTOR3& rayEndWorld,
+
+                               // ヒット位置の出力先を受け取る。
                                D3DXVECTOR3* outPoint,
+
+                               // ヒット面の法線の出力先を受け取る。
                                D3DXVECTOR3* outSurfaceNormal,
+
+                               // ヒット距離の出力先を受け取る。
                                float* outDistance)
 {
+
+    // メッシュが無効なら判定できない。
     if (mesh == NULL)
     {
+
+        // 判定失敗として終了する。
         return false;
     }
 
+
+    // オブジェクトの Transform からワールド行列を作る。
     D3DXMATRIX worldMatrix = BuildWorldMatrix(transform);
+
+    // ワールド座標からローカル座標へ戻す逆行列を用意する。
     D3DXMATRIX inverseWorldMatrix;
+
+    // ワールド行列の逆行列を計算する。
     D3DXMatrixInverse(&inverseWorldMatrix, NULL, &worldMatrix);
 
+
+    // 線分始点のローカル座標を格納する。
     D3DXVECTOR3 originLocal;
+
+    // 線分終点のローカル座標を格納する。
     D3DXVECTOR3 endLocal;
+
+    // 線分始点をローカル座標系へ変換する。
     D3DXVec3TransformCoord(&originLocal, &rayOriginWorld, &inverseWorldMatrix);
+
+    // 線分終点をローカル座標系へ変換する。
     D3DXVec3TransformCoord(&endLocal, &rayEndWorld, &inverseWorldMatrix);
 
+
+    // ローカル座標系での線分ベクトルを求める。
     D3DXVECTOR3 rayVectorLocal = endLocal - originLocal;
+
+    // ローカル座標系での線分長を求める。
     const float maxDistanceLocal = D3DXVec3Length(&rayVectorLocal);
+
+    // 線分長がほぼゼロならレイを作れない。
     if (maxDistanceLocal <= 0.0001f)
     {
+
+        // 判定失敗として終了する。
         return false;
     }
 
+
+    // D3DXIntersect に渡すため、線分方向を正規化する。
     D3DXVECTOR3 rayDirectionLocal = rayVectorLocal / maxDistanceLocal;
 
+
+    // ヒット有無の受け取り先を初期化する。
     BOOL hit = FALSE;
+
+    // ヒットした面インデックスの受け取り先を初期化する。
     DWORD faceIndex = 0;
+
+    // バリセントリック座標 U の受け取り先を初期化する。
     FLOAT barycentricU = 0.0f;
+
+    // バリセントリック座標 V の受け取り先を初期化する。
     FLOAT barycentricV = 0.0f;
+
+    // ローカル座標系でのヒット距離の受け取り先を初期化する。
     FLOAT distanceLocal = 0.0f;
+
+    // メッシュとレイの交差判定を実行する。
     HRESULT result = D3DXIntersect(mesh,
+
+                                   // ローカル座標系のレイ始点を渡す。
                                    &originLocal,
+
+                                   // ローカル座標系のレイ方向を渡す。
                                    &rayDirectionLocal,
+
+                                   // ヒット有無の受け取り先を渡す。
                                    &hit,
+
+                                   // 面インデックスの受け取り先を渡す。
                                    &faceIndex,
+
+                                   // バリセントリック座標 U の受け取り先を渡す。
                                    &barycentricU,
+
+                                   // バリセントリック座標 V の受け取り先を渡す。
                                    &barycentricV,
+
+                                   // ヒット距離の受け取り先を渡す。
                                    &distanceLocal,
+
+                                   // 全ヒット情報の配列は使わない。
                                    NULL,
+
+                                   // 全ヒット数の受け取り先も使わない。
                                    NULL);
 
+
+    // API失敗、未ヒット、または線分終点より先のヒットは無効とする。
     if (FAILED(result) || !hit || distanceLocal > maxDistanceLocal)
     {
+
+        // 判定失敗として終了する。
         return false;
     }
 
+
+    // ローカル座標系でのヒット位置を求める。
     D3DXVECTOR3 localHitPoint = originLocal + rayDirectionLocal * distanceLocal;
+
+    // ワールド座標系でのヒット位置を格納する。
     D3DXVECTOR3 worldHitPoint;
+
+    // ヒット位置をワールド座標系へ戻す。
     D3DXVec3TransformCoord(&worldHitPoint, &localHitPoint, &worldMatrix);
 
+
+    // ローカル座標系での面法線を格納する。
     D3DXVECTOR3 localNormal;
+
+    // ヒット面の法線を取り出せなければ失敗とする。
     if (!ExtractFaceNormal(mesh, faceIndex, &localNormal))
     {
+
+        // 判定失敗として終了する。
         return false;
     }
 
+
+    // 法線変換用に逆行列の転置行列を用意する。
     D3DXMATRIX inverseTransposeWorld;
+
+    // 逆行列を転置して法線変換用行列を作る。
     D3DXMatrixTranspose(&inverseTransposeWorld, &inverseWorldMatrix);
+
+    // ワールド座標系へ変換した法線を格納する。
     D3DXVECTOR3 surfaceNormal;
+
+    // ローカル法線をワールド座標系へ変換する。
     D3DXVec3TransformNormal(&surfaceNormal, &localNormal, &inverseTransposeWorld);
+
+    // 変換後の法線を正規化する。
     D3DXVec3Normalize(&surfaceNormal, &surfaceNormal);
 
+
+    // ワールド座標系での始点からヒット位置までの差分を求める。
     D3DXVECTOR3 worldHitOffset = worldHitPoint - rayOriginWorld;
 
+
+    // ヒット位置の出力先があれば書き込む。
     if (outPoint != nullptr)
     {
+
+        // ヒット位置を呼び出し元へ返す。
         *outPoint = worldHitPoint;
     }
+
+    // 法線の出力先があれば書き込む。
     if (outSurfaceNormal != nullptr)
     {
+
+        // ヒット面の法線を呼び出し元へ返す。
         *outSurfaceNormal = surfaceNormal;
     }
+
+    // 距離の出力先があれば書き込む。
     if (outDistance != nullptr)
     {
+
+        // 始点からヒット位置までのワールド距離を呼び出し元へ返す。
         *outDistance = D3DXVec3Length(&worldHitOffset);
     }
+
+    // ここまで到達したので判定成功である。
     return true;
 }
 
