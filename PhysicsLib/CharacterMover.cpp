@@ -213,6 +213,10 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     D3DXVECTOR3 nextPosition = m_position;
     D3DXVECTOR3 nextVelocity = m_velocity;
     float lastNormalMove = 0.0f;
+    D3DXVECTOR3 lastHitNormal(0.0f, 0.0f, 0.0f);
+    float lastHitDistance = 0.0f;
+    D3DXVECTOR3 lastSlideMove(0.0f, 0.0f, 0.0f);
+    int slideCount = 0;
     const D3DXVECTOR3 attemptedVelocity = m_velocity;
     const bool collided = PhysicsLib::CheckCollide(m_position,
                                                    m_velocity,
@@ -221,9 +225,13 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &nextVelocity,
                                                    outPassThroughIds,
                                                    outSolidIds,
-                                                   &lastNormalMove,
                                                    m_settings.radius,
-                                                   m_settings.height);
+                                                   m_settings.height,
+                                                   &lastNormalMove,
+                                                   &lastHitNormal,
+                                                   &lastHitDistance,
+                                                   &lastSlideMove,
+                                                   &slideCount);
     m_position = nextPosition;
     m_velocity = nextVelocity;
     if (SettingsState::IsGravityEnabled())
@@ -244,6 +252,10 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_debugInfo.hitCount = 1;
     }
     m_debugInfo.lastNormalMove = lastNormalMove;
+    m_debugInfo.lastHitNormal = lastHitNormal;
+    m_debugInfo.lastHitDistance = lastHitDistance;
+    m_debugInfo.lastSlideMove = lastSlideMove;
+    m_debugInfo.slideCount = slideCount;
     return collided;
 }
 }

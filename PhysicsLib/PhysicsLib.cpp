@@ -40,6 +40,7 @@ bool g_doubleJumpEnabled = false;
 bool g_infiniteJumpEnabled = true;
 bool g_gravityEnabled = true;
 bool g_inertiaEnabled = false;
+bool g_slideEnabled = false;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 
@@ -389,6 +390,16 @@ void SettingsState::SetInertiaEnabled(bool enabled)
     g_inertiaEnabled = enabled;
 }
 
+bool SettingsState::IsSlideEnabled()
+{
+    return g_slideEnabled;
+}
+
+void SettingsState::SetSlideEnabled(bool enabled)
+{
+    g_slideEnabled = enabled;
+}
+
 bool SettingsState::IsContactEnabled()
 {
     return g_contactEnabled;
@@ -543,9 +554,13 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               D3DXVECTOR3* outNextMoveVector,
                               std::vector<int>* outPassThroughIds,
                               std::vector<int>* outSolidIds,
-                              float* outNormalMove,
                               float radius,
-                              float height)
+                              float height,
+                              float* outNormalMove,
+                              D3DXVECTOR3* outHitNormal,
+                              float* outHitDistance,
+                              D3DXVECTOR3* outSlideMove,
+                              int* outSlideCount)
 {
     UNREFERENCED_PARAMETER(shapeType);
     UNREFERENCED_PARAMETER(radius);
@@ -555,6 +570,10 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     D3DXVECTOR3 nextMoveVector = moveVector;
     bool collided = false;
     float lastNormalMove = 0.0f;
+    D3DXVECTOR3 lastHitNormal(0.0f, 0.0f, 0.0f);
+    float lastHitDistance = 0.0f;
+    D3DXVECTOR3 lastSlideMove(0.0f, 0.0f, 0.0f);
+    int slideCount = 0;
 
     if (outPassThroughIds != nullptr)
     {
@@ -614,8 +633,78 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
             {
                 nextPosition = nearestPoint;
                 nextPosition += nearestNormal * kGroundContactOffset;
+                lastHitNormal = nearestNormal;
+                lastHitDistance = nearestDistance;
 
-                nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                if (SettingsState::IsSlideEnabled())
+                {
+                    const D3DXVECTOR3 hitMove = nearestPoint - currentPosition;
+                    const D3DXVECTOR3 remainingMove = frameMove - hitMove;
+                    const float slideNormalMove = D3DXVec3Dot(&remainingMove, &nearestNormal);
+                    D3DXVECTOR3 slideMove = remainingMove - nearestNormal * slideNormalMove;
+                    lastSlideMove = slideMove;
+                    if (D3DXVec3Length(&slideMove) > 0.0001f)
+                    {
+                        D3DXVECTOR3 slideEndPosition = nextPosition + slideMove;
+                        D3DXVECTOR3 slideHitPoint;
+                        D3DXVECTOR3 slideHitNormal;
+                        float slideHitDistance = 0.0f;
+                        bool slideBlocked = false;
+                        float nearestSlideDistance = std::numeric_limits<float>::max();
+                        for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+                        {
+                            if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
+                            {
+                                continue;
+                            }
+
+                            if (RayCastObject(g_simpleObjects[i].mesh,
+                                              g_simpleObjects[i].transform,
+                                              nextPosition,
+                                              slideEndPosition,
+                                               &slideHitPoint,
+                                               &slideHitNormal,
+                                               &slideHitDistance))
+                            {
+                                if (slideHitDistance >= nearestSlideDistance)
+                                {
+                                    continue;
+                                }
+
+                                const float slideHitNormalMove = D3DXVec3Dot(&slideMove, &slideHitNormal);
+                                if (slideHitNormalMove > 0.0f)
+                                {
+                                    continue;
+                                }
+
+                                slideEndPosition = slideHitPoint + slideHitNormal * kGroundContactOffset;
+                                lastHitNormal = slideHitNormal;
+                                lastHitDistance = slideHitDistance;
+                                nearestSlideDistance = slideHitDistance;
+                                slideBlocked = true;
+                            }
+                        }
+
+                        nextPosition = slideEndPosition;
+                        ++slideCount;
+                        if (slideBlocked)
+                        {
+                            nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                        }
+                        else
+                        {
+                            nextMoveVector = slideMove / kDeltaSeconds;
+                        }
+                    }
+                    else
+                    {
+                        nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                    }
+                }
+                else
+                {
+                    nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                }
                 collided = true;
             }
         }
@@ -632,6 +721,22 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     if (outNormalMove != nullptr)
     {
         *outNormalMove = lastNormalMove;
+    }
+    if (outHitNormal != nullptr)
+    {
+        *outHitNormal = lastHitNormal;
+    }
+    if (outHitDistance != nullptr)
+    {
+        *outHitDistance = lastHitDistance;
+    }
+    if (outSlideMove != nullptr)
+    {
+        *outSlideMove = lastSlideMove;
+    }
+    if (outSlideCount != nullptr)
+    {
+        *outSlideCount = slideCount;
     }
 
     return collided;

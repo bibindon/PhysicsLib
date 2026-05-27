@@ -14,6 +14,7 @@ const int kSettingsCheckboxStartId = 4100;
 const int kDoubleJumpCheckboxId = kSettingsCheckboxStartId + 0;
 const int kInfiniteJumpCheckboxId = kSettingsCheckboxStartId + 1;
 const int kGravityCheckboxId = kSettingsCheckboxStartId + 2;
+const int kSlideCheckboxId = kSettingsCheckboxStartId + 3;
 const int kInertiaCheckboxId = kSettingsCheckboxStartId + 6;
 const int kContactCheckboxId = kSettingsCheckboxStartId + 7;
 const int kSurfaceContactCheckboxId = kSettingsCheckboxStartId + 8;
@@ -72,6 +73,13 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
             SettingsState::SetInertiaEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kSlideCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SettingsState::SetSlideEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
@@ -181,6 +189,15 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         {
             LRESULT checkState = BST_UNCHECKED;
             if (SettingsState::IsInertiaEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
+        }
+        else if (kSettingsCheckboxStartId + i == kSlideCheckboxId)
+        {
+            LRESULT checkState = BST_UNCHECKED;
+            if (SettingsState::IsSlideEnabled())
             {
                 checkState = BST_CHECKED;
             }

@@ -15,6 +15,8 @@ public:
     static void SetGravityEnabled(bool enabled);
     static bool IsInertiaEnabled();
     static void SetInertiaEnabled(bool enabled);
+    static bool IsSlideEnabled();
+    static void SetSlideEnabled(bool enabled);
     static bool IsContactEnabled();
     static void SetContactEnabled(bool enabled);
     static bool IsSurfaceContactEnabled();
