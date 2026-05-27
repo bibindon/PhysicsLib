@@ -955,6 +955,8 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 
         if (iteration == kMaxSlideIterations - 1)
         {
+            nextMoveVector.x = 0.0f;
+            nextMoveVector.z = 0.0f;
             remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
             break;
         }
