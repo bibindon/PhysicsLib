@@ -21,6 +21,8 @@ public:
     static void SetTangentMoveEnabled(bool enabled);
     static bool IsAirMoveEnabled();
     static void SetAirMoveEnabled(bool enabled);
+    static bool IsOptimizationEnabled();
+    static void SetOptimizationEnabled(bool enabled);
     static bool IsContactEnabled();
     static void SetContactEnabled(bool enabled);
     static bool IsSurfaceContactEnabled();

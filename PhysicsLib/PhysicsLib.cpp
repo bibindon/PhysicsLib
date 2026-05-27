@@ -4,6 +4,7 @@
 
 #include "PhysicsLibInternal.h"
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -21,6 +22,8 @@ namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
 constexpr float kGroundContactOffset = 0.001f;
+constexpr int kQuadTreeMaxDepth = 5;
+constexpr size_t kQuadTreeNodeCapacity = 4;
 
 LPDIRECT3D9 g_direct3d = NULL;
 LPDIRECT3DDEVICE9 g_device = NULL;
@@ -32,6 +35,24 @@ struct SimpleObject
     PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
     LPD3DXMESH mesh = NULL;
     PhysicsLib::Transform transform;
+    D3DXVECTOR3 localBoundsMin = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    D3DXVECTOR3 localBoundsMax = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+};
+
+struct Aabb2D
+{
+    float minX = 0.0f;
+    float minZ = 0.0f;
+    float maxX = 0.0f;
+    float maxZ = 0.0f;
+};
+
+struct QuadTreeNode
+{
+    Aabb2D bounds;
+    int depth = 0;
+    std::vector<size_t> objectIndices;
+    std::vector<QuadTreeNode> children;
 };
 
 std::vector<SimpleObject> g_simpleObjects;
@@ -43,8 +64,299 @@ bool g_inertiaEnabled = true;
 bool g_slideEnabled = true;
 bool g_tangentMoveEnabled = true;
 bool g_airMoveEnabled = true;
+bool g_optimizationEnabled = false;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
+
+bool IntersectsAabb2D(const Aabb2D& a, const Aabb2D& b)
+{
+    if (a.maxX < b.minX || b.maxX < a.minX)
+    {
+        return false;
+    }
+
+    if (a.maxZ < b.minZ || b.maxZ < a.minZ)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool ContainsAabb2D(const Aabb2D& outer, const Aabb2D& inner)
+{
+    return inner.minX >= outer.minX &&
+           inner.maxX <= outer.maxX &&
+           inner.minZ >= outer.minZ &&
+           inner.maxZ <= outer.maxZ;
+}
+
+Aabb2D MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
+{
+    Aabb2D bounds;
+    bounds.minX = std::min(start.x, end.x) - kGroundContactOffset;
+    bounds.maxX = std::max(start.x, end.x) + kGroundContactOffset;
+    bounds.minZ = std::min(start.z, end.z) - kGroundContactOffset;
+    bounds.maxZ = std::max(start.z, end.z) + kGroundContactOffset;
+    return bounds;
+}
+
+Aabb2D MakeWorldAabb2D(const SimpleObject& object)
+{
+    D3DXMATRIX scaleMatrix;
+    D3DXMATRIX rotationMatrix;
+    D3DXMATRIX translationMatrix;
+
+    D3DXMatrixScaling(&scaleMatrix,
+                      object.transform.scale.x,
+                      object.transform.scale.y,
+                      object.transform.scale.z);
+    D3DXMatrixRotationYawPitchRoll(&rotationMatrix,
+                                   object.transform.rotation.y,
+                                   object.transform.rotation.x,
+                                   object.transform.rotation.z);
+    D3DXMatrixTranslation(&translationMatrix,
+                          object.transform.position.x,
+                          object.transform.position.y,
+                          object.transform.position.z);
+
+    const D3DXMATRIX worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+    const D3DXVECTOR3 corners[8] =
+    {
+        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMin.y, object.localBoundsMin.z),
+        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMin.y, object.localBoundsMin.z),
+        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMax.y, object.localBoundsMin.z),
+        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMax.y, object.localBoundsMin.z),
+        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMin.y, object.localBoundsMax.z),
+        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMin.y, object.localBoundsMax.z),
+        D3DXVECTOR3(object.localBoundsMin.x, object.localBoundsMax.y, object.localBoundsMax.z),
+        D3DXVECTOR3(object.localBoundsMax.x, object.localBoundsMax.y, object.localBoundsMax.z),
+    };
+
+    Aabb2D bounds;
+    bounds.minX = std::numeric_limits<float>::max();
+    bounds.minZ = std::numeric_limits<float>::max();
+    bounds.maxX = -std::numeric_limits<float>::max();
+    bounds.maxZ = -std::numeric_limits<float>::max();
+
+    for (int i = 0; i < 8; ++i)
+    {
+        D3DXVECTOR3 worldCorner;
+        D3DXVec3TransformCoord(&worldCorner, &corners[i], &worldMatrix);
+        bounds.minX = std::min(bounds.minX, worldCorner.x);
+        bounds.minZ = std::min(bounds.minZ, worldCorner.z);
+        bounds.maxX = std::max(bounds.maxX, worldCorner.x);
+        bounds.maxZ = std::max(bounds.maxZ, worldCorner.z);
+    }
+
+    return bounds;
+}
+
+bool ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax)
+{
+    if (mesh == NULL || outMin == nullptr || outMax == nullptr)
+    {
+        return false;
+    }
+
+    void* vertexBuffer = NULL;
+    HRESULT result = mesh->LockVertexBuffer(D3DLOCK_READONLY, &vertexBuffer);
+    if (FAILED(result))
+    {
+        return false;
+    }
+
+    const BYTE* vertices = static_cast<const BYTE*>(vertexBuffer);
+    const DWORD stride = mesh->GetNumBytesPerVertex();
+    const DWORD vertexCount = mesh->GetNumVertices();
+    *outMin = D3DXVECTOR3(std::numeric_limits<float>::max(),
+                          std::numeric_limits<float>::max(),
+                          std::numeric_limits<float>::max());
+    *outMax = D3DXVECTOR3(-std::numeric_limits<float>::max(),
+                          -std::numeric_limits<float>::max(),
+                          -std::numeric_limits<float>::max());
+
+    for (DWORD i = 0; i < vertexCount; ++i)
+    {
+        const D3DXVECTOR3* position = reinterpret_cast<const D3DXVECTOR3*>(vertices + i * stride);
+        outMin->x = std::min(outMin->x, position->x);
+        outMin->y = std::min(outMin->y, position->y);
+        outMin->z = std::min(outMin->z, position->z);
+        outMax->x = std::max(outMax->x, position->x);
+        outMax->y = std::max(outMax->y, position->y);
+        outMax->z = std::max(outMax->z, position->z);
+    }
+
+    mesh->UnlockVertexBuffer();
+    return vertexCount > 0;
+}
+
+void SplitQuadTreeNode(QuadTreeNode* node)
+{
+    if (node == nullptr || !node->children.empty())
+    {
+        return;
+    }
+
+    const float centerX = (node->bounds.minX + node->bounds.maxX) * 0.5f;
+    const float centerZ = (node->bounds.minZ + node->bounds.maxZ) * 0.5f;
+    node->children.resize(4);
+    node->children[0].bounds = { node->bounds.minX, node->bounds.minZ, centerX, centerZ };
+    node->children[1].bounds = { centerX, node->bounds.minZ, node->bounds.maxX, centerZ };
+    node->children[2].bounds = { node->bounds.minX, centerZ, centerX, node->bounds.maxZ };
+    node->children[3].bounds = { centerX, centerZ, node->bounds.maxX, node->bounds.maxZ };
+
+    for (size_t i = 0; i < node->children.size(); ++i)
+    {
+        node->children[i].depth = node->depth + 1;
+    }
+}
+
+bool InsertIntoChildIfContained(QuadTreeNode* node,
+                                size_t objectIndex,
+                                const Aabb2D& objectBounds,
+                                const std::vector<Aabb2D>& allBounds);
+
+void InsertQuadTreeObject(QuadTreeNode* node,
+                          size_t objectIndex,
+                          const Aabb2D& objectBounds,
+                          const std::vector<Aabb2D>& allBounds)
+{
+    if (node == nullptr)
+    {
+        return;
+    }
+
+    if (InsertIntoChildIfContained(node, objectIndex, objectBounds, allBounds))
+    {
+        return;
+    }
+
+    node->objectIndices.push_back(objectIndex);
+    if (node->objectIndices.size() <= kQuadTreeNodeCapacity || node->depth >= kQuadTreeMaxDepth)
+    {
+        return;
+    }
+
+    SplitQuadTreeNode(node);
+    for (size_t i = 0; i < node->objectIndices.size();)
+    {
+        const size_t storedIndex = node->objectIndices[i];
+        if (InsertIntoChildIfContained(node, storedIndex, allBounds[storedIndex], allBounds))
+        {
+            node->objectIndices.erase(node->objectIndices.begin() + i);
+        }
+        else
+        {
+            ++i;
+        }
+    }
+}
+
+bool InsertIntoChildIfContained(QuadTreeNode* node,
+                                size_t objectIndex,
+                                const Aabb2D& objectBounds,
+                                const std::vector<Aabb2D>& allBounds)
+{
+    if (node == nullptr || node->children.empty())
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < node->children.size(); ++i)
+    {
+        if (ContainsAabb2D(node->children[i].bounds, objectBounds))
+        {
+            InsertQuadTreeObject(&node->children[i], objectIndex, objectBounds, allBounds);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void QueryQuadTree(const QuadTreeNode& node, const Aabb2D& queryBounds, std::vector<size_t>* outIndices)
+{
+    if (outIndices == nullptr || !IntersectsAabb2D(node.bounds, queryBounds))
+    {
+        return;
+    }
+
+    for (size_t i = 0; i < node.objectIndices.size(); ++i)
+    {
+        outIndices->push_back(node.objectIndices[i]);
+    }
+
+    for (size_t i = 0; i < node.children.size(); ++i)
+    {
+        QueryQuadTree(node.children[i], queryBounds, outIndices);
+    }
+}
+
+std::vector<size_t> BuildCollisionCandidateIndices(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
+{
+    std::vector<size_t> candidates;
+    if (!SettingsState::IsOptimizationEnabled())
+    {
+        for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+        {
+            candidates.push_back(i);
+        }
+        return candidates;
+    }
+
+    std::vector<Aabb2D> objectBounds(g_simpleObjects.size());
+    bool hasRootBounds = false;
+    Aabb2D rootBounds;
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        objectBounds[i] = MakeWorldAabb2D(g_simpleObjects[i]);
+        if (g_simpleObjects[i].objectType == PhysicsLib::ObjectType::PassThrough ||
+            g_simpleObjects[i].mesh == NULL)
+        {
+            continue;
+        }
+
+        if (!hasRootBounds)
+        {
+            rootBounds = objectBounds[i];
+            hasRootBounds = true;
+        }
+        else
+        {
+            rootBounds.minX = std::min(rootBounds.minX, objectBounds[i].minX);
+            rootBounds.minZ = std::min(rootBounds.minZ, objectBounds[i].minZ);
+            rootBounds.maxX = std::max(rootBounds.maxX, objectBounds[i].maxX);
+            rootBounds.maxZ = std::max(rootBounds.maxZ, objectBounds[i].maxZ);
+        }
+    }
+
+    if (!hasRootBounds)
+    {
+        return candidates;
+    }
+
+    rootBounds.minX -= kGroundContactOffset;
+    rootBounds.minZ -= kGroundContactOffset;
+    rootBounds.maxX += kGroundContactOffset;
+    rootBounds.maxZ += kGroundContactOffset;
+
+    QuadTreeNode root;
+    root.bounds = rootBounds;
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].objectType == PhysicsLib::ObjectType::PassThrough ||
+            g_simpleObjects[i].mesh == NULL)
+        {
+            continue;
+        }
+
+        InsertQuadTreeObject(&root, i, objectBounds[i], objectBounds);
+    }
+
+    QueryQuadTree(root, MakeSegmentAabb2D(start, end), &candidates);
+    return candidates;
+}
 
 }
 
@@ -442,6 +754,16 @@ void SettingsState::SetAirMoveEnabled(bool enabled)
     g_airMoveEnabled = enabled;
 }
 
+bool SettingsState::IsOptimizationEnabled()
+{
+    return g_optimizationEnabled;
+}
+
+void SettingsState::SetOptimizationEnabled(bool enabled)
+{
+    g_optimizationEnabled = enabled;
+}
+
 bool SettingsState::IsContactEnabled()
 {
     return g_contactEnabled;
@@ -542,6 +864,7 @@ int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float fricti
     if (modelPath != nullptr && modelPath[0] != _T('\0'))
     {
         LoadMesh(modelPath, &object.mesh);
+        ComputeMeshLocalBounds(object.mesh, &object.localBoundsMin, &object.localBoundsMax);
     }
     g_simpleObjects.push_back(object);
     return object.id;
@@ -637,8 +960,10 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
             bool foundHit = false;
             float nearestDistance = std::numeric_limits<float>::max();
 
-            for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+            const std::vector<size_t> candidateIndices = BuildCollisionCandidateIndices(currentPosition, nextPosition);
+            for (size_t candidateIndex = 0; candidateIndex < candidateIndices.size(); ++candidateIndex)
             {
+                const size_t i = candidateIndices[candidateIndex];
                 if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
                 {
                     continue;
@@ -696,8 +1021,11 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                         D3DXVECTOR3 nearestSlidePoint = slideEndPosition;
                         D3DXVECTOR3 nearestSlideNormal(0.0f, 1.0f, 0.0f);
                         float nearestSlideDistance = std::numeric_limits<float>::max();
-                        for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+                        const std::vector<size_t> slideCandidateIndices =
+                            BuildCollisionCandidateIndices(nextPosition, slideEndPosition);
+                        for (size_t candidateIndex = 0; candidateIndex < slideCandidateIndices.size(); ++candidateIndex)
                         {
+                            const size_t i = slideCandidateIndices[candidateIndex];
                             if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
                             {
                                 continue;
