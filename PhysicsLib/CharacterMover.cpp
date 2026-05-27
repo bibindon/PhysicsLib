@@ -305,6 +305,8 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     float lastHitDistance = 0.0f;
     D3DXVECTOR3 lastSlideMove(0.0f, 0.0f, 0.0f);
     int slideCount = 0;
+    int supportObjectId = -1;
+    D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
     const bool collided = PhysicsLib::CheckCollide(m_position,
                                                    m_velocity,
                                                    m_settings.shapeType,
@@ -318,7 +320,9 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &lastHitNormal,
                                                    &lastHitDistance,
                                                    &lastSlideMove,
-                                                   &slideCount);
+                                                   &slideCount,
+                                                   &supportObjectId,
+                                                   &supportVelocity);
     m_position = nextPosition;
     m_velocity = nextVelocity;
     if (SettingsState::IsGravityEnabled())
@@ -330,11 +334,19 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     {
         m_isGrounded = true;
         m_remainingAirJumps = 1;
+        m_supportObjectId = supportObjectId;
         m_groundNormal = lastHitNormal;
         D3DXVec3Normalize(&m_groundNormal, &m_groundNormal);
     }
     m_isTouchingWall = false;
-    m_supportObjectId = -1;
+    if (!m_isGrounded)
+    {
+        m_supportObjectId = -1;
+    }
+    if (m_isGrounded && SettingsState::IsMovingFloorEnabled() && m_supportObjectId >= 0)
+    {
+        m_position += supportVelocity * kDeltaSeconds;
+    }
     m_debugInfo = DebugInfo();
     if (collided)
     {

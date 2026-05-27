@@ -572,24 +572,13 @@ void UpdatePlayer()
     }
     g_prevEscPressed = isEscPressed;
 
-    D3DXVECTOR3 movingPlatformDelta(0.0f, 0.0f, 0.0f);
     if (g_movingPlatformId >= 0)
     {
-        const PhysicsLib::PhysicsLib::Transform beforeUpdate =
-            PhysicsLib::PhysicsLib::GetTransform(g_movingPlatformId);
         PhysicsLib::PhysicsLib::Update();
-        const PhysicsLib::PhysicsLib::Transform afterUpdate =
-            PhysicsLib::PhysicsLib::GetTransform(g_movingPlatformId);
-        movingPlatformDelta = afterUpdate.position - beforeUpdate.position;
     }
     else
     {
         PhysicsLib::PhysicsLib::Update();
-    }
-
-    if (g_playerMover.GetSupportObjectId() == g_movingPlatformId)
-    {
-        g_playerMover.SetPosition(g_playerMover.GetPosition() + movingPlatformDelta);
     }
 
     if (g_movingPlatformId >= 0)

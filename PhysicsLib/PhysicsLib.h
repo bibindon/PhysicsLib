@@ -95,7 +95,9 @@ public:
                              D3DXVECTOR3* outHitNormal = nullptr,
                              float* outHitDistance = nullptr,
                              D3DXVECTOR3* outSlideMove = nullptr,
-                             int* outSlideCount = nullptr);
+                             int* outSlideCount = nullptr,
+                             int* outSupportObjectId = nullptr,
+                             D3DXVECTOR3* outSupportVelocity = nullptr);
 
     // 指定IDのオブジェクトと position の距離が distance 以下かを判定する。
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);

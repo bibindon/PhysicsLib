@@ -65,6 +65,7 @@ bool g_slideEnabled = true;
 bool g_tangentMoveEnabled = true;
 bool g_airMoveEnabled = true;
 bool g_optimizationEnabled = false;
+bool g_movingFloorEnabled = false;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 
@@ -764,6 +765,16 @@ void SettingsState::SetOptimizationEnabled(bool enabled)
     g_optimizationEnabled = enabled;
 }
 
+bool SettingsState::IsMovingFloorEnabled()
+{
+    return g_movingFloorEnabled;
+}
+
+void SettingsState::SetMovingFloorEnabled(bool enabled)
+{
+    g_movingFloorEnabled = enabled;
+}
+
 bool SettingsState::IsContactEnabled()
 {
     return g_contactEnabled;
@@ -925,7 +936,9 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               D3DXVECTOR3* outHitNormal,
                               float* outHitDistance,
                               D3DXVECTOR3* outSlideMove,
-                              int* outSlideCount)
+                              int* outSlideCount,
+                              int* outSupportObjectId,
+                              D3DXVECTOR3* outSupportVelocity)
 {
     UNREFERENCED_PARAMETER(shapeType);
     UNREFERENCED_PARAMETER(radius);
@@ -939,6 +952,8 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     float lastHitDistance = 0.0f;
     D3DXVECTOR3 lastSlideMove(0.0f, 0.0f, 0.0f);
     int slideCount = 0;
+    int supportObjectId = -1;
+    D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
 
     if (outPassThroughIds != nullptr)
     {
@@ -959,6 +974,9 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
             D3DXVECTOR3 nearestNormal(0.0f, 1.0f, 0.0f);
             bool foundHit = false;
             float nearestDistance = std::numeric_limits<float>::max();
+            int nearestObjectId = -1;
+            ObjectType nearestObjectType = ObjectType::Slide;
+            D3DXVECTOR3 nearestVelocity(0.0f, 0.0f, 0.0f);
 
             const std::vector<size_t> candidateIndices = BuildCollisionCandidateIndices(currentPosition, nextPosition);
             for (size_t candidateIndex = 0; candidateIndex < candidateIndices.size(); ++candidateIndex)
@@ -993,6 +1011,9 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                     nearestDistance = hitDistance;
                     nearestPoint = hitPoint;
                     nearestNormal = surfaceNormal;
+                    nearestObjectId = g_simpleObjects[i].id;
+                    nearestObjectType = g_simpleObjects[i].objectType;
+                    nearestVelocity = g_simpleObjects[i].transform.velocity;
                 }
             }
 
@@ -1003,6 +1024,11 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                 nextMoveVector = RemoveIntoSurfaceVelocity(moveVector, nearestNormal);
                 lastHitNormal = nearestNormal;
                 lastHitDistance = nearestDistance;
+                if (nearestNormal.y > 0.0f && nearestObjectType == ObjectType::MovingSlide)
+                {
+                    supportObjectId = nearestObjectId;
+                    supportVelocity = nearestVelocity;
+                }
 
                 if (SettingsState::IsSlideEnabled())
                 {
@@ -1103,6 +1129,14 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     if (outSlideCount != nullptr)
     {
         *outSlideCount = slideCount;
+    }
+    if (outSupportObjectId != nullptr)
+    {
+        *outSupportObjectId = supportObjectId;
+    }
+    if (outSupportVelocity != nullptr)
+    {
+        *outSupportVelocity = supportVelocity;
     }
 
     return collided;

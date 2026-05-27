@@ -23,6 +23,8 @@ public:
     static void SetAirMoveEnabled(bool enabled);
     static bool IsOptimizationEnabled();
     static void SetOptimizationEnabled(bool enabled);
+    static bool IsMovingFloorEnabled();
+    static void SetMovingFloorEnabled(bool enabled);
     static bool IsContactEnabled();
     static void SetContactEnabled(bool enabled);
     static bool IsSurfaceContactEnabled();
