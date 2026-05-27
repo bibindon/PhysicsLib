@@ -96,9 +96,17 @@ public:
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
 
 private:
+
+    // COMオブジェクトを安全に解放するための補助関数である。
     static void SafeRelease(IUnknown* object);
+
+    // Transform からワールド行列を組み立てる補助関数である。
     static D3DXMATRIX BuildWorldMatrix(const Transform& transform);
+
+    // メッシュの指定面から法線を取り出す補助関数である。
     static bool ExtractFaceNormal(LPD3DXMESH mesh, DWORD faceIndex, D3DXVECTOR3* outNormal);
+
+    // ワールド座標系の線分と単一メッシュの接面判定を行う補助関数である。
     static bool RayCastObject(LPD3DXMESH mesh,
                               const Transform& transform,
                               const D3DXVECTOR3& rayOriginWorld,
@@ -106,6 +114,8 @@ private:
                               D3DXVECTOR3* outPoint,
                               D3DXVECTOR3* outSurfaceNormal,
                               float* outDistance);
+
+    // Xファイルからメッシュを読み込む補助関数である。
     static void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh);
 };
 

@@ -44,7 +44,7 @@ bool g_surfaceContactEnabled = true;
 
 }
 
-
+// COMオブジェクトを安全に解放する処理である。
 void PhysicsLib::SafeRelease(IUnknown* object)
 {
     if (object != NULL)
@@ -53,6 +53,7 @@ void PhysicsLib::SafeRelease(IUnknown* object)
     }
 }
 
+// Transform からワールド行列を生成する処理である。
 D3DXMATRIX PhysicsLib::BuildWorldMatrix(const Transform& transform)
 {
     D3DXMATRIX scaleMatrix;
@@ -72,6 +73,7 @@ D3DXMATRIX PhysicsLib::BuildWorldMatrix(const Transform& transform)
     return scaleMatrix * rotationMatrix * translationMatrix;
 }
 
+// メッシュの指定面からローカル法線を取り出す処理である。
 bool PhysicsLib::ExtractFaceNormal(LPD3DXMESH mesh, DWORD faceIndex, D3DXVECTOR3* outNormal)
 {
     if (mesh == NULL)
@@ -131,6 +133,7 @@ bool PhysicsLib::ExtractFaceNormal(LPD3DXMESH mesh, DWORD faceIndex, D3DXVECTOR3
     return true;
 }
 
+// 線分と単一メッシュの接面判定をワールド座標系で行う処理である。
 bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
                                const Transform& transform,
                                const D3DXVECTOR3& rayOriginWorld,
@@ -216,6 +219,7 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     return true;
 }
 
+// Xファイルから衝突用メッシュを読み込む処理である。
 void PhysicsLib::LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 {
     LPD3DXBUFFER materialBuffer = NULL;
