@@ -24,7 +24,7 @@
 const int IDC_DOUBLE_JUMP_CHECKBOX = 1001;
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
-const ULONGLONG kTargetFrameMilliseconds = 16;
+const double kTargetFrameSeconds = 1.0 / 60.0;
 const float kPlayerSpeed = 5.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
@@ -159,7 +159,10 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
     UpdateWindow(hWnd);
 
     MSG msg;
-    ULONGLONG nextFrameTick = GetTickCount64();
+    LARGE_INTEGER performanceFrequency;
+    LARGE_INTEGER nextFrameCounter;
+    QueryPerformanceFrequency(&performanceFrequency);
+    QueryPerformanceCounter(&nextFrameCounter);
 
     while (true)
     {
@@ -169,14 +172,28 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
         }
         else
         {
-            const ULONGLONG currentTick = GetTickCount64();
-            if (currentTick < nextFrameTick)
+            LARGE_INTEGER currentCounter;
+            QueryPerformanceCounter(&currentCounter);
+
+            const LONGLONG remainingCounts = nextFrameCounter.QuadPart - currentCounter.QuadPart;
+            if (remainingCounts > 0)
             {
-                Sleep(static_cast<DWORD>(nextFrameTick - currentTick));
+                const double remainingSeconds =
+                    static_cast<double>(remainingCounts) / static_cast<double>(performanceFrequency.QuadPart);
+                if (remainingSeconds > 0.002)
+                {
+                    Sleep(static_cast<DWORD>((remainingSeconds - 0.001) * 1000.0));
+                }
+                else
+                {
+                    Sleep(0);
+                }
                 continue;
             }
 
-            nextFrameTick = currentTick + kTargetFrameMilliseconds;
+            nextFrameCounter.QuadPart =
+                currentCounter.QuadPart +
+                static_cast<LONGLONG>(kTargetFrameSeconds * static_cast<double>(performanceFrequency.QuadPart));
             UpdatePlayer();
             Render();
         }
