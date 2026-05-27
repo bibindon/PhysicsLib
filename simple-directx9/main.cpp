@@ -643,9 +643,12 @@ void UpdateCamera()
     const D3DXVECTOR3 cameraUp(0.0f, 1.0f, 0.0f);
 
     D3DXMatrixLookAtLH(&g_cameraView, &cameraPosition, &cameraTarget, &cameraUp);
+    const float aspect = (float)WINDOW_SIZE_W / WINDOW_SIZE_H;
+    const float horizontalFov = D3DXToRadian(90.0f);
+    const float verticalFov = 2.0f * atanf(tanf(horizontalFov * 0.5f) / aspect);
     D3DXMatrixPerspectiveFovLH(&g_cameraProjection,
-                               D3DXToRadian(45.0f),
-                               (float)WINDOW_SIZE_W / WINDOW_SIZE_H,
+                               verticalFov,
+                               aspect,
                                0.1f,
                                1000.0f);
 }
