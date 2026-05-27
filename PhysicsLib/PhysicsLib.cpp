@@ -49,6 +49,7 @@ struct RaycastHit
     float distance = 0.0f;
     D3DXVECTOR3 point = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 normal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
+    D3DXVECTOR3 surfaceNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     int objectId = -1;
     PhysicsLibOld::ObjectType objectType = PhysicsLibOld::ObjectType::Slide;
 };
@@ -551,6 +552,7 @@ bool RaycastObject(const LoadedObject& object,
     D3DXVECTOR3 worldNormal;
     D3DXVec3TransformNormal(&worldNormal, &localNormal, &inverseTransposeWorld);
     D3DXVec3Normalize(&worldNormal, &worldNormal);
+    D3DXVECTOR3 surfaceNormal = worldNormal;
 
     const D3DXVECTOR3 rayVectorWorld = rayEndWorld - rayOriginWorld;
     D3DXVECTOR3 rayDirectionWorld = rayVectorWorld;
@@ -573,6 +575,7 @@ bool RaycastObject(const LoadedObject& object,
     outHit->distance = D3DXVec3Length(&worldHitOffset);
     outHit->point = worldHitPoint;
     outHit->normal = worldNormal;
+    outHit->surfaceNormal = surfaceNormal;
     outHit->objectId = object.id;
     outHit->objectType = object.objectType;
     return true;
@@ -1255,6 +1258,12 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                 if (RaycastObject(object, currentPosition, nextPosition, &hit) &&
                     hit.distance < nearestDistance)
                 {
+                    const float normalMove = D3DXVec3Dot(&frameMove, &hit.surfaceNormal);
+                    if (normalMove > 0.0f)
+                    {
+                        continue;
+                    }
+
                     foundHit = true;
                     nearestDistance = hit.distance;
                     nearestHit = hit;
