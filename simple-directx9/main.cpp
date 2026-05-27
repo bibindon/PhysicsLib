@@ -68,6 +68,7 @@ std::vector<LPD3DXMESH> g_ownedSceneMeshes;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
 PhysicsLib::CharacterMover g_playerMover(kPlayerStartPosition);
+PhysicsLib::CameraMover g_cameraMover;
 int g_movingPlatformId = -1;
 std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
@@ -662,7 +663,8 @@ void UpdateCamera()
     const D3DXVECTOR3 offset(sinf(g_cameraYaw) * horizontalDistance,
                              sinf(g_cameraPitch) * g_cameraDistance,
                              -cosf(g_cameraYaw) * horizontalDistance);
-    const D3DXVECTOR3 cameraPosition = cameraTarget + offset;
+    const D3DXVECTOR3 desiredCameraPosition = cameraTarget + offset;
+    const D3DXVECTOR3 cameraPosition = g_cameraMover.ResolvePosition(cameraTarget, desiredCameraPosition);
     const D3DXVECTOR3 cameraUp(0.0f, 1.0f, 0.0f);
 
     D3DXMatrixLookAtLH(&g_cameraView, &cameraPosition, &cameraTarget, &cameraUp);

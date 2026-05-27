@@ -115,4 +115,25 @@ private:
     int m_supportObjectId;
     int m_remainingAirJumps;
 };
+
+class CameraMover
+{
+public:
+    struct Settings
+    {
+        float minimumDistance = 2.0f;
+        float obstacleOffset = 0.1f;
+    };
+
+    CameraMover();
+
+    void SetSettings(const Settings& settings);
+    Settings GetSettings() const;
+
+    D3DXVECTOR3 ResolvePosition(const D3DXVECTOR3& targetPosition,
+                                const D3DXVECTOR3& desiredCameraPosition) const;
+
+private:
+    Settings m_settings;
+};
 }

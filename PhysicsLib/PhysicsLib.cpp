@@ -1155,6 +1155,64 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 nullptr);
 }
 
+CameraMover::CameraMover()
+{
+}
+
+void CameraMover::SetSettings(const Settings& settings)
+{
+    if (settings.minimumDistance < 0.0f)
+    {
+        throw std::out_of_range("CameraMover minimumDistance must not be negative.");
+    }
+
+    if (settings.obstacleOffset < 0.0f)
+    {
+        throw std::out_of_range("CameraMover obstacleOffset must not be negative.");
+    }
+
+    m_settings = settings;
+}
+
+CameraMover::Settings CameraMover::GetSettings() const
+{
+    return m_settings;
+}
+
+D3DXVECTOR3 CameraMover::ResolvePosition(const D3DXVECTOR3& targetPosition,
+                                         const D3DXVECTOR3& desiredCameraPosition) const
+{
+    EnsureInitialized();
+
+    const D3DXVECTOR3 targetToCamera = desiredCameraPosition - targetPosition;
+    const float desiredDistance = D3DXVec3Length(&targetToCamera);
+    if (desiredDistance <= 0.0001f)
+    {
+        return desiredCameraPosition;
+    }
+
+    RaycastHit hit;
+    if (!FindNearestHit(targetPosition,
+                        targetToCamera,
+                        PhysicsLib::ShapeType::Point,
+                        0.0f,
+                        0.0f,
+                        nullptr,
+                        nullptr,
+                        &hit))
+    {
+        return desiredCameraPosition;
+    }
+
+    const float resolvedDistance = std::max(0.0f, hit.distance - m_settings.obstacleOffset);
+    if (resolvedDistance < m_settings.minimumDistance)
+    {
+        return desiredCameraPosition;
+    }
+
+    return targetPosition + targetToCamera / desiredDistance * resolvedDistance;
+}
+
 CharacterMover::CharacterMover()
     : m_position(0.0f, 0.0f, 0.0f),
       m_velocity(0.0f, 0.0f, 0.0f),
