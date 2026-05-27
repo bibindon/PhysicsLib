@@ -429,6 +429,24 @@ void InitScene()
                                          D3DXVECTOR3(1.0f, 1.0f, 1.0f));
     g_worldObjects.push_back({ wallMesh, wallId, D3DXVECTOR3(-6.0f, 1.5f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, D3DXToRadian(18.0f), 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
 
+    const int crossWallIdA = PhysicsLib::PhysicsLib::Load(_T("collision_wall.x"),
+                                                          PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                          0.0f);
+    PhysicsLib::PhysicsLib::SetTransform(crossWallIdA,
+                                         D3DXVECTOR3(-2.0f, 1.5f, -4.0f),
+                                         D3DXVECTOR3(0.0f, D3DXToRadian(45.0f), 0.0f),
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ wallMesh, crossWallIdA, D3DXVECTOR3(-2.0f, 1.5f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, D3DXToRadian(45.0f), 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
+
+    const int crossWallIdB = PhysicsLib::PhysicsLib::Load(_T("collision_wall.x"),
+                                                          PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                          0.0f);
+    PhysicsLib::PhysicsLib::SetTransform(crossWallIdB,
+                                         D3DXVECTOR3(-2.0f, 1.5f, -4.0f),
+                                         D3DXVECTOR3(0.0f, D3DXToRadian(-45.0f), 0.0f),
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ wallMesh, crossWallIdB, D3DXVECTOR3(-2.0f, 1.5f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, D3DXToRadian(-45.0f), 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
+
     LPD3DXMESH bigSphereMesh = CreateSphereMesh(2.0f);
     SaveCollisionMesh(bigSphereMesh, _T("collision_big_sphere.x"));
     const int bigSphereId = PhysicsLib::PhysicsLib::Load(_T("collision_big_sphere.x"),
