@@ -99,6 +99,7 @@ static void UpdateCamera();
 static void SyncSceneFromPhysics();
 static LPD3DXMESH CreateBoxMesh(float width, float height, float depth);
 static LPD3DXMESH CreateSphereMesh(float radius);
+static LPD3DXMESH CreatePlateGroundMesh(float width, float depth);
 static LPD3DXMESH CreateBumpyGroundMesh(float width, float depth, int divisions, float heightScale);
 static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path);
 static void SaveCollisionMesh(LPD3DXMESH mesh, const TCHAR* path);
@@ -355,16 +356,16 @@ void InitScene()
     }
     g_ownedSceneMeshes.clear();
 
-    LPD3DXMESH groundMesh = CreateBoxMesh(120.0f, 1.0f, 120.0f);
-    SaveCollisionMesh(groundMesh, _T("collision_ground.x"));
-    const int groundId = PhysicsLib::PhysicsLib::Load(_T("collision_ground.x"),
+    LPD3DXMESH groundMesh = CreatePlateGroundMesh(120.0f, 120.0f);
+    SaveCollisionMesh(groundMesh, _T("plateGround.x"));
+    const int groundId = PhysicsLib::PhysicsLib::Load(_T("plateGround.x"),
                                                       PhysicsLib::PhysicsLib::ObjectType::Slide,
                                                       0.0f);
     PhysicsLib::PhysicsLib::SetTransform(groundId,
-                                         D3DXVECTOR3(0.0f, -0.5f, 0.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, 0.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, 0.0f),
                                          D3DXVECTOR3(1.0f, 1.0f, 1.0f));
-    g_worldObjects.push_back({ groundMesh, groundId, D3DXVECTOR3(0.0f, -0.5f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.35f, 0.70f, 0.35f, 1.0f), false });
+    g_worldObjects.push_back({ groundMesh, groundId, D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.35f, 0.70f, 0.35f, 1.0f), false });
 
     LPD3DXMESH bumpyGroundMesh = CreateBumpyGroundMesh(20.0f, 20.0f, 24, 0.8f);
     SaveCollisionMesh(bumpyGroundMesh, _T("collision_bumpy_ground.x"));
@@ -522,8 +523,8 @@ void InitSettingsDialog(HWND ownerWindow)
 void ResetPlayer()
 {
     PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
-    settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Sphere;
-    //settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Point;
+    //settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Sphere;
+    settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Point;
     settings.shapeOffset = D3DXVECTOR3(0.0f, 0.5f, 0.0f);
     settings.radius = 0.5f;
     settings.height = 0.0f;
@@ -724,6 +725,68 @@ LPD3DXMESH CreateSphereMesh(float radius)
     LPD3DXMESH mesh = NULL;
     HRESULT hResult = D3DXCreateSphere(g_pd3dDevice, radius, 24, 24, &mesh, NULL);
     assert(hResult == S_OK);
+    g_ownedSceneMeshes.push_back(mesh);
+    return mesh;
+}
+
+LPD3DXMESH CreatePlateGroundMesh(float width, float depth)
+{
+    const DWORD vertexCount = 4;
+    const DWORD faceCount = 2;
+    const DWORD fvf = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1;
+
+    LPD3DXMESH mesh = NULL;
+    HRESULT hResult = D3DXCreateMeshFVF(faceCount,
+                                        vertexCount,
+                                        D3DXMESH_MANAGED,
+                                        fvf,
+                                        g_pd3dDevice,
+                                        &mesh);
+    assert(hResult == S_OK);
+
+    TerrainVertex* vertices = NULL;
+    hResult = mesh->LockVertexBuffer(0, reinterpret_cast<void**>(&vertices));
+    assert(hResult == S_OK);
+
+    WORD* indices = NULL;
+    hResult = mesh->LockIndexBuffer(0, reinterpret_cast<void**>(&indices));
+    assert(hResult == S_OK);
+
+    const float halfWidth = width * 0.5f;
+    const float halfDepth = depth * 0.5f;
+    const D3DXVECTOR3 normal(0.0f, 1.0f, 0.0f);
+
+    vertices[0].position = D3DXVECTOR3(-halfWidth, 0.0f, -halfDepth);
+    vertices[1].position = D3DXVECTOR3(-halfWidth, 0.0f, halfDepth);
+    vertices[2].position = D3DXVECTOR3(halfWidth, 0.0f, -halfDepth);
+    vertices[3].position = D3DXVECTOR3(halfWidth, 0.0f, halfDepth);
+
+    for (DWORD vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+    {
+        vertices[vertexIndex].normal = normal;
+        vertices[vertexIndex].u = (vertices[vertexIndex].position.x / width) + 0.5f;
+        vertices[vertexIndex].v = (vertices[vertexIndex].position.z / depth) + 0.5f;
+    }
+
+    indices[0] = 0;
+    indices[1] = 1;
+    indices[2] = 2;
+    indices[3] = 2;
+    indices[4] = 1;
+    indices[5] = 3;
+
+    mesh->UnlockIndexBuffer();
+    mesh->UnlockVertexBuffer();
+
+    DWORD* attributes = NULL;
+    hResult = mesh->LockAttributeBuffer(0, &attributes);
+    assert(hResult == S_OK);
+    for (DWORD faceIndex = 0; faceIndex < faceCount; ++faceIndex)
+    {
+        attributes[faceIndex] = 0;
+    }
+    mesh->UnlockAttributeBuffer();
+
     g_ownedSceneMeshes.push_back(mesh);
     return mesh;
 }
