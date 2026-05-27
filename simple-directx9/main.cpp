@@ -28,6 +28,7 @@ const float kMinCameraDistance = 2.0f;
 const float kMaxCameraDistance = 30.0f;
 const float kCameraWheelZoomStep = 0.5f;
 const float kPlayerSpeed = 5.0f;
+const float kPlayerSpeedBoostMultiplier = 3.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
@@ -583,6 +584,17 @@ void UpdatePlayer()
     }
     g_prevF4Pressed = isF4Pressed;
 
+    float speedMultiplier = 1.0f;
+    if (isWindowActive && ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0))
+    {
+        speedMultiplier = kPlayerSpeedBoostMultiplier;
+    }
+    PhysicsLib::CharacterMover::Settings speedSettings = g_playerMover.GetSettings();
+    speedSettings.moveSpeed = kPlayerSpeed * speedMultiplier;
+    speedSettings.groundAcceleration = kPlayerSpeed * 2.0f * speedMultiplier;
+    speedSettings.airAcceleration = kPlayerSpeed * 0.35f * speedMultiplier;
+    g_playerMover.SetSettings(speedSettings);
+
     bool isEscPressed = isWindowActive && ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);
     if (isEscPressed && !g_prevEscPressed)
     {
@@ -1093,7 +1105,7 @@ void Render()
         doubleJumpText = _T("ON");
     }
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  ESC: cursor=%s  F1: reset  F3: AirControl=%s  F4: DoubleJump=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SHIFT: speed x3  SPACE: jump  ESC: cursor=%s  F1: reset  F3: AirControl=%s  F4: DoubleJump=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
                 cursorText,
                 airControlText,
                 doubleJumpText,
