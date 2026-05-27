@@ -938,6 +938,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
                 currentPositionForSlide = nearestHit.point;
                 nextPosition = currentPositionForSlide;
                 nextMoveVector.x = 0.0f;
+                nextMoveVector.y = 0.0f;
                 nextMoveVector.z = 0.0f;
                 remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
                 break;
@@ -1427,7 +1428,12 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                               &wallContact,
                                               &m_debugInfo);
 
-    m_isGrounded = nextVelocity.y == 0.0f;
+    if (groundContact && nextVelocity.y < 0.0f)
+    {
+        nextVelocity.y = 0.0f;
+    }
+
+    m_isGrounded = groundContact || nextVelocity.y == 0.0f;
     m_isTouchingWall = wallContact;
     m_supportObjectId = -1;
     if (m_isGrounded && outSolidIds != nullptr && !outSolidIds->empty())
