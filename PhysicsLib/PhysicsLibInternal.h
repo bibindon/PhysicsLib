@@ -27,6 +27,8 @@ public:
     static void SetOptimizationEnabled(bool enabled);
     static bool IsMovingFloorEnabled();
     static void SetMovingFloorEnabled(bool enabled);
+    static bool IsCameraAutoMoveEnabled();
+    static void SetCameraAutoMoveEnabled(bool enabled);
     static bool IsContactEnabled();
     static void SetContactEnabled(bool enabled);
     static bool IsSurfaceContactEnabled();

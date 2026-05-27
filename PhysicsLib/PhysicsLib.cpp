@@ -21,7 +21,7 @@ namespace PhysicsLib
 namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
-constexpr float kGroundContactOffset = 0.001f;
+constexpr float kGroundContactOffset = 0.0005f;
 constexpr int kQuadTreeMaxDepth = 5;
 constexpr size_t kQuadTreeNodeCapacity = 4;
 
@@ -51,6 +51,7 @@ bool g_tangentMoveEnabled = true;
 bool g_airMoveEnabled = true;
 bool g_optimizationEnabled = true;
 bool g_movingFloorEnabled = true;
+bool g_cameraAutoMoveEnabled = true;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 
@@ -771,6 +772,16 @@ void SettingsState::SetMovingFloorEnabled(bool enabled)
     g_movingFloorEnabled = enabled;
 }
 
+bool SettingsState::IsCameraAutoMoveEnabled()
+{
+    return g_cameraAutoMoveEnabled;
+}
+
+void SettingsState::SetCameraAutoMoveEnabled(bool enabled)
+{
+    g_cameraAutoMoveEnabled = enabled;
+}
+
 bool SettingsState::IsContactEnabled()
 {
     return g_contactEnabled;
@@ -1211,6 +1222,80 @@ bool PhysicsLib::CheckContact(int id, const D3DXVECTOR3& position, float distanc
     }
 
     return false;
+}
+
+bool PhysicsLib::ResolveCameraCollision(const D3DXVECTOR3& targetPosition,
+                                        const D3DXVECTOR3& desiredCameraPosition,
+                                        float minimumDistance,
+                                        float obstacleOffset,
+                                        D3DXVECTOR3* outPosition)
+{
+    if (outPosition == nullptr)
+    {
+        return false;
+    }
+
+    D3DXVECTOR3 cameraVector = desiredCameraPosition - targetPosition;
+    const float desiredDistance = D3DXVec3Length(&cameraVector);
+    if (desiredDistance <= 0.0001f)
+    {
+        *outPosition = desiredCameraPosition;
+        return false;
+    }
+
+    cameraVector /= desiredDistance;
+
+    float nearestDistance = std::numeric_limits<float>::max();
+    bool foundHit = false;
+    const std::vector<size_t> candidateIndices =
+        BuildCollisionCandidateIndices(targetPosition, desiredCameraPosition);
+    for (size_t candidateIndex = 0; candidateIndex < candidateIndices.size(); ++candidateIndex)
+    {
+        const size_t i = candidateIndices[candidateIndex];
+        if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
+        {
+            continue;
+        }
+
+        D3DXVECTOR3 hitPoint;
+        D3DXVECTOR3 hitNormal;
+        float hitDistance = 0.0f;
+        if (RayCastObject(g_simpleObjects[i].mesh,
+                          g_simpleObjects[i].transform,
+                          targetPosition,
+                          desiredCameraPosition,
+                          &hitPoint,
+                          &hitNormal,
+                          &hitDistance))
+        {
+            if (hitDistance >= nearestDistance)
+            {
+                continue;
+            }
+
+            nearestDistance = hitDistance;
+            foundHit = true;
+        }
+    }
+
+    if (!foundHit)
+    {
+        *outPosition = desiredCameraPosition;
+        return false;
+    }
+
+    float cameraDistance = nearestDistance - obstacleOffset;
+    if (cameraDistance < minimumDistance)
+    {
+        cameraDistance = minimumDistance;
+    }
+    if (cameraDistance > desiredDistance)
+    {
+        cameraDistance = desiredDistance;
+    }
+
+    *outPosition = targetPosition + cameraVector * cameraDistance;
+    return true;
 }
 
 }

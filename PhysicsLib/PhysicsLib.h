@@ -102,6 +102,13 @@ public:
     // 指定IDのオブジェクトと position の距離が distance 以下かを判定する。
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
 
+    // 注視点と希望カメラ位置の間にある障害物を避けたカメラ位置を求める。
+    static bool ResolveCameraCollision(const D3DXVECTOR3& targetPosition,
+                                       const D3DXVECTOR3& desiredCameraPosition,
+                                       float minimumDistance,
+                                       float obstacleOffset,
+                                       D3DXVECTOR3* outPosition);
+
 private:
     struct Aabb2D
     {
