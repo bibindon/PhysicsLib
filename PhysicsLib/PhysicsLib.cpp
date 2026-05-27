@@ -81,6 +81,7 @@ bool g_doubleJumpEnabled = false;
 bool g_infiniteJumpEnabled = false;
 bool g_gravityEnabled = true;
 bool g_inertiaEnabled = false;
+bool g_contactEnabled = true;
 
 struct HitCollection
 {
@@ -1248,6 +1249,16 @@ void SetInertiaEnabled(bool enabled)
     g_inertiaEnabled = enabled;
 }
 
+bool IsContactEnabled()
+{
+    return g_contactEnabled;
+}
+
+void SetContactEnabled(bool enabled)
+{
+    g_contactEnabled = enabled;
+}
+
 void PhysicsLib::Initialize()
 {
     g_simpleObjects.clear();
@@ -1365,6 +1376,27 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     if (outNextMoveVector != nullptr)
     {
         *outNextMoveVector = moveVector;
+    }
+
+    return false;
+}
+
+bool PhysicsLib::CheckContact(int id, const D3DXVECTOR3& position, float distance)
+{
+    if (!IsContactEnabled() || distance < 0.0f)
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].id != id)
+        {
+            continue;
+        }
+
+        const D3DXVECTOR3 difference = g_simpleObjects[i].transform.position - position;
+        return D3DXVec3Length(&difference) <= distance;
     }
 
     return false;

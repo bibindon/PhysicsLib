@@ -652,6 +652,20 @@ void UpdatePlayer()
     g_prevSpacePressed = isSpacePressed;
     g_playerMover.Update(inputMove, jump, &passThroughIds, &solidIds);
 
+    const D3DXVECTOR3 playerPosition = g_playerMover.GetPosition();
+    for (size_t i = 0; i < g_itemObjects.size(); ++i)
+    {
+        if (g_collectedItemIds.find(g_itemObjects[i].collisionId) != g_collectedItemIds.end())
+        {
+            continue;
+        }
+
+        if (PhysicsLib::PhysicsLib::CheckContact(g_itemObjects[i].collisionId, playerPosition, 1.0f))
+        {
+            g_collectedItemIds.insert(g_itemObjects[i].collisionId);
+        }
+    }
+
     for (size_t i = 0; i < passThroughIds.size(); ++i)
     {
         g_collectedItemIds.insert(passThroughIds[i]);

@@ -10,6 +10,8 @@ bool IsGravityEnabled();
 void SetGravityEnabled(bool enabled);
 bool IsInertiaEnabled();
 void SetInertiaEnabled(bool enabled);
+bool IsContactEnabled();
+void SetContactEnabled(bool enabled);
 
 void DestroySettingsDialog();
 }

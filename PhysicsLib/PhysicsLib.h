@@ -115,6 +115,7 @@ public:
                              std::vector<int>* outSolidIds,
                              float radius = 0.0f,
                              float height = 0.0f);
+    static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
 };
 
 class CharacterMover
