@@ -503,7 +503,7 @@ void ResetPlayer()
     settings.radius = 0.5f;
     settings.height = 0.0f;
     settings.moveSpeed = kPlayerSpeed;
-    settings.groundAcceleration = kPlayerSpeed;
+    settings.groundAcceleration = kPlayerSpeed * 2.0f;
     settings.airAcceleration = kPlayerSpeed * 0.35f;
     settings.jumpVelocity = kJumpVelocity;
     settings.doubleJumpEnabled = false;
