@@ -77,8 +77,16 @@ int g_simpleNextId = 1;
 bool g_simpleIntersectMultithreadEnabled = false;
 HWND g_settingsDialog = NULL;
 void (*g_resetCallback)() = nullptr;
+bool g_doubleJumpEnabled = false;
+bool g_infiniteJumpEnabled = false;
+bool g_gravityEnabled = true;
+bool g_inertiaEnabled = false;
 
 const int kSettingsCheckboxStartId = 4100;
+const int kDoubleJumpCheckboxId = kSettingsCheckboxStartId + 0;
+const int kInfiniteJumpCheckboxId = kSettingsCheckboxStartId + 1;
+const int kGravityCheckboxId = kSettingsCheckboxStartId + 2;
+const int kInertiaCheckboxId = kSettingsCheckboxStartId + 6;
 const int kSettingsResetButtonId = 4200;
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -88,12 +96,11 @@ const TCHAR* kSettingsCheckboxLabels[] =
     _T("スライド"),
     _T("高速化"),
     _T("初期化"),
+    _T("慣性"),
 };
 
 LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    UNREFERENCED_PARAMETER(lParam);
-
     if (message == WM_COMMAND)
     {
         if (LOWORD(wParam) == kSettingsResetButtonId && HIWORD(wParam) == BN_CLICKED)
@@ -102,6 +109,34 @@ LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LP
             {
                 g_resetCallback();
             }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kGravityCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            g_gravityEnabled = checkState == BST_CHECKED;
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kDoubleJumpCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            g_doubleJumpEnabled = checkState == BST_CHECKED;
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kInfiniteJumpCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            g_infiniteJumpEnabled = checkState == BST_CHECKED;
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kInertiaCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            g_inertiaEnabled = checkState == BST_CHECKED;
             return 0;
         }
     }
@@ -1308,7 +1343,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                       40,
                                       40,
                                       340,
-                                      300,
+                                      330,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -1321,24 +1356,40 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
 
     for (int i = 0; i < static_cast<int>(sizeof(kSettingsCheckboxLabels) / sizeof(kSettingsCheckboxLabels[0])); ++i)
     {
-        CreateWindow(_T("BUTTON"),
-                     kSettingsCheckboxLabels[i],
-                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                     16,
-                     18 + i * 30,
-                     210,
-                     24,
-                     g_settingsDialog,
-                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsCheckboxStartId + i)),
-                     instance,
-                     NULL);
+        HWND checkbox = CreateWindow(_T("BUTTON"),
+                                     kSettingsCheckboxLabels[i],
+                                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                                     16,
+                                     18 + i * 30,
+                                     210,
+                                     24,
+                                     g_settingsDialog,
+                                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsCheckboxStartId + i)),
+                                     instance,
+                                     NULL);
+        if (kSettingsCheckboxStartId + i == kGravityCheckboxId)
+        {
+            SendMessage(checkbox, BM_SETCHECK, g_gravityEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
+        else if (kSettingsCheckboxStartId + i == kDoubleJumpCheckboxId)
+        {
+            SendMessage(checkbox, BM_SETCHECK, g_doubleJumpEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
+        else if (kSettingsCheckboxStartId + i == kInfiniteJumpCheckboxId)
+        {
+            SendMessage(checkbox, BM_SETCHECK, g_infiniteJumpEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
+        else if (kSettingsCheckboxStartId + i == kInertiaCheckboxId)
+        {
+            SendMessage(checkbox, BM_SETCHECK, g_inertiaEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
     }
 
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 210,
+                 240,
                  130,
                  32,
                  g_settingsDialog,
@@ -1528,7 +1579,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_isGrounded = true;
     m_isTouchingWall = false;
     m_supportObjectId = -1;
-    m_remainingAirJumps = 0;
+    m_remainingAirJumps = 1;
     m_debugInfo = DebugInfo();
 }
 
@@ -1577,8 +1628,6 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                             std::vector<int>* outPassThroughIds,
                             std::vector<int>* outSolidIds)
 {
-    UNREFERENCED_PARAMETER(jump);
-
     if (outPassThroughIds != nullptr)
     {
         outPassThroughIds->clear();
@@ -1595,14 +1644,61 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         inputMove *= m_settings.moveSpeed;
     }
 
-    m_velocity.x = inputMove.x;
-    m_velocity.z = inputMove.z;
-    m_velocity.y -= 9.8f * kDeltaSeconds;
+    if (g_inertiaEnabled)
+    {
+        if (D3DXVec3Length(&inputMove) > 0.0001f)
+        {
+            MoveHorizontalVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
+        }
+    }
+    else
+    {
+        m_velocity.x = inputMove.x;
+        m_velocity.z = inputMove.z;
+    }
+
+    const bool isGroundJump = jump && m_isGrounded;
+    bool canJump = false;
+    if (jump && m_isGrounded)
+    {
+        canJump = true;
+    }
+    else if (jump && g_infiniteJumpEnabled)
+    {
+        canJump = true;
+    }
+    else if (jump && g_doubleJumpEnabled && m_remainingAirJumps > 0)
+    {
+        canJump = true;
+        --m_remainingAirJumps;
+    }
+
+    if (canJump)
+    {
+        if (isGroundJump)
+        {
+            m_remainingAirJumps = 1;
+        }
+
+        m_velocity.y = m_settings.jumpVelocity;
+        m_isGrounded = false;
+    }
+
+    if (g_gravityEnabled)
+    {
+        m_velocity.y -= 9.8f * kDeltaSeconds;
+    }
+    else
+    {
+        m_velocity.y = 0.0f;
+    }
     m_position += m_velocity * kDeltaSeconds;
-    m_isGrounded = false;
+    if (g_gravityEnabled)
+    {
+        m_isGrounded = false;
+    }
     m_isTouchingWall = false;
     m_supportObjectId = -1;
-    m_remainingAirJumps = 1;
     m_debugInfo = DebugInfo();
     return false;
 }
