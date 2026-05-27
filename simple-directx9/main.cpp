@@ -24,6 +24,7 @@
 const int IDC_DOUBLE_JUMP_CHECKBOX = 1001;
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
+const ULONGLONG kTargetFrameMilliseconds = 16;
 const float kPlayerSpeed = 5.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
@@ -158,6 +159,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
     UpdateWindow(hWnd);
 
     MSG msg;
+    ULONGLONG nextFrameTick = GetTickCount64();
 
     while (true)
     {
@@ -167,7 +169,14 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
         }
         else
         {
-            Sleep(16);
+            const ULONGLONG currentTick = GetTickCount64();
+            if (currentTick < nextFrameTick)
+            {
+                Sleep(static_cast<DWORD>(nextFrameTick - currentTick));
+                continue;
+            }
+
+            nextFrameTick = currentTick + kTargetFrameMilliseconds;
             UpdatePlayer();
             Render();
         }
@@ -376,9 +385,9 @@ void InitScene()
     const float manyEdgesSpacingX = 7.2f;
     const float manyEdgesSpacingZ = 7.2f;
     const D3DXVECTOR3 manyEdgesBase(-7.2f, 0.75f, -5.4f);
-    for (int row = 0; row < 10; ++row)
+    for (int row = 0; row < 1; ++row)
     {
-        for (int col = 0; col < 5; ++col)
+        for (int col = 0; col < 1; ++col)
         {
             const D3DXVECTOR3 objectPosition(manyEdgesBase.x + col * manyEdgesSpacingX,
                                              manyEdgesBase.y,
