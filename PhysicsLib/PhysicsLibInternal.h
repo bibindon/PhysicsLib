@@ -1,19 +1,30 @@
 ﻿#pragma once
 
+#include <windows.h>
+
 namespace PhysicsLib
 {
-bool IsDoubleJumpEnabled();
-void SetDoubleJumpEnabled(bool enabled);
-bool IsInfiniteJumpEnabled();
-void SetInfiniteJumpEnabled(bool enabled);
-bool IsGravityEnabled();
-void SetGravityEnabled(bool enabled);
-bool IsInertiaEnabled();
-void SetInertiaEnabled(bool enabled);
-bool IsContactEnabled();
-void SetContactEnabled(bool enabled);
-bool IsSurfaceContactEnabled();
-void SetSurfaceContactEnabled(bool enabled);
+class SettingsState
+{
+public:
+    static bool IsDoubleJumpEnabled();
+    static void SetDoubleJumpEnabled(bool enabled);
+    static bool IsInfiniteJumpEnabled();
+    static void SetInfiniteJumpEnabled(bool enabled);
+    static bool IsGravityEnabled();
+    static void SetGravityEnabled(bool enabled);
+    static bool IsInertiaEnabled();
+    static void SetInertiaEnabled(bool enabled);
+    static bool IsContactEnabled();
+    static void SetContactEnabled(bool enabled);
+    static bool IsSurfaceContactEnabled();
+    static void SetSurfaceContactEnabled(bool enabled);
+};
 
-void DestroySettingsDialog();
+class SettingsDialog
+{
+public:
+    static LRESULT CALLBACK Proc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+    static void Destroy();
+};
 }

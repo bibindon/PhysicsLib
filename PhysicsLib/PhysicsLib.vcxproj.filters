@@ -23,6 +23,12 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CameraMover.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterMover.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="PhysicsLib.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

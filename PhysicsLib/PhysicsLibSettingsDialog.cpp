@@ -32,7 +32,9 @@ const TCHAR* kSettingsCheckboxLabels[] =
     _T("接面判定"),
 };
 
-LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+}
+
+LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
     if (message == WM_COMMAND)
     {
@@ -48,42 +50,42 @@ LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LP
         if (LOWORD(wParam) == kGravityCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            SetGravityEnabled(checkState == BST_CHECKED);
+            SettingsState::SetGravityEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
         if (LOWORD(wParam) == kDoubleJumpCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            SetDoubleJumpEnabled(checkState == BST_CHECKED);
+            SettingsState::SetDoubleJumpEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
         if (LOWORD(wParam) == kInfiniteJumpCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            SetInfiniteJumpEnabled(checkState == BST_CHECKED);
+            SettingsState::SetInfiniteJumpEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
         if (LOWORD(wParam) == kInertiaCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            SetInertiaEnabled(checkState == BST_CHECKED);
+            SettingsState::SetInertiaEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
         if (LOWORD(wParam) == kContactCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            SetContactEnabled(checkState == BST_CHECKED);
+            SettingsState::SetContactEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
         if (LOWORD(wParam) == kSurfaceContactCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            SetSurfaceContactEnabled(checkState == BST_CHECKED);
+            SettingsState::SetSurfaceContactEnabled(checkState == BST_CHECKED);
             return 0;
         }
     }
@@ -95,7 +97,6 @@ LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LP
     }
 
     return DefWindowProc(window, message, wParam, lParam);
-}
 }
 
 void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
@@ -112,7 +113,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
 
     WNDCLASSEX windowClass = {};
     windowClass.cbSize = sizeof(WNDCLASSEX);
-    windowClass.lpfnWndProc = SettingsDialogProc;
+    windowClass.lpfnWndProc = SettingsDialog::Proc;
     windowClass.hInstance = instance;
     windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
     windowClass.lpszClassName = className;
@@ -152,7 +153,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         if (kSettingsCheckboxStartId + i == kGravityCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
-            if (IsGravityEnabled())
+            if (SettingsState::IsGravityEnabled())
             {
                 checkState = BST_CHECKED;
             }
@@ -161,7 +162,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         else if (kSettingsCheckboxStartId + i == kDoubleJumpCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
-            if (IsDoubleJumpEnabled())
+            if (SettingsState::IsDoubleJumpEnabled())
             {
                 checkState = BST_CHECKED;
             }
@@ -170,7 +171,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         else if (kSettingsCheckboxStartId + i == kInfiniteJumpCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
-            if (IsInfiniteJumpEnabled())
+            if (SettingsState::IsInfiniteJumpEnabled())
             {
                 checkState = BST_CHECKED;
             }
@@ -179,7 +180,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         else if (kSettingsCheckboxStartId + i == kInertiaCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
-            if (IsInertiaEnabled())
+            if (SettingsState::IsInertiaEnabled())
             {
                 checkState = BST_CHECKED;
             }
@@ -188,7 +189,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         else if (kSettingsCheckboxStartId + i == kContactCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
-            if (IsContactEnabled())
+            if (SettingsState::IsContactEnabled())
             {
                 checkState = BST_CHECKED;
             }
@@ -197,7 +198,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         else if (kSettingsCheckboxStartId + i == kSurfaceContactCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
-            if (IsSurfaceContactEnabled())
+            if (SettingsState::IsSurfaceContactEnabled())
             {
                 checkState = BST_CHECKED;
             }
@@ -223,7 +224,7 @@ void PhysicsLib::SetResetCallback(void (*callback)())
     g_resetCallback = callback;
 }
 
-void DestroySettingsDialog()
+void SettingsDialog::Destroy()
 {
     if (g_settingsDialog != NULL)
     {

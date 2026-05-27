@@ -185,6 +185,10 @@ public:
                 std::vector<int>* outSolidIds = nullptr);
 
 private:
+    static void MoveHorizontalVelocityToward(D3DXVECTOR3* velocity,
+                                             const D3DXVECTOR3& targetVelocity,
+                                             float acceleration);
+
     Settings m_settings;
     D3DXVECTOR3 m_position;
     D3DXVECTOR3 m_velocity;

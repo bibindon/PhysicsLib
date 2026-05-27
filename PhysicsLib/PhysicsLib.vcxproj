@@ -133,6 +133,8 @@
     <ClInclude Include="PhysicsLib.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CameraMover.cpp" />
+    <ClCompile Include="CharacterMover.cpp" />
     <ClCompile Include="PhysicsLib.cpp" />
     <ClCompile Include="PhysicsLibSettingsDialog.cpp" />
   </ItemGroup>
