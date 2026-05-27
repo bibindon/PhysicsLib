@@ -70,11 +70,11 @@ struct SimpleObject
 std::vector<SimpleObject> g_simpleObjects;
 int g_simpleNextId = 1;
 bool g_doubleJumpEnabled = false;
-bool g_infiniteJumpEnabled = false;
+bool g_infiniteJumpEnabled = true;
 bool g_gravityEnabled = true;
 bool g_inertiaEnabled = false;
 bool g_contactEnabled = true;
-bool g_surfaceContactEnabled = false;
+bool g_surfaceContactEnabled = true;
 
 struct HitCollection
 {
@@ -1253,7 +1253,6 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
 
                 RaycastHit hit;
                 if (RaycastObject(object, currentPosition, nextPosition, &hit) &&
-                    hit.distance > 0.001f &&
                     hit.distance < nearestDistance)
                 {
                     foundHit = true;
