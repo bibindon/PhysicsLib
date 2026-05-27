@@ -35,7 +35,6 @@ struct RaycastHit
     bool hit = false;
     float distance = 0.0f;
     D3DXVECTOR3 point = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    D3DXVECTOR3 normal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     D3DXVECTOR3 surfaceNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     int objectId = -1;
     PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
@@ -118,9 +117,21 @@ bool ExtractFaceNormal(const LoadedObject& object, DWORD faceIndex, D3DXVECTOR3*
     const WORD* indices16 = static_cast<const WORD*>(indexBuffer);
     const bool use32BitIndices = (object.mesh->GetOptions() & D3DXMESH_32BIT) != 0;
 
-    const DWORD i0 = use32BitIndices ? indices32[faceIndex * 3 + 0] : indices16[faceIndex * 3 + 0];
-    const DWORD i1 = use32BitIndices ? indices32[faceIndex * 3 + 1] : indices16[faceIndex * 3 + 1];
-    const DWORD i2 = use32BitIndices ? indices32[faceIndex * 3 + 2] : indices16[faceIndex * 3 + 2];
+    DWORD i0 = 0;
+    DWORD i1 = 0;
+    DWORD i2 = 0;
+    if (use32BitIndices)
+    {
+        i0 = indices32[faceIndex * 3 + 0];
+        i1 = indices32[faceIndex * 3 + 1];
+        i2 = indices32[faceIndex * 3 + 2];
+    }
+    else
+    {
+        i0 = indices16[faceIndex * 3 + 0];
+        i1 = indices16[faceIndex * 3 + 1];
+        i2 = indices16[faceIndex * 3 + 2];
+    }
 
     const D3DXVECTOR3* p0 = reinterpret_cast<const D3DXVECTOR3*>(vertices + i0 * stride);
     const D3DXVECTOR3* p1 = reinterpret_cast<const D3DXVECTOR3*>(vertices + i1 * stride);
@@ -197,32 +208,15 @@ bool RaycastObject(const LoadedObject& object,
 
     D3DXMATRIX inverseTransposeWorld;
     D3DXMatrixTranspose(&inverseTransposeWorld, &inverseWorldMatrix);
-    D3DXVECTOR3 worldNormal;
-    D3DXVec3TransformNormal(&worldNormal, &localNormal, &inverseTransposeWorld);
-    D3DXVec3Normalize(&worldNormal, &worldNormal);
-    D3DXVECTOR3 surfaceNormal = worldNormal;
-
-    const D3DXVECTOR3 rayVectorWorld = rayEndWorld - rayOriginWorld;
-    D3DXVECTOR3 rayDirectionWorld = rayVectorWorld;
-    D3DXVec3Normalize(&rayDirectionWorld, &rayDirectionWorld);
-    const float normalDirection = D3DXVec3Dot(&worldNormal, &rayDirectionWorld);
-    if (normalDirection > 0.0f)
-    {
-        worldNormal = -worldNormal;
-    }
-    else if (std::abs(normalDirection) <= 0.0001f &&
-             std::abs(worldNormal.y) > 0.5f &&
-             worldNormal.y < 0.0f)
-    {
-        worldNormal = -worldNormal;
-    }
+    D3DXVECTOR3 surfaceNormal;
+    D3DXVec3TransformNormal(&surfaceNormal, &localNormal, &inverseTransposeWorld);
+    D3DXVec3Normalize(&surfaceNormal, &surfaceNormal);
 
     D3DXVECTOR3 worldHitOffset = worldHitPoint - rayOriginWorld;
 
     outHit->hit = true;
     outHit->distance = D3DXVec3Length(&worldHitOffset);
     outHit->point = worldHitPoint;
-    outHit->normal = worldNormal;
     outHit->surfaceNormal = surfaceNormal;
     outHit->objectId = object.id;
     outHit->objectType = object.objectType;

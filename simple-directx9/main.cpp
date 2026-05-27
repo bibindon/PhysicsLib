@@ -965,7 +965,12 @@ void DrawMesh(LPD3DXMESH mesh,
     hResult = g_pEffect->SetVector("g_meshColor", (const D3DXVECTOR4*)&color);
     assert(hResult == S_OK);
 
-    hResult = g_pEffect->SetFloat("g_useTexture", useTexture ? 1.0f : 0.0f);
+    float useTextureValue = 0.0f;
+    if (useTexture)
+    {
+        useTextureValue = 1.0f;
+    }
+    hResult = g_pEffect->SetFloat("g_useTexture", useTextureValue);
     assert(hResult == S_OK);
 
     if (mesh == g_pCubeMesh && useTexture)
@@ -1065,11 +1070,26 @@ void Render()
     const PhysicsLib::CharacterMover::Settings moverSettings = g_playerMover.GetSettings();
     const bool airControlEnabled = moverSettings.airControlEnabled;
     const bool doubleJumpEnabled = moverSettings.doubleJumpEnabled;
+    const TCHAR* cursorText = _T("OFF");
+    if (g_isMouseCursorVisible)
+    {
+        cursorText = _T("ON");
+    }
+    const TCHAR* airControlText = _T("OFF");
+    if (airControlEnabled)
+    {
+        airControlText = _T("ON");
+    }
+    const TCHAR* doubleJumpText = _T("OFF");
+    if (doubleJumpEnabled)
+    {
+        doubleJumpText = _T("ON");
+    }
     _stprintf_s(msg,
                 _T("WASD: move  SPACE: jump  ESC: cursor=%s  F1: reset  F3: AirControl=%s  F4: DoubleJump=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
-                g_isMouseCursorVisible ? _T("ON") : _T("OFF"),
-                airControlEnabled ? _T("ON") : _T("OFF"),
-                doubleJumpEnabled ? _T("ON") : _T("OFF"),
+                cursorText,
+                airControlText,
+                doubleJumpText,
                 (int)g_collectedItemIds.size(),
                 playerPosition.x,
                 playerPosition.y,
@@ -1080,10 +1100,20 @@ void Render()
     const D3DXVECTOR3 playerVelocity = g_playerMover.GetVelocity();
     const float playerSpeed = sqrtf(playerVelocity.x * playerVelocity.x +
                                     playerVelocity.z * playerVelocity.z);
+    const TCHAR* groundText = _T("OFF");
+    if (g_playerMover.IsGrounded())
+    {
+        groundText = _T("ON");
+    }
+    const TCHAR* wallText = _T("OFF");
+    if (g_playerMover.IsTouchingWall())
+    {
+        wallText = _T("ON");
+    }
     _stprintf_s(contactText,
                 _T("Ground=%s  Wall=%s  Velocity(%.2f, %.2f, %.2f)  Speed=%.2f"),
-                g_playerMover.IsGrounded() ? _T("ON") : _T("OFF"),
-                g_playerMover.IsTouchingWall() ? _T("ON") : _T("OFF"),
+                groundText,
+                wallText,
                 playerVelocity.x,
                 playerVelocity.y,
                 playerVelocity.z,
@@ -1180,7 +1210,12 @@ void OnMouseMove(LPARAM lParam)
 void SetMouseCursorVisible(bool visible)
 {
     g_isMouseCursorVisible = visible;
-    ShowCursor(visible ? TRUE : FALSE);
+    BOOL showCursor = FALSE;
+    if (visible)
+    {
+        showCursor = TRUE;
+    }
+    ShowCursor(showCursor);
     if (visible)
     {
         ReleaseCapture();

@@ -151,27 +151,57 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                      NULL);
         if (kSettingsCheckboxStartId + i == kGravityCheckboxId)
         {
-            SendMessage(checkbox, BM_SETCHECK, IsGravityEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+            LRESULT checkState = BST_UNCHECKED;
+            if (IsGravityEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
         else if (kSettingsCheckboxStartId + i == kDoubleJumpCheckboxId)
         {
-            SendMessage(checkbox, BM_SETCHECK, IsDoubleJumpEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+            LRESULT checkState = BST_UNCHECKED;
+            if (IsDoubleJumpEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
         else if (kSettingsCheckboxStartId + i == kInfiniteJumpCheckboxId)
         {
-            SendMessage(checkbox, BM_SETCHECK, IsInfiniteJumpEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+            LRESULT checkState = BST_UNCHECKED;
+            if (IsInfiniteJumpEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
         else if (kSettingsCheckboxStartId + i == kInertiaCheckboxId)
         {
-            SendMessage(checkbox, BM_SETCHECK, IsInertiaEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+            LRESULT checkState = BST_UNCHECKED;
+            if (IsInertiaEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
         else if (kSettingsCheckboxStartId + i == kContactCheckboxId)
         {
-            SendMessage(checkbox, BM_SETCHECK, IsContactEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+            LRESULT checkState = BST_UNCHECKED;
+            if (IsContactEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
         else if (kSettingsCheckboxStartId + i == kSurfaceContactCheckboxId)
         {
-            SendMessage(checkbox, BM_SETCHECK, IsSurfaceContactEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+            LRESULT checkState = BST_UNCHECKED;
+            if (IsSurfaceContactEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
     }
 
