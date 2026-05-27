@@ -1131,7 +1131,6 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 ++slideCount;
                                 if (secondSlideBlocked)
                                 {
-                                    nextPosition = nearestSecondSlidePoint + nearestSecondSlideNormal * kGroundContactOffset;
                                     nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
                                     lastHitNormal = nearestSecondSlideNormal;
                                     lastHitDistance = nearestSecondSlideDistance;
