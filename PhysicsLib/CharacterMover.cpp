@@ -212,6 +212,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
 
     D3DXVECTOR3 nextPosition = m_position;
     D3DXVECTOR3 nextVelocity = m_velocity;
+    float lastNormalMove = 0.0f;
     const D3DXVECTOR3 attemptedVelocity = m_velocity;
     const bool collided = PhysicsLib::CheckCollide(m_position,
                                                    m_velocity,
@@ -220,6 +221,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &nextVelocity,
                                                    outPassThroughIds,
                                                    outSolidIds,
+                                                   &lastNormalMove,
                                                    m_settings.radius,
                                                    m_settings.height);
     m_position = nextPosition;
@@ -241,6 +243,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_debugInfo.collideCheckCount = 1;
         m_debugInfo.hitCount = 1;
     }
+    m_debugInfo.lastNormalMove = lastNormalMove;
     return collided;
 }
 }

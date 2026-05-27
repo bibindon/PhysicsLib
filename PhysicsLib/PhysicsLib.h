@@ -89,6 +89,7 @@ public:
                              D3DXVECTOR3* outNextMoveVector,
                              std::vector<int>* outPassThroughIds,
                              std::vector<int>* outSolidIds,
+                             float* outNormalMove = nullptr,
                              float radius = 0.0f,
                              float height = 0.0f);
 
@@ -134,6 +135,7 @@ public:
         D3DXVECTOR3 lastHitNormal = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
         D3DXVECTOR3 lastSlideMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
         float lastHitDistance = 0.0f;
+        float lastNormalMove = 0.0f;
     };
 
     // プレイヤー移動の設定値である。

@@ -542,6 +542,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               D3DXVECTOR3* outNextMoveVector,
                               std::vector<int>* outPassThroughIds,
                               std::vector<int>* outSolidIds,
+                              float* outNormalMove,
                               float radius,
                               float height)
 {
@@ -552,6 +553,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     D3DXVECTOR3 nextPosition = currentPosition + moveVector * kDeltaSeconds;
     D3DXVECTOR3 nextMoveVector = moveVector;
     bool collided = false;
+    float lastNormalMove = 0.0f;
 
     if (outPassThroughIds != nullptr)
     {
@@ -593,6 +595,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                     hitDistance < nearestDistance)
                 {
                     const float normalMove = D3DXVec3Dot(&frameMove, &surfaceNormal);
+                    lastNormalMove = normalMove;
                     if (normalMove > 0.0f)
                     {
                         continue;
@@ -621,6 +624,10 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     if (outNextMoveVector != nullptr)
     {
         *outNextMoveVector = nextMoveVector;
+    }
+    if (outNormalMove != nullptr)
+    {
+        *outNormalMove = lastNormalMove;
     }
 
     return collided;
