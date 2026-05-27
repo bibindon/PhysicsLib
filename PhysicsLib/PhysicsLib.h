@@ -39,8 +39,6 @@ public:
     static void Initialize();
     static void Finalize();
     static void Update(float deltaSeconds = 1.0f / 60.0f);
-    static void SetIntersectMultithreadEnabled(bool enabled);
-    static bool IsIntersectMultithreadEnabled();
 
     static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
 
@@ -91,8 +89,6 @@ public:
     static void Initialize();
     static void Finalize();
     static void Update(float deltaSeconds = 1.0f / 60.0f);
-    static void SetIntersectMultithreadEnabled(bool enabled);
-    static bool IsIntersectMultithreadEnabled();
     static void ShowSettingsDialog(HWND ownerWindow);
     static void SetResetCallback(void (*callback)());
 

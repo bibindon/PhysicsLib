@@ -71,7 +71,6 @@ PhysicsLib::CameraMover g_cameraMover;
 int g_movingPlatformId = -1;
 std::set<int> g_collectedItemIds;
 bool g_prevF1Pressed = false;
-bool g_prevF2Pressed = false;
 bool g_prevF3Pressed = false;
 bool g_prevF4Pressed = false;
 bool g_prevSpacePressed = false;
@@ -195,7 +194,6 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
 
     InitD3D(hWnd);
     PhysicsLib::PhysicsLib::Initialize();
-    PhysicsLib::PhysicsLib::SetIntersectMultithreadEnabled(false);
     PhysicsLib::PhysicsLib::SetResetCallback(ResetPlayer);
     InitScene();
     PhysicsLib::PhysicsLib::ShowSettingsDialog(hWnd);
@@ -549,14 +547,6 @@ void UpdatePlayer()
         ResetPlayer();
     }
     g_prevF1Pressed = isF1Pressed;
-
-    bool isF2Pressed = isWindowActive && ((GetAsyncKeyState(VK_F2) & 0x8000) != 0);
-    if (isF2Pressed && !g_prevF2Pressed)
-    {
-        const bool nextEnabled = !PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled();
-        PhysicsLib::PhysicsLib::SetIntersectMultithreadEnabled(nextEnabled);
-    }
-    g_prevF2Pressed = isF2Pressed;
 
     bool isF3Pressed = isWindowActive && ((GetAsyncKeyState(VK_F3) & 0x8000) != 0);
     if (isF3Pressed && !g_prevF3Pressed)
@@ -1076,9 +1066,8 @@ void Render()
     const bool airControlEnabled = moverSettings.airControlEnabled;
     const bool doubleJumpEnabled = moverSettings.doubleJumpEnabled;
     _stprintf_s(msg,
-                _T("WASD: move  SPACE: jump  ESC: cursor=%s  F1: reset  F2: D3DXIntersect MT=%s  F3: AirControl=%s  F4: DoubleJump=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SPACE: jump  ESC: cursor=%s  F1: reset  F3: AirControl=%s  F4: DoubleJump=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
                 g_isMouseCursorVisible ? _T("ON") : _T("OFF"),
-                PhysicsLib::PhysicsLib::IsIntersectMultithreadEnabled() ? _T("ON") : _T("OFF"),
                 airControlEnabled ? _T("ON") : _T("OFF"),
                 doubleJumpEnabled ? _T("ON") : _T("OFF"),
                 (int)g_collectedItemIds.size(),

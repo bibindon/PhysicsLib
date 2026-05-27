@@ -13,10 +13,6 @@
 #include <unordered_set>
 #include <vector>
 
-#if defined(_OPENMP)
-#include <omp.h>
-#endif
-
 #pragma comment(lib, "d3d9.lib")
 #if defined(DEBUG) || defined(_DEBUG)
 #pragma comment(lib, "d3dx9d.lib")
@@ -35,9 +31,6 @@ constexpr float kSkinWidth = 0.01f;
 constexpr float kGroundNormalY = 0.5f;
 constexpr int kMaxSlideIterations = 3;
 constexpr int kQuadTreeLevel = 6;
-
-// マルチスレッド化。ほぼ効果なし。やる価値なし。
-#define THREAD_NUM 2
 
 struct LoadedObject
 {
@@ -65,7 +58,6 @@ LPDIRECT3DDEVICE9 g_device = NULL;
 std::vector<LoadedObject> g_objects;
 int g_nextId = 1;
 bool g_initialized = false;
-bool g_intersectMultithreadEnabled = false;
 
 struct SimpleObject
 {
@@ -77,7 +69,6 @@ struct SimpleObject
 
 std::vector<SimpleObject> g_simpleObjects;
 int g_simpleNextId = 1;
-bool g_simpleIntersectMultithreadEnabled = false;
 bool g_doubleJumpEnabled = false;
 bool g_infiniteJumpEnabled = false;
 bool g_gravityEnabled = true;
@@ -728,39 +719,6 @@ bool FindNearestHit(const D3DXVECTOR3& startPosition,
         meshGroups[mesh].push_back(objectIndex);
     }
 
-#if defined(_OPENMP)
-    if (g_intersectMultithreadEnabled && meshOrder.size() > 1)
-    {
-        std::vector<HitCollection> threadCollections(THREAD_NUM);
-#pragma omp parallel num_threads(THREAD_NUM)
-        {
-            HitCollection& threadCollection = threadCollections[omp_get_thread_num()];
-#pragma omp for schedule(static)
-            for (int meshGroupIndex = 0; meshGroupIndex < static_cast<int>(meshOrder.size()); ++meshGroupIndex)
-            {
-                const std::vector<size_t>& objectIndices = meshGroups[meshOrder[meshGroupIndex]];
-                for (size_t objectListIndex = 0; objectListIndex < objectIndices.size(); ++objectListIndex)
-                {
-                    const LoadedObject& object = g_objects[objectIndices[objectListIndex]];
-                    AccumulateObjectHits(object, startPosition, endPosition, offsets, &threadCollection);
-                }
-            }
-        }
-
-        for (size_t threadIndex = 0; threadIndex < threadCollections.size(); ++threadIndex)
-        {
-            MergeHitCollection(threadCollections[threadIndex],
-                               outPassThroughIds,
-                               outSolidIds,
-                               &foundSolid,
-                               &nearestDistance,
-                               outNearestSolidHit);
-        }
-
-        return foundSolid;
-    }
-#endif
-
     for (size_t meshGroupIndex = 0; meshGroupIndex < meshOrder.size(); ++meshGroupIndex)
     {
         HitCollection localCollection;
@@ -1112,11 +1070,43 @@ void SetSurfaceContactEnabled(bool enabled)
 
 void PhysicsLib::Initialize()
 {
-    if (!g_initialized)
+    if (g_initialized)
     {
-        PhysicsLibOld::Initialize();
+        return;
     }
 
+    g_direct3d = Direct3DCreate9(D3D_SDK_VERSION);
+    if (g_direct3d == NULL)
+    {
+        throw std::runtime_error("Direct3DCreate9 failed.");
+    }
+
+    D3DPRESENT_PARAMETERS presentParameters;
+    ZeroMemory(&presentParameters, sizeof(presentParameters));
+    presentParameters.Windowed = TRUE;
+    presentParameters.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    presentParameters.BackBufferFormat = D3DFMT_UNKNOWN;
+    presentParameters.BackBufferWidth = 1;
+    presentParameters.BackBufferHeight = 1;
+    presentParameters.hDeviceWindow = GetDesktopWindow();
+
+    HRESULT result = g_direct3d->CreateDevice(D3DADAPTER_DEFAULT,
+                                              D3DDEVTYPE_HAL,
+                                              presentParameters.hDeviceWindow,
+                                              D3DCREATE_SOFTWARE_VERTEXPROCESSING,
+                                              &presentParameters,
+                                              &g_device);
+
+    if (FAILED(result))
+    {
+        SafeRelease(g_direct3d);
+        g_direct3d = NULL;
+        throw std::runtime_error("Failed to create internal Direct3D device.");
+    }
+
+    g_initialized = true;
+    ReleaseLoadedObjects();
+    g_nextId = 1;
     g_simpleObjects.clear();
     g_simpleNextId = 1;
 }
@@ -1131,7 +1121,14 @@ void PhysicsLib::Finalize()
     }
     g_simpleObjects.clear();
     g_simpleNextId = 1;
-    PhysicsLibOld::Finalize();
+    ReleaseLoadedObjects();
+    g_nextId = 1;
+    g_initialized = false;
+
+    SafeRelease(g_device);
+    SafeRelease(g_direct3d);
+    g_device = NULL;
+    g_direct3d = NULL;
 }
 
 void PhysicsLib::Update(float deltaSeconds)
@@ -1143,16 +1140,6 @@ void PhysicsLib::Update(float deltaSeconds)
             g_simpleObjects[i].transform.position += g_simpleObjects[i].transform.velocity * deltaSeconds;
         }
     }
-}
-
-void PhysicsLib::SetIntersectMultithreadEnabled(bool enabled)
-{
-    g_simpleIntersectMultithreadEnabled = enabled;
-}
-
-bool PhysicsLib::IsIntersectMultithreadEnabled()
-{
-    return g_simpleIntersectMultithreadEnabled;
 }
 
 int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
