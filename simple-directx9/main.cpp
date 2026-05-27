@@ -90,6 +90,7 @@ bool g_prevEscPressed = false;
 POINT g_lastMousePosition = { 0, 0 };
 
 static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
+static std::basic_string<TCHAR> ResolveAssetPath(const TCHAR* fileName);
 static void InitD3D(HWND hWnd);
 static void InitScene();
 static void InitSettingsDialog(HWND ownerWindow);
@@ -122,6 +123,37 @@ extern int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
                             _In_opt_ HINSTANCE hPrevInstance,
                             _In_ LPTSTR lpCmdLine,
                             _In_ int nCmdShow);
+
+std::basic_string<TCHAR> ResolveAssetPath(const TCHAR* fileName)
+{
+    if (GetFileAttributes(fileName) != INVALID_FILE_ATTRIBUTES)
+    {
+        return fileName;
+    }
+
+    TCHAR modulePath[MAX_PATH] = {};
+    GetModuleFileName(NULL, modulePath, MAX_PATH);
+    TCHAR* lastSlash = _tcsrchr(modulePath, _T('\\'));
+    if (lastSlash != nullptr)
+    {
+        *(lastSlash + 1) = _T('\0');
+        std::basic_string<TCHAR> exeRelativePath = modulePath;
+        exeRelativePath += fileName;
+        if (GetFileAttributes(exeRelativePath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            return exeRelativePath;
+        }
+    }
+
+    std::basic_string<TCHAR> projectRelativePath = _T("simple-directx9\\");
+    projectRelativePath += fileName;
+    if (GetFileAttributes(projectRelativePath.c_str()) != INVALID_FILE_ATTRIBUTES)
+    {
+        return projectRelativePath;
+    }
+
+    return fileName;
+}
 
 int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -302,7 +334,8 @@ void InitD3D(HWND hWnd)
     assert(hResult == S_OK);
 
     LPD3DXBUFFER pD3DXMtrlBuffer = NULL;
-    hResult = D3DXLoadMeshFromX(_T("cube.x"),
+    const std::basic_string<TCHAR> cubePath = ResolveAssetPath(_T("cube.x"));
+    hResult = D3DXLoadMeshFromX(cubePath.c_str(),
                                 D3DXMESH_SYSTEMMEM,
                                 g_pd3dDevice,
                                 NULL,

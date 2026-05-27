@@ -40,12 +40,12 @@ constexpr int kQuadTreeLevel = 6;
 struct LoadedObject
 {
     int id = 0;
-    PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
+    PhysicsLibOld::ObjectType objectType = PhysicsLibOld::ObjectType::Slide;
     float friction = 0.0f;
     LPD3DXMESH mesh = NULL;
     D3DXVECTOR3 localBoundsMin = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 localBoundsMax = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    PhysicsLib::Transform transform;
+    PhysicsLibOld::Transform transform;
 };
 
 struct RaycastHit
@@ -55,7 +55,7 @@ struct RaycastHit
     D3DXVECTOR3 point = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 normal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     int objectId = -1;
-    PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
+    PhysicsLibOld::ObjectType objectType = PhysicsLibOld::ObjectType::Slide;
 };
 
 LPDIRECT3D9 g_direct3d = NULL;
@@ -64,6 +64,17 @@ std::vector<LoadedObject> g_objects;
 int g_nextId = 1;
 bool g_initialized = false;
 bool g_intersectMultithreadEnabled = false;
+
+struct SimpleObject
+{
+    int id = 0;
+    PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
+    PhysicsLib::Transform transform;
+};
+
+std::vector<SimpleObject> g_simpleObjects;
+int g_simpleNextId = 1;
+bool g_simpleIntersectMultithreadEnabled = false;
 
 struct HitCollection
 {
@@ -312,7 +323,7 @@ LoadedObject& FindObject(int id)
     throw std::out_of_range("Invalid collision object id.");
 }
 
-D3DXMATRIX BuildWorldMatrix(const PhysicsLib::Transform& transform)
+D3DXMATRIX BuildWorldMatrix(const PhysicsLibOld::Transform& transform)
 {
     D3DXMATRIX scaleMatrix;
     D3DXMATRIX rotationMatrix;
@@ -396,7 +407,7 @@ XzBounds ComputeSweptShapeXzBounds(const D3DXVECTOR3& startPosition,
     return bounds;
 }
 
-void GetShapeOffsets(PhysicsLib::ShapeType shapeType,
+void GetShapeOffsets(PhysicsLibOld::ShapeType shapeType,
                      float radius,
                      float height,
                      std::vector<D3DXVECTOR3>* offsets)
@@ -404,7 +415,7 @@ void GetShapeOffsets(PhysicsLib::ShapeType shapeType,
     offsets->clear();
     offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, 0.0f));
 
-    if (shapeType == PhysicsLib::ShapeType::Sphere)
+    if (shapeType == PhysicsLibOld::ShapeType::Sphere)
     {
         offsets->push_back(D3DXVECTOR3(radius, 0.0f, 0.0f));
         offsets->push_back(D3DXVECTOR3(-radius, 0.0f, 0.0f));
@@ -413,7 +424,7 @@ void GetShapeOffsets(PhysicsLib::ShapeType shapeType,
         offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, radius));
         offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, -radius));
     }
-    else if (shapeType == PhysicsLib::ShapeType::Cylinder)
+    else if (shapeType == PhysicsLibOld::ShapeType::Cylinder)
     {
         const float halfHeight = height * 0.5f;
         offsets->push_back(D3DXVECTOR3(0.0f, halfHeight, 0.0f));
@@ -578,7 +589,7 @@ void AccumulateRaycast(const LoadedObject& object,
         return;
     }
 
-    if (hit.objectType == PhysicsLib::ObjectType::PassThrough)
+    if (hit.objectType == PhysicsLibOld::ObjectType::PassThrough)
     {
         inOutCollection->passThroughIds.insert(hit.objectId);
         return;
@@ -660,7 +671,7 @@ void MergeHitCollection(const HitCollection& source,
 
 bool FindNearestHit(const D3DXVECTOR3& startPosition,
                     const D3DXVECTOR3& moveVector,
-                    PhysicsLib::ShapeType shapeType,
+                    PhysicsLibOld::ShapeType shapeType,
                     float radius,
                     float height,
                     std::vector<int>* outPassThroughIds,
@@ -831,7 +842,7 @@ void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 
 bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
                           const D3DXVECTOR3& moveVector,
-                          PhysicsLib::ShapeType shapeType,
+                          PhysicsLibOld::ShapeType shapeType,
                           D3DXVECTOR3* outPosition,
                           D3DXVECTOR3* outNextMoveVector,
                           std::vector<int>* outPassThroughIds,
@@ -856,12 +867,12 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         throw std::invalid_argument("outNextMoveVector must not be null.");
     }
 
-    if (shapeType == PhysicsLib::ShapeType::Sphere && radius < 0.0f)
+    if (shapeType == PhysicsLibOld::ShapeType::Sphere && radius < 0.0f)
     {
         throw std::out_of_range("Sphere radius must not be negative.");
     }
 
-    if (shapeType == PhysicsLib::ShapeType::Cylinder && (radius < 0.0f || height < 0.0f))
+    if (shapeType == PhysicsLibOld::ShapeType::Cylinder && (radius < 0.0f || height < 0.0f))
     {
         throw std::out_of_range("Cylinder radius and height must not be negative.");
     }
@@ -1029,7 +1040,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 }
 }
 
-void PhysicsLib::Initialize()
+void PhysicsLibOld::Initialize()
 {
 #if defined(_OPENMP)
     omp_set_num_threads(THREAD_NUM);
@@ -1073,7 +1084,7 @@ void PhysicsLib::Initialize()
     g_initialized = true;
 }
 
-void PhysicsLib::Finalize()
+void PhysicsLibOld::Finalize()
 {
     ReleaseLoadedObjects();
     g_nextId = 1;
@@ -1085,7 +1096,7 @@ void PhysicsLib::Finalize()
     g_direct3d = NULL;
 }
 
-void PhysicsLib::Update(float deltaSeconds)
+void PhysicsLibOld::Update(float deltaSeconds)
 {
     EnsureInitialized();
 
@@ -1098,17 +1109,17 @@ void PhysicsLib::Update(float deltaSeconds)
     }
 }
 
-void PhysicsLib::SetIntersectMultithreadEnabled(bool enabled)
+void PhysicsLibOld::SetIntersectMultithreadEnabled(bool enabled)
 {
     g_intersectMultithreadEnabled = enabled;
 }
 
-bool PhysicsLib::IsIntersectMultithreadEnabled()
+bool PhysicsLibOld::IsIntersectMultithreadEnabled()
 {
     return g_intersectMultithreadEnabled;
 }
 
-int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
+int PhysicsLibOld::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
 {
     EnsureInitialized();
 
@@ -1138,7 +1149,7 @@ int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float fricti
     return object.id;
 }
 
-void PhysicsLib::SetTransform(int id,
+void PhysicsLibOld::SetTransform(int id,
                               const D3DXVECTOR3& position,
                               const D3DXVECTOR3& rotation,
                               const D3DXVECTOR3& scale)
@@ -1151,7 +1162,7 @@ void PhysicsLib::SetTransform(int id,
     object.transform.scale = scale;
 }
 
-void PhysicsLib::SetVelocity(int id, const D3DXVECTOR3& velocity)
+void PhysicsLibOld::SetVelocity(int id, const D3DXVECTOR3& velocity)
 {
     EnsureInitialized();
 
@@ -1159,13 +1170,13 @@ void PhysicsLib::SetVelocity(int id, const D3DXVECTOR3& velocity)
     object.transform.velocity = velocity;
 }
 
-PhysicsLib::Transform PhysicsLib::GetTransform(int id)
+PhysicsLibOld::Transform PhysicsLibOld::GetTransform(int id)
 {
     EnsureInitialized();
     return FindObject(id).transform;
 }
 
-bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
+bool PhysicsLibOld::CheckCollide(const D3DXVECTOR3& currentPosition,
                               const D3DXVECTOR3& moveVector,
                               ShapeType shapeType,
                               D3DXVECTOR3* outPosition,
@@ -1189,6 +1200,127 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 nullptr,
                                 nullptr,
                                 nullptr);
+}
+
+void PhysicsLib::Initialize()
+{
+    g_simpleObjects.clear();
+    g_simpleNextId = 1;
+}
+
+void PhysicsLib::Finalize()
+{
+    g_simpleObjects.clear();
+    g_simpleNextId = 1;
+}
+
+void PhysicsLib::Update(float deltaSeconds)
+{
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].objectType == ObjectType::MovingSlide)
+        {
+            g_simpleObjects[i].transform.position += g_simpleObjects[i].transform.velocity * deltaSeconds;
+        }
+    }
+}
+
+void PhysicsLib::SetIntersectMultithreadEnabled(bool enabled)
+{
+    g_simpleIntersectMultithreadEnabled = enabled;
+}
+
+bool PhysicsLib::IsIntersectMultithreadEnabled()
+{
+    return g_simpleIntersectMultithreadEnabled;
+}
+
+int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
+{
+    UNREFERENCED_PARAMETER(modelPath);
+    UNREFERENCED_PARAMETER(friction);
+
+    SimpleObject object;
+    object.id = g_simpleNextId++;
+    object.objectType = objectType;
+    g_simpleObjects.push_back(object);
+    return object.id;
+}
+
+void PhysicsLib::SetTransform(int id,
+                              const D3DXVECTOR3& position,
+                              const D3DXVECTOR3& rotation,
+                              const D3DXVECTOR3& scale)
+{
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].id == id)
+        {
+            g_simpleObjects[i].transform.position = position;
+            g_simpleObjects[i].transform.rotation = rotation;
+            g_simpleObjects[i].transform.scale = scale;
+            return;
+        }
+    }
+}
+
+void PhysicsLib::SetVelocity(int id, const D3DXVECTOR3& velocity)
+{
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].id == id)
+        {
+            g_simpleObjects[i].transform.velocity = velocity;
+            return;
+        }
+    }
+}
+
+PhysicsLib::Transform PhysicsLib::GetTransform(int id)
+{
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].id == id)
+        {
+            return g_simpleObjects[i].transform;
+        }
+    }
+
+    return Transform();
+}
+
+bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
+                              const D3DXVECTOR3& moveVector,
+                              ShapeType shapeType,
+                              D3DXVECTOR3* outPosition,
+                              D3DXVECTOR3* outNextMoveVector,
+                              std::vector<int>* outPassThroughIds,
+                              std::vector<int>* outSolidIds,
+                              float radius,
+                              float height)
+{
+    UNREFERENCED_PARAMETER(shapeType);
+    UNREFERENCED_PARAMETER(radius);
+    UNREFERENCED_PARAMETER(height);
+
+    if (outPassThroughIds != nullptr)
+    {
+        outPassThroughIds->clear();
+    }
+    if (outSolidIds != nullptr)
+    {
+        outSolidIds->clear();
+    }
+    if (outPosition != nullptr)
+    {
+        *outPosition = currentPosition + moveVector * kDeltaSeconds;
+    }
+    if (outNextMoveVector != nullptr)
+    {
+        *outNextMoveVector = moveVector;
+    }
+
+    return false;
 }
 
 CameraMover::CameraMover()
@@ -1218,35 +1350,8 @@ CameraMover::Settings CameraMover::GetSettings() const
 D3DXVECTOR3 CameraMover::ResolvePosition(const D3DXVECTOR3& targetPosition,
                                          const D3DXVECTOR3& desiredCameraPosition) const
 {
-    EnsureInitialized();
-
-    const D3DXVECTOR3 targetToCamera = desiredCameraPosition - targetPosition;
-    const float desiredDistance = D3DXVec3Length(&targetToCamera);
-    if (desiredDistance <= 0.0001f)
-    {
-        return desiredCameraPosition;
-    }
-
-    RaycastHit hit;
-    if (!FindNearestHit(targetPosition,
-                        targetToCamera,
-                        PhysicsLib::ShapeType::Point,
-                        0.0f,
-                        0.0f,
-                        nullptr,
-                        nullptr,
-                        &hit))
-    {
-        return desiredCameraPosition;
-    }
-
-    const float resolvedDistance = std::max(0.0f, hit.distance - m_settings.obstacleOffset);
-    if (resolvedDistance < m_settings.minimumDistance)
-    {
-        return desiredCameraPosition;
-    }
-
-    return targetPosition + targetToCamera / desiredDistance * resolvedDistance;
+    UNREFERENCED_PARAMETER(targetPosition);
+    return desiredCameraPosition;
 }
 
 CharacterMover::CharacterMover()
@@ -1355,6 +1460,17 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                             std::vector<int>* outPassThroughIds,
                             std::vector<int>* outSolidIds)
 {
+    UNREFERENCED_PARAMETER(jump);
+
+    if (outPassThroughIds != nullptr)
+    {
+        outPassThroughIds->clear();
+    }
+    if (outSolidIds != nullptr)
+    {
+        outSolidIds->clear();
+    }
+
     D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
     if (D3DXVec3Length(&inputMove) > 0.0001f)
     {
@@ -1362,103 +1478,13 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         inputMove *= m_settings.moveSpeed;
     }
 
-    if (m_settings.airControlEnabled || m_isGrounded)
-    {
-        float acceleration = m_settings.groundAcceleration;
-        if (!m_isGrounded)
-        {
-            acceleration = m_settings.airAcceleration;
-        }
-
-        MoveHorizontalVelocityToward(&m_velocity, inputMove, acceleration);
-    }
-
-    if (jump)
-    {
-        int i = 0;
-        ++i;
-    }
-
-    bool canJump = false;
-    if (jump && m_isGrounded)
-    {
-        canJump = true;
-    }
-    else if (jump && m_settings.doubleJumpEnabled && m_remainingAirJumps > 0)
-    {
-        canJump = true;
-        --m_remainingAirJumps;
-    }
-
-    if (canJump)
-    {
-        if (!m_settings.keepHorizontalVelocityOnJump)
-        {
-            m_velocity.x = inputMove.x;
-            m_velocity.z = inputMove.z;
-        }
-
-        m_velocity.y = m_settings.jumpVelocity;
-        m_isGrounded = false;
-        m_supportObjectId = -1;
-    }
-
-    const D3DXVECTOR3 shapePosition = m_position + m_settings.shapeOffset;
-    D3DXVECTOR3 correctedShapePosition = shapePosition;
-    D3DXVECTOR3 nextVelocity = m_velocity;
-
-    const bool wasGrounded = m_isGrounded;
-    bool groundContact = false;
-    bool wallContact = false;
-    const bool collided = CheckCollideInternal(shapePosition,
-                                              m_velocity,
-                                              m_settings.shapeType,
-                                              &correctedShapePosition,
-                                              &nextVelocity,
-                                              outPassThroughIds,
-                                              outSolidIds,
-                                              m_settings.radius,
-                                              m_settings.height,
-                                              false,
-                                              !wasGrounded,
-                                              &groundContact,
-                                              &wallContact,
-                                              &m_debugInfo);
-
-    if (groundContact && nextVelocity.y < 0.0f)
-    {
-        nextVelocity.y = 0.0f;
-    }
-
-    m_isGrounded = groundContact || nextVelocity.y == 0.0f;
-    m_isTouchingWall = wallContact;
+    m_velocity = inputMove;
+    m_position += m_velocity * kDeltaSeconds;
+    m_isGrounded = true;
+    m_isTouchingWall = false;
     m_supportObjectId = -1;
-    if (m_isGrounded && outSolidIds != nullptr && !outSolidIds->empty())
-    {
-        m_supportObjectId = outSolidIds->front();
-    }
-
-    if (m_isGrounded)
-    {
-        m_remainingAirJumps = 1;
-    }
-
-    if (!wasGrounded && collided && !m_isGrounded)
-    {
-        nextVelocity.y = 0.0f;
-    }
-
-    float damping = m_settings.groundDamping;
-    if (!m_isGrounded)
-    {
-        damping = m_settings.airDamping;
-    }
-
-    nextVelocity.x *= damping;
-    nextVelocity.z *= damping;
-
-    m_position = correctedShapePosition - m_settings.shapeOffset;
-    m_velocity = nextVelocity;
-    return collided;
+    m_remainingAirJumps = 1;
+    m_debugInfo = DebugInfo();
+    return false;
 }
 }
