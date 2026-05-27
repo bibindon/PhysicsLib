@@ -156,11 +156,9 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
                                // ヒット距離の出力先を受け取る。
                                float* outDistance)
 {
-
     // メッシュが無効なら判定できない。
     if (mesh == NULL)
     {
-
         // 判定失敗として終了する。
         return false;
     }
@@ -198,7 +196,6 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     // 線分長がほぼゼロならレイを作れない。
     if (maxDistanceLocal <= 0.0001f)
     {
-
         // 判定失敗として終了する。
         return false;
     }
@@ -257,7 +254,6 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     // API失敗、未ヒット、または線分終点より先のヒットは無効とする。
     if (FAILED(result) || !hit || distanceLocal > maxDistanceLocal)
     {
-
         // 判定失敗として終了する。
         return false;
     }
@@ -279,7 +275,6 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     // ヒット面の法線を取り出せなければ失敗とする。
     if (!ExtractFaceNormal(mesh, faceIndex, &localNormal))
     {
-
         // 判定失敗として終了する。
         return false;
     }
@@ -308,7 +303,6 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     // ヒット位置の出力先があれば書き込む。
     if (outPoint != nullptr)
     {
-
         // ヒット位置を呼び出し元へ返す。
         *outPoint = worldHitPoint;
     }
@@ -316,7 +310,6 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     // 法線の出力先があれば書き込む。
     if (outSurfaceNormal != nullptr)
     {
-
         // ヒット面の法線を呼び出し元へ返す。
         *outSurfaceNormal = surfaceNormal;
     }
@@ -324,7 +317,6 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     // 距離の出力先があれば書き込む。
     if (outDistance != nullptr)
     {
-
         // 始点からヒット位置までのワールド距離を呼び出し元へ返す。
         *outDistance = D3DXVec3Length(&worldHitOffset);
     }
