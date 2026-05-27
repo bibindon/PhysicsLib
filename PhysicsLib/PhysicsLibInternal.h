@@ -12,6 +12,8 @@ bool IsInertiaEnabled();
 void SetInertiaEnabled(bool enabled);
 bool IsContactEnabled();
 void SetContactEnabled(bool enabled);
+bool IsSurfaceContactEnabled();
+void SetSurfaceContactEnabled(bool enabled);
 
 void DestroySettingsDialog();
 }

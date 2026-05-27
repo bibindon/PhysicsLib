@@ -16,6 +16,7 @@ const int kInfiniteJumpCheckboxId = kSettingsCheckboxStartId + 1;
 const int kGravityCheckboxId = kSettingsCheckboxStartId + 2;
 const int kInertiaCheckboxId = kSettingsCheckboxStartId + 6;
 const int kContactCheckboxId = kSettingsCheckboxStartId + 7;
+const int kSurfaceContactCheckboxId = kSettingsCheckboxStartId + 8;
 const int kSettingsResetButtonId = 4200;
 
 const TCHAR* kSettingsCheckboxLabels[] =
@@ -28,6 +29,7 @@ const TCHAR* kSettingsCheckboxLabels[] =
     _T("初期化"),
     _T("慣性"),
     _T("接触判定"),
+    _T("接面判定"),
 };
 
 LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
@@ -77,6 +79,13 @@ LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LP
             SetContactEnabled(checkState == BST_CHECKED);
             return 0;
         }
+
+        if (LOWORD(wParam) == kSurfaceContactCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SetSurfaceContactEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -117,7 +126,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                       40,
                                       40,
                                       340,
-                                      360,
+                                      390,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -160,13 +169,17 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         {
             SendMessage(checkbox, BM_SETCHECK, IsContactEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
         }
+        else if (kSettingsCheckboxStartId + i == kSurfaceContactCheckboxId)
+        {
+            SendMessage(checkbox, BM_SETCHECK, IsSurfaceContactEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
     }
 
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 270,
+                 300,
                  130,
                  32,
                  g_settingsDialog,

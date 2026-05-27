@@ -71,6 +71,7 @@ struct SimpleObject
 {
     int id = 0;
     PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
+    LPD3DXMESH mesh = NULL;
     PhysicsLib::Transform transform;
 };
 
@@ -82,6 +83,7 @@ bool g_infiniteJumpEnabled = false;
 bool g_gravityEnabled = true;
 bool g_inertiaEnabled = false;
 bool g_contactEnabled = true;
+bool g_surfaceContactEnabled = false;
 
 struct HitCollection
 {
@@ -1259,8 +1261,23 @@ void SetContactEnabled(bool enabled)
     g_contactEnabled = enabled;
 }
 
+bool IsSurfaceContactEnabled()
+{
+    return g_surfaceContactEnabled;
+}
+
+void SetSurfaceContactEnabled(bool enabled)
+{
+    g_surfaceContactEnabled = enabled;
+}
+
 void PhysicsLib::Initialize()
 {
+    if (!g_initialized)
+    {
+        PhysicsLibOld::Initialize();
+    }
+
     g_simpleObjects.clear();
     g_simpleNextId = 1;
 }
@@ -1268,8 +1285,14 @@ void PhysicsLib::Initialize()
 void PhysicsLib::Finalize()
 {
     DestroySettingsDialog();
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        SafeRelease(g_simpleObjects[i].mesh);
+        g_simpleObjects[i].mesh = NULL;
+    }
     g_simpleObjects.clear();
     g_simpleNextId = 1;
+    PhysicsLibOld::Finalize();
 }
 
 void PhysicsLib::Update(float deltaSeconds)
@@ -1295,12 +1318,15 @@ bool PhysicsLib::IsIntersectMultithreadEnabled()
 
 int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
 {
-    UNREFERENCED_PARAMETER(modelPath);
     UNREFERENCED_PARAMETER(friction);
 
     SimpleObject object;
     object.id = g_simpleNextId++;
     object.objectType = objectType;
+    if (modelPath != nullptr && modelPath[0] != _T('\0'))
+    {
+        LoadMesh(modelPath, &object.mesh);
+    }
     g_simpleObjects.push_back(object);
     return object.id;
 }
@@ -1361,6 +1387,10 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     UNREFERENCED_PARAMETER(radius);
     UNREFERENCED_PARAMETER(height);
 
+    D3DXVECTOR3 nextPosition = currentPosition + moveVector * kDeltaSeconds;
+    D3DXVECTOR3 nextMoveVector = moveVector;
+    bool collided = false;
+
     if (outPassThroughIds != nullptr)
     {
         outPassThroughIds->clear();
@@ -1369,16 +1399,60 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     {
         outSolidIds->clear();
     }
+
+    if (IsSurfaceContactEnabled())
+    {
+        const D3DXVECTOR3 frameMove = nextPosition - currentPosition;
+        const float frameMoveLength = D3DXVec3Length(&frameMove);
+        if (frameMoveLength > 0.0001f)
+        {
+            RaycastHit nearestHit;
+            bool foundHit = false;
+            float nearestDistance = std::numeric_limits<float>::max();
+            for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+            {
+                if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
+                {
+                    continue;
+                }
+
+                LoadedObject object;
+                object.id = g_simpleObjects[i].id;
+                object.objectType = PhysicsLibOld::ObjectType::Slide;
+                object.mesh = g_simpleObjects[i].mesh;
+                object.transform.position = g_simpleObjects[i].transform.position;
+                object.transform.rotation = g_simpleObjects[i].transform.rotation;
+                object.transform.scale = g_simpleObjects[i].transform.scale;
+                object.transform.velocity = g_simpleObjects[i].transform.velocity;
+
+                RaycastHit hit;
+                if (RaycastObject(object, currentPosition, nextPosition, &hit) && hit.distance < nearestDistance)
+                {
+                    foundHit = true;
+                    nearestDistance = hit.distance;
+                    nearestHit = hit;
+                }
+            }
+
+            if (foundHit)
+            {
+                nextPosition = nearestHit.point;
+                nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                collided = true;
+            }
+        }
+    }
+
     if (outPosition != nullptr)
     {
-        *outPosition = currentPosition + moveVector * kDeltaSeconds;
+        *outPosition = nextPosition;
     }
     if (outNextMoveVector != nullptr)
     {
-        *outNextMoveVector = moveVector;
+        *outNextMoveVector = nextMoveVector;
     }
 
-    return false;
+    return collided;
 }
 
 bool PhysicsLib::CheckContact(int id, const D3DXVECTOR3& position, float distance)
@@ -1603,7 +1677,19 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     {
         m_velocity.y = 0.0f;
     }
-    m_position += m_velocity * kDeltaSeconds;
+    D3DXVECTOR3 nextPosition = m_position;
+    D3DXVECTOR3 nextVelocity = m_velocity;
+    const bool collided = PhysicsLib::CheckCollide(m_position,
+                                                   m_velocity,
+                                                   m_settings.shapeType,
+                                                   &nextPosition,
+                                                   &nextVelocity,
+                                                   outPassThroughIds,
+                                                   outSolidIds,
+                                                   m_settings.radius,
+                                                   m_settings.height);
+    m_position = nextPosition;
+    m_velocity = nextVelocity;
     if (IsGravityEnabled())
     {
         m_isGrounded = false;
@@ -1611,6 +1697,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     m_isTouchingWall = false;
     m_supportObjectId = -1;
     m_debugInfo = DebugInfo();
-    return false;
+    if (collided)
+    {
+        m_debugInfo.collideCheckCount = 1;
+        m_debugInfo.hitCount = 1;
+    }
+    return collided;
 }
 }
