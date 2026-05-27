@@ -35,12 +35,12 @@ constexpr int kQuadTreeLevel = 6;
 struct LoadedObject
 {
     int id = 0;
-    PhysicsLibOld::ObjectType objectType = PhysicsLibOld::ObjectType::Slide;
+    PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
     float friction = 0.0f;
     LPD3DXMESH mesh = NULL;
     D3DXVECTOR3 localBoundsMin = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 localBoundsMax = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    PhysicsLibOld::Transform transform;
+    PhysicsLib::Transform transform;
 };
 
 struct RaycastHit
@@ -51,7 +51,7 @@ struct RaycastHit
     D3DXVECTOR3 normal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     D3DXVECTOR3 surfaceNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     int objectId = -1;
-    PhysicsLibOld::ObjectType objectType = PhysicsLibOld::ObjectType::Slide;
+    PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
 };
 
 LPDIRECT3D9 g_direct3d = NULL;
@@ -324,7 +324,7 @@ LoadedObject& FindObject(int id)
     throw std::out_of_range("Invalid collision object id.");
 }
 
-D3DXMATRIX BuildWorldMatrix(const PhysicsLibOld::Transform& transform)
+D3DXMATRIX BuildWorldMatrix(const PhysicsLib::Transform& transform)
 {
     D3DXMATRIX scaleMatrix;
     D3DXMATRIX rotationMatrix;
@@ -408,7 +408,7 @@ XzBounds ComputeSweptShapeXzBounds(const D3DXVECTOR3& startPosition,
     return bounds;
 }
 
-void GetShapeOffsets(PhysicsLibOld::ShapeType shapeType,
+void GetShapeOffsets(PhysicsLib::ShapeType shapeType,
                      float radius,
                      float height,
                      std::vector<D3DXVECTOR3>* offsets)
@@ -416,7 +416,7 @@ void GetShapeOffsets(PhysicsLibOld::ShapeType shapeType,
     offsets->clear();
     offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, 0.0f));
 
-    if (shapeType == PhysicsLibOld::ShapeType::Sphere)
+    if (shapeType == PhysicsLib::ShapeType::Sphere)
     {
         offsets->push_back(D3DXVECTOR3(radius, 0.0f, 0.0f));
         offsets->push_back(D3DXVECTOR3(-radius, 0.0f, 0.0f));
@@ -425,7 +425,7 @@ void GetShapeOffsets(PhysicsLibOld::ShapeType shapeType,
         offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, radius));
         offsets->push_back(D3DXVECTOR3(0.0f, 0.0f, -radius));
     }
-    else if (shapeType == PhysicsLibOld::ShapeType::Cylinder)
+    else if (shapeType == PhysicsLib::ShapeType::Cylinder)
     {
         const float halfHeight = height * 0.5f;
         offsets->push_back(D3DXVECTOR3(0.0f, halfHeight, 0.0f));
@@ -592,7 +592,7 @@ void AccumulateRaycast(const LoadedObject& object,
         return;
     }
 
-    if (hit.objectType == PhysicsLibOld::ObjectType::PassThrough)
+    if (hit.objectType == PhysicsLib::ObjectType::PassThrough)
     {
         inOutCollection->passThroughIds.insert(hit.objectId);
         return;
@@ -674,7 +674,7 @@ void MergeHitCollection(const HitCollection& source,
 
 bool FindNearestHit(const D3DXVECTOR3& startPosition,
                     const D3DXVECTOR3& moveVector,
-                    PhysicsLibOld::ShapeType shapeType,
+                    PhysicsLib::ShapeType shapeType,
                     float radius,
                     float height,
                     std::vector<int>* outPassThroughIds,
@@ -812,7 +812,7 @@ void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 
 bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
                           const D3DXVECTOR3& moveVector,
-                          PhysicsLibOld::ShapeType shapeType,
+                          PhysicsLib::ShapeType shapeType,
                           D3DXVECTOR3* outPosition,
                           D3DXVECTOR3* outNextMoveVector,
                           std::vector<int>* outPassThroughIds,
@@ -837,12 +837,12 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         throw std::invalid_argument("outNextMoveVector must not be null.");
     }
 
-    if (shapeType == PhysicsLibOld::ShapeType::Sphere && radius < 0.0f)
+    if (shapeType == PhysicsLib::ShapeType::Sphere && radius < 0.0f)
     {
         throw std::out_of_range("Sphere radius must not be negative.");
     }
 
-    if (shapeType == PhysicsLibOld::ShapeType::Cylinder && (radius < 0.0f || height < 0.0f))
+    if (shapeType == PhysicsLib::ShapeType::Cylinder && (radius < 0.0f || height < 0.0f))
     {
         throw std::out_of_range("Cylinder radius and height must not be negative.");
     }
@@ -1247,7 +1247,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
 
                 LoadedObject object;
                 object.id = g_simpleObjects[i].id;
-                object.objectType = PhysicsLibOld::ObjectType::Slide;
+                object.objectType = PhysicsLib::ObjectType::Slide;
                 object.mesh = g_simpleObjects[i].mesh;
                 object.transform.position = g_simpleObjects[i].transform.position;
                 object.transform.rotation = g_simpleObjects[i].transform.rotation;
