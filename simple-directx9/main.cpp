@@ -522,7 +522,8 @@ void InitSettingsDialog(HWND ownerWindow)
 void ResetPlayer()
 {
     PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
-    settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Sphere;
+    //settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Sphere;
+    settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Point;
     settings.shapeOffset = D3DXVECTOR3(0.0f, 0.5f, 0.0f);
     settings.radius = 0.5f;
     settings.height = 0.0f;
