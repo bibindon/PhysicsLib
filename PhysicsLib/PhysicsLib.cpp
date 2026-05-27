@@ -20,6 +20,7 @@ namespace PhysicsLib
 namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
+constexpr float kGroundContactOffset = 0.001f;
 
 LPDIRECT3D9 g_direct3d = NULL;
 LPDIRECT3DDEVICE9 g_device = NULL;
@@ -571,6 +572,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
         if (frameMoveLength > 0.0001f)
         {
             D3DXVECTOR3 nearestPoint = currentPosition;
+            D3DXVECTOR3 nearestNormal(0.0f, 1.0f, 0.0f);
             bool foundHit = false;
             float nearestDistance = std::numeric_limits<float>::max();
 
@@ -604,12 +606,14 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                     foundHit = true;
                     nearestDistance = hitDistance;
                     nearestPoint = hitPoint;
+                    nearestNormal = surfaceNormal;
                 }
             }
 
             if (foundHit)
             {
                 nextPosition = nearestPoint;
+                nextPosition += nearestNormal * kGroundContactOffset;
 
                 nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
                 collided = true;
