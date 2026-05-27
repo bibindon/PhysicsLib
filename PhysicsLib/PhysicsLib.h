@@ -120,6 +120,10 @@ private:
                               D3DXVECTOR3* outSurfaceNormal,
                               float* outDistance);
 
+    // 速度から接触面へ向かう成分だけを取り除く補助関数である。
+    static D3DXVECTOR3 RemoveIntoSurfaceVelocity(const D3DXVECTOR3& velocity,
+                                                 const D3DXVECTOR3& surfaceNormal);
+
     // Xファイルからメッシュを読み込む補助関数である。
     static void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh);
 };

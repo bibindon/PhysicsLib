@@ -329,6 +329,26 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     return true;
 }
 
+// 速度から接触面へ向かう成分だけを取り除く処理である。
+D3DXVECTOR3 PhysicsLib::RemoveIntoSurfaceVelocity(const D3DXVECTOR3& velocity,
+                                                  const D3DXVECTOR3& surfaceNormal)
+{
+    D3DXVECTOR3 normalizedNormal = surfaceNormal;
+    if (D3DXVec3Length(&normalizedNormal) <= 0.0001f)
+    {
+        return velocity;
+    }
+
+    D3DXVec3Normalize(&normalizedNormal, &normalizedNormal);
+    const float intoSurface = D3DXVec3Dot(&velocity, &normalizedNormal);
+    if (intoSurface >= 0.0f)
+    {
+        return velocity;
+    }
+
+    return velocity - normalizedNormal * intoSurface;
+}
+
 // Xファイルから衝突用メッシュを読み込む処理である。
 void PhysicsLib::LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 {
@@ -655,6 +675,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
             {
                 nextPosition = nearestPoint;
                 nextPosition += nearestNormal * kGroundContactOffset;
+                nextMoveVector = RemoveIntoSurfaceVelocity(moveVector, nearestNormal);
                 lastHitNormal = nearestNormal;
                 lastHitDistance = nearestDistance;
 
@@ -672,6 +693,8 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                         D3DXVECTOR3 slideHitNormal;
                         float slideHitDistance = 0.0f;
                         bool slideBlocked = false;
+                        D3DXVECTOR3 nearestSlidePoint = slideEndPosition;
+                        D3DXVECTOR3 nearestSlideNormal(0.0f, 1.0f, 0.0f);
                         float nearestSlideDistance = std::numeric_limits<float>::max();
                         for (size_t i = 0; i < g_simpleObjects.size(); ++i)
                         {
@@ -684,9 +707,9 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                               g_simpleObjects[i].transform,
                                               nextPosition,
                                               slideEndPosition,
-                                               &slideHitPoint,
-                                               &slideHitNormal,
-                                               &slideHitDistance))
+                                              &slideHitPoint,
+                                              &slideHitNormal,
+                                              &slideHitDistance))
                             {
                                 if (slideHitDistance >= nearestSlideDistance)
                                 {
@@ -699,33 +722,26 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                     continue;
                                 }
 
-                                slideEndPosition = slideHitPoint + slideHitNormal * kGroundContactOffset;
-                                lastHitNormal = slideHitNormal;
-                                lastHitDistance = slideHitDistance;
+                                nearestSlidePoint = slideHitPoint;
+                                nearestSlideNormal = slideHitNormal;
                                 nearestSlideDistance = slideHitDistance;
                                 slideBlocked = true;
                             }
                         }
 
-                        nextPosition = slideEndPosition;
                         ++slideCount;
                         if (slideBlocked)
                         {
-                            nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                            nextPosition = nearestSlidePoint + nearestSlideNormal * kGroundContactOffset;
+                            nextMoveVector = RemoveIntoSurfaceVelocity(nextMoveVector, nearestSlideNormal);
+                            lastHitNormal = nearestSlideNormal;
+                            lastHitDistance = nearestSlideDistance;
                         }
                         else
                         {
-                            nextMoveVector = slideMove / kDeltaSeconds;
+                            nextPosition = slideEndPosition;
                         }
                     }
-                    else
-                    {
-                        nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-                    }
-                }
-                else
-                {
-                    nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
                 }
                 collided = true;
             }
