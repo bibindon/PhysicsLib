@@ -933,11 +933,8 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
             nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
             remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
             stopVelocityAtHit = true;
-            if (nearestHit.normal.y > kGroundNormalY)
-            {
-                groundContact = true;
-            }
-            else
+            groundContact = true;
+            if (nearestHit.normal.y <= kGroundNormalY)
             {
                 wallContact = true;
             }
@@ -1448,7 +1445,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
 
     if (!wasGrounded && collided && !m_isGrounded)
     {
-        nextVelocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        nextVelocity.y = 0.0f;
     }
 
     float damping = m_settings.groundDamping;
