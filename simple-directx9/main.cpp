@@ -72,7 +72,7 @@ D3DXMATRIX g_cameraView;
 D3DXMATRIX g_cameraProjection;
 float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
-float g_cameraDistance = 12.0f;
+float g_cameraDistance = 4.0f;
 bool g_isMouseCursorVisible = true;
 bool g_prevEscPressed = false;
 POINT g_lastMousePosition = { 0, 0 };
