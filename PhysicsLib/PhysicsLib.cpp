@@ -887,6 +887,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
     D3DXVECTOR3 remainingMove = frameMove;
     bool groundContact = false;
     bool wallContact = false;
+    bool stopVelocityAtHit = false;
     CharacterMover::DebugInfo debugInfo;
 
     for (int iteration = 0; iteration < kMaxSlideIterations; ++iteration)
@@ -925,6 +926,25 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         debugInfo.lastHitDistance = nearestHit.distance;
 
         const bool isLastSlideIteration = iteration == kMaxSlideIterations - 1;
+        if (isLastSlideIteration)
+        {
+            currentPositionForSlide = nearestHit.point;
+            nextPosition = currentPositionForSlide;
+            nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+            stopVelocityAtHit = true;
+            if (nearestHit.normal.y > kGroundNormalY)
+            {
+                groundContact = true;
+            }
+            else
+            {
+                wallContact = true;
+            }
+
+            break;
+        }
+
         const bool isGroundContact = nearestHit.normal.y > kGroundNormalY && nearestHit.distance <= kSkinWidth;
         if (isGroundContact)
         {
@@ -933,16 +953,6 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
             ++debugInfo.slideCount;
             debugInfo.lastSlideMove = slideMove;
             nextPosition = currentPositionForSlide;
-            if (isLastSlideIteration)
-            {
-                currentPositionForSlide = nearestHit.point;
-                nextPosition = currentPositionForSlide;
-                nextMoveVector.x = 0.0f;
-                nextMoveVector.y = 0.0f;
-                nextMoveVector.z = 0.0f;
-                remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-                break;
-            }
 
             if (nextMoveVector.y < 0.0f)
             {
@@ -966,12 +976,6 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         if (stopOnNonGroundHit && nearestHit.normal.y <= kGroundNormalY)
         {
             wallContact = true;
-            if (isLastSlideIteration)
-            {
-                currentPositionForSlide = nearestHit.point;
-                nextPosition = currentPositionForSlide;
-            }
-
             nextMoveVector.x = 0.0f;
             nextMoveVector.z = 0.0f;
             remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
@@ -989,16 +993,6 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
             wallContact = true;
         }
 
-        if (iteration == kMaxSlideIterations - 1)
-        {
-            currentPositionForSlide = nearestHit.point;
-            nextPosition = currentPositionForSlide;
-            nextMoveVector.x = 0.0f;
-            nextMoveVector.z = 0.0f;
-            remainingMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-            break;
-        }
-
         remainingMove = slideMove;
     }
 
@@ -1007,7 +1001,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
         nextPosition = currentPositionForSlide + remainingMove;
     }
 
-    if (D3DXVec3Length(&frameMove) > 0.0001f && (!groundContact || wallContact))
+    if (!stopVelocityAtHit && D3DXVec3Length(&frameMove) > 0.0001f && (!groundContact || wallContact))
     {
         D3DXVECTOR3 actualFrameMove = nextPosition - currentPosition;
         nextMoveVector.x = actualFrameMove.x / kDeltaSeconds;
@@ -1380,6 +1374,12 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         }
 
         MoveHorizontalVelocityToward(&m_velocity, inputMove, acceleration);
+    }
+
+    if (jump)
+    {
+        int i = 0;
+        ++i;
     }
 
     bool canJump = false;
