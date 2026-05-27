@@ -54,7 +54,6 @@ struct RaycastHit
     float distance = 0.0f;
     D3DXVECTOR3 point = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 normal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
-    D3DXVECTOR3 shapeOffset = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     int objectId = -1;
     PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
 };
@@ -571,7 +570,6 @@ bool RaycastObject(const LoadedObject& object,
 void AccumulateRaycast(const LoadedObject& object,
                        const D3DXVECTOR3& rayStart,
                        const D3DXVECTOR3& rayEnd,
-                       const D3DXVECTOR3& shapeOffset,
                        HitCollection* inOutCollection)
 {
     RaycastHit hit;
@@ -579,8 +577,6 @@ void AccumulateRaycast(const LoadedObject& object,
     {
         return;
     }
-
-    hit.shapeOffset = shapeOffset;
 
     if (hit.objectType == PhysicsLib::ObjectType::PassThrough)
     {
@@ -617,7 +613,7 @@ void AccumulateObjectHits(const LoadedObject& object,
     {
         const D3DXVECTOR3 rayStart = startPosition + offsets[offsetIndex];
         const D3DXVECTOR3 rayEnd = endPosition + offsets[offsetIndex];
-        AccumulateRaycast(object, rayStart, rayEnd, offsets[offsetIndex], inOutCollection);
+        AccumulateRaycast(object, rayStart, rayEnd, inOutCollection);
     }
 }
 
@@ -939,7 +935,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
             nextPosition = currentPositionForSlide;
             if (isLastSlideIteration)
             {
-                currentPositionForSlide = nearestHit.point - nearestHit.shapeOffset;
+                currentPositionForSlide = nearestHit.point;
                 nextPosition = currentPositionForSlide;
                 nextMoveVector.x = 0.0f;
                 nextMoveVector.z = 0.0f;
@@ -971,7 +967,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
             wallContact = true;
             if (isLastSlideIteration)
             {
-                currentPositionForSlide = nearestHit.point - nearestHit.shapeOffset;
+                currentPositionForSlide = nearestHit.point;
                 nextPosition = currentPositionForSlide;
             }
 
@@ -994,7 +990,7 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 
         if (iteration == kMaxSlideIterations - 1)
         {
-            currentPositionForSlide = nearestHit.point - nearestHit.shapeOffset;
+            currentPositionForSlide = nearestHit.point;
             nextPosition = currentPositionForSlide;
             nextMoveVector.x = 0.0f;
             nextMoveVector.z = 0.0f;
