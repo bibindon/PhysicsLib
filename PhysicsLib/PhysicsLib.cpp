@@ -42,6 +42,7 @@ bool g_gravityEnabled = true;
 bool g_inertiaEnabled = false;
 bool g_slideEnabled = false;
 bool g_tangentMoveEnabled = false;
+bool g_airMoveEnabled = true;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 
@@ -409,6 +410,16 @@ bool SettingsState::IsTangentMoveEnabled()
 void SettingsState::SetTangentMoveEnabled(bool enabled)
 {
     g_tangentMoveEnabled = enabled;
+}
+
+bool SettingsState::IsAirMoveEnabled()
+{
+    return g_airMoveEnabled;
+}
+
+void SettingsState::SetAirMoveEnabled(bool enabled)
+{
+    g_airMoveEnabled = enabled;
 }
 
 bool SettingsState::IsContactEnabled()

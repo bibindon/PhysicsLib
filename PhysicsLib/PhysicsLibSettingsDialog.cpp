@@ -16,6 +16,7 @@ const int kInfiniteJumpCheckboxId = kSettingsCheckboxStartId + 1;
 const int kGravityCheckboxId = kSettingsCheckboxStartId + 2;
 const int kSlideCheckboxId = kSettingsCheckboxStartId + 3;
 const int kTangentMoveCheckboxId = kSettingsCheckboxStartId + 9;
+const int kAirMoveCheckboxId = kSettingsCheckboxStartId + 10;
 const int kInertiaCheckboxId = kSettingsCheckboxStartId + 6;
 const int kContactCheckboxId = kSettingsCheckboxStartId + 7;
 const int kSurfaceContactCheckboxId = kSettingsCheckboxStartId + 8;
@@ -33,6 +34,7 @@ const TCHAR* kSettingsCheckboxLabels[] =
     _T("接触判定"),
     _T("接面判定"),
     _T("接平面移動"),
+    _T("空中移動"),
 };
 
 }
@@ -92,6 +94,13 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             return 0;
         }
 
+        if (LOWORD(wParam) == kAirMoveCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SettingsState::SetAirMoveEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+
         if (LOWORD(wParam) == kContactCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
@@ -141,10 +150,10 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                       className,
                                       _T("PhysicsLib Settings"),
                                       WS_CAPTION | WS_BORDER | WS_VISIBLE,
-                                       40,
-                                       40,
-                                       340,
-                                       420,
+                                      40,
+                                      40,
+                                      340,
+                                      450,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -221,6 +230,15 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
             }
             SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
+        else if (kSettingsCheckboxStartId + i == kAirMoveCheckboxId)
+        {
+            LRESULT checkState = BST_UNCHECKED;
+            if (SettingsState::IsAirMoveEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
+        }
         else if (kSettingsCheckboxStartId + i == kContactCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
@@ -245,7 +263,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 330,
+                 360,
                  130,
                  32,
                  g_settingsDialog,

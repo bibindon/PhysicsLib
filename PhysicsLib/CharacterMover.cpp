@@ -200,8 +200,13 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         outSolidIds->clear();
     }
 
+    const bool canChangeMoveDirection = m_isGrounded || SettingsState::IsAirMoveEnabled();
     D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
-    if (D3DXVec3Length(&inputMove) > 0.0001f)
+    if (!canChangeMoveDirection)
+    {
+        inputMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else if (D3DXVec3Length(&inputMove) > 0.0001f)
     {
         if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
         {
@@ -217,7 +222,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
 
     if (SettingsState::IsInertiaEnabled())
     {
-        if (D3DXVec3Length(&inputMove) > 0.0001f)
+        if (canChangeMoveDirection && D3DXVec3Length(&inputMove) > 0.0001f)
         {
             if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
             {
@@ -231,12 +236,15 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     }
     else
     {
-        m_velocity.x = inputMove.x;
-        if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
+        if (canChangeMoveDirection)
         {
-            m_velocity.y = inputMove.y;
+            m_velocity.x = inputMove.x;
+            if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
+            {
+                m_velocity.y = inputMove.y;
+            }
+            m_velocity.z = inputMove.z;
         }
-        m_velocity.z = inputMove.z;
     }
 
     const bool isGroundJump = jump && m_isGrounded;
