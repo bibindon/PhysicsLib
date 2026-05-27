@@ -233,6 +233,21 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                 MoveHorizontalVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
             }
         }
+        else if (m_isGrounded)
+        {
+            if (SettingsState::IsTangentMoveEnabled())
+            {
+                MoveVelocityToward(&m_velocity,
+                                   D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                   m_settings.groundAcceleration);
+            }
+            else
+            {
+                MoveHorizontalVelocityToward(&m_velocity,
+                                             D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                             m_settings.groundAcceleration);
+            }
+        }
     }
     else
     {
