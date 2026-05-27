@@ -11,17 +11,22 @@
 
 namespace PhysicsLib
 {
+
 // 衝突用オブジェクトの読み込み、更新、簡易的な接触判定を管理する。
 class PhysicsLib
 {
 public:
+
     // 衝突オブジェクトの扱い方である。
     enum class ObjectType
     {
+
         // 通過可能なオブジェクトである。接触判定やアイテム取得などに使う。
         PassThrough,
+
         // 静止している衝突オブジェクトである。
         Slide,
+
         // 速度に従って移動する衝突オブジェクトである。
         MovingSlide,
     };
@@ -29,10 +34,13 @@ public:
     // プレイヤー側の判定形状である。
     enum class ShapeType
     {
+
         // 点として判定する。
         Point,
+
         // 球として判定する。
         Sphere,
+
         // 円柱として判定する。
         Cylinder,
     };
@@ -48,10 +56,13 @@ public:
 
     static void Initialize();
     static void Finalize();
+
     // MovingSlide の位置を速度に従って更新する。
     static void Update(float deltaSeconds = 1.0f / 60.0f);
+
     // ライブラリ側の設定ダイアログを表示する。
     static void ShowSettingsDialog(HWND ownerWindow);
+
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 
@@ -66,6 +77,7 @@ public:
 
     // MovingSlide など、登録済みオブジェクトの速度を設定する。
     static void SetVelocity(int id, const D3DXVECTOR3& velocity);
+
     // 登録済みオブジェクトの現在の Transform を取得する。
     static Transform GetTransform(int id);
 
@@ -79,14 +91,17 @@ public:
                              std::vector<int>* outSolidIds,
                              float radius = 0.0f,
                              float height = 0.0f);
+
     // 指定IDのオブジェクトと position の距離が distance 以下かを判定する。
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
 };
+
 
 // 入力方向、重力、ジャンプ、接面判定をまとめてプレイヤー位置へ反映する。
 class CharacterMover
 {
 public:
+
     // 画面表示や調査用のデバッグ情報である。
     struct DebugInfo
     {
@@ -101,30 +116,43 @@ public:
     // プレイヤー移動の設定値である。
     struct Settings
     {
+
         // 現在は主に Point を想定している。Sphere/Cylinder は今後の判定拡張用である。
         PhysicsLib::ShapeType shapeType = PhysicsLib::ShapeType::Sphere;
+
         // 判定形状をプレイヤー位置からずらすためのオフセットである。
         D3DXVECTOR3 shapeOffset = D3DXVECTOR3(0.0f, 0.5f, 0.0f);
+
         // Sphere/Cylinder 用の半径である。
         float radius = 0.5f;
+
         // Cylinder 用の高さである。
         float height = 0.0f;
+
         // 水平方向の最高速度である。
         float moveSpeed = 6.0f;
+
         // 地上で目標速度へ近づく加速度である。
         float groundAcceleration = 6.0f;
+
         // 空中で目標速度へ近づく加速度である。
         float airAcceleration = 2.0f;
+
         // ジャンプ時に設定される上向き速度である。
         float jumpVelocity = 2.0f;
+
         // true の場合、空中でも入力方向へ速度を変える。
         bool airControlEnabled = false;
+
         // true の場合、空中で1回だけ追加ジャンプできる。
         bool doubleJumpEnabled = false;
+
         // true の場合、ジャンプ時に水平速度を維持する。
         bool keepHorizontalVelocityOnJump = true;
+
         // 地上の減衰率である。
         float groundDamping = 1.0f;
+
         // 空中の減衰率である。
         float airDamping = 1.0f;
     };
@@ -145,6 +173,7 @@ public:
 
     bool IsGrounded() const;
     bool IsTouchingWall() const;
+
     // 乗っている移動床などのIDである。未接触時は -1 である。
     int GetSupportObjectId() const;
     DebugInfo GetDebugInfo() const;
@@ -162,10 +191,12 @@ private:
     bool m_isGrounded;
     bool m_isTouchingWall;
     int m_supportObjectId;
+
     // 空中であと何回ジャンプできるかを表す。主に2段ジャンプ用である。
     int m_remainingAirJumps;
     DebugInfo m_debugInfo;
 };
+
 
 // カメラ位置を管理する。現在は希望位置をそのまま返す。
 class CameraMover
@@ -173,8 +204,10 @@ class CameraMover
 public:
     struct Settings
     {
+
         // 注視点へ近づける場合の最短距離である。
         float minimumDistance = 2.0f;
+
         // 障害物から少し手前に止めるための余白である。
         float obstacleOffset = 0.1f;
     };
