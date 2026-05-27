@@ -75,6 +75,32 @@ struct SimpleObject
 std::vector<SimpleObject> g_simpleObjects;
 int g_simpleNextId = 1;
 bool g_simpleIntersectMultithreadEnabled = false;
+HWND g_settingsDialog = NULL;
+
+const int kSettingsCheckboxStartId = 4100;
+const TCHAR* kSettingsCheckboxLabels[] =
+{
+    _T("2段ジャンプ"),
+    _T("多段ジャンプ"),
+    _T("重力"),
+    _T("スライド"),
+    _T("高速化"),
+    _T("初期化"),
+};
+
+LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(wParam);
+    UNREFERENCED_PARAMETER(lParam);
+
+    if (message == WM_CLOSE)
+    {
+        ShowWindow(window, SW_HIDE);
+        return 0;
+    }
+
+    return DefWindowProc(window, message, wParam, lParam);
+}
 
 struct HitCollection
 {
@@ -1210,6 +1236,12 @@ void PhysicsLib::Initialize()
 
 void PhysicsLib::Finalize()
 {
+    if (g_settingsDialog != NULL)
+    {
+        DestroyWindow(g_settingsDialog);
+        g_settingsDialog = NULL;
+    }
+
     g_simpleObjects.clear();
     g_simpleNextId = 1;
 }
@@ -1233,6 +1265,61 @@ void PhysicsLib::SetIntersectMultithreadEnabled(bool enabled)
 bool PhysicsLib::IsIntersectMultithreadEnabled()
 {
     return g_simpleIntersectMultithreadEnabled;
+}
+
+void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
+{
+    if (g_settingsDialog != NULL)
+    {
+        ShowWindow(g_settingsDialog, SW_SHOW);
+        SetForegroundWindow(g_settingsDialog);
+        return;
+    }
+
+    HINSTANCE instance = GetModuleHandle(NULL);
+    const TCHAR* className = _T("PhysicsLibSettingsDialog");
+
+    WNDCLASSEX windowClass = {};
+    windowClass.cbSize = sizeof(WNDCLASSEX);
+    windowClass.lpfnWndProc = SettingsDialogProc;
+    windowClass.hInstance = instance;
+    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+    windowClass.lpszClassName = className;
+    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    RegisterClassEx(&windowClass);
+
+    g_settingsDialog = CreateWindowEx(WS_EX_TOOLWINDOW,
+                                      className,
+                                      _T("PhysicsLib Settings"),
+                                      WS_CAPTION | WS_BORDER | WS_VISIBLE,
+                                      40,
+                                      40,
+                                      260,
+                                      220,
+                                      ownerWindow,
+                                      NULL,
+                                      instance,
+                                      NULL);
+
+    if (g_settingsDialog == NULL)
+    {
+        return;
+    }
+
+    for (int i = 0; i < static_cast<int>(sizeof(kSettingsCheckboxLabels) / sizeof(kSettingsCheckboxLabels[0])); ++i)
+    {
+        CreateWindow(_T("BUTTON"),
+                     kSettingsCheckboxLabels[i],
+                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                     16,
+                     18 + i * 30,
+                     210,
+                     24,
+                     g_settingsDialog,
+                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsCheckboxStartId + i)),
+                     instance,
+                     NULL);
+    }
 }
 
 int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)

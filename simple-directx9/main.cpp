@@ -21,7 +21,6 @@
 
 #define SAFE_RELEASE(p) { if (p) { (p)->Release(); (p) = NULL; } }
 
-const int IDC_DOUBLE_JUMP_CHECKBOX = 1001;
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
 const double kTargetFrameSeconds = 1.0 / 60.0;
@@ -62,8 +61,6 @@ DWORD g_dwNumMaterials = 0;
 LPD3DXEFFECT g_pEffect = NULL;
 bool g_bClose = false;
 HWND g_mainWindow = NULL;
-HWND g_settingsWindow = NULL;
-HWND g_doubleJumpCheckBox = NULL;
 std::vector<LPD3DXMESH> g_ownedSceneMeshes;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
@@ -93,7 +90,6 @@ static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
 static std::basic_string<TCHAR> ResolveAssetPath(const TCHAR* fileName);
 static void InitD3D(HWND hWnd);
 static void InitScene();
-static void InitSettingsDialog(HWND ownerWindow);
 static void ResetPlayer();
 static void UpdatePlayer();
 static void UpdateCamera();
@@ -115,7 +111,6 @@ static void Render();
 static void OnMouseMove(LPARAM lParam);
 static void SetMouseCursorVisible(bool visible);
 static void SetDoubleJumpEnabled(bool enabled);
-static void SyncSettingsDialog();
 static float ClampFloat(float value, float minValue, float maxValue);
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -200,7 +195,7 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
     PhysicsLib::PhysicsLib::Initialize();
     PhysicsLib::PhysicsLib::SetIntersectMultithreadEnabled(false);
     InitScene();
-    InitSettingsDialog(hWnd);
+    PhysicsLib::PhysicsLib::ShowSettingsDialog(hWnd);
     ShowWindow(hWnd, SW_SHOWDEFAULT);
     UpdateWindow(hWnd);
 
@@ -522,37 +517,6 @@ void InitScene()
     SyncSceneFromPhysics();
 }
 
-void InitSettingsDialog(HWND ownerWindow)
-{
-    g_settingsWindow = CreateWindowEx(WS_EX_TOOLWINDOW,
-                                      _T("Window1"),
-                                      _T("Settings"),
-                                      WS_CAPTION | WS_BORDER | WS_VISIBLE,
-                                      40,
-                                      40,
-                                      240,
-                                      90,
-                                      ownerWindow,
-                                      NULL,
-                                      GetModuleHandle(NULL),
-                                      NULL);
-    assert(g_settingsWindow != NULL);
-
-    g_doubleJumpCheckBox = CreateWindow(_T("BUTTON"),
-                                        _T("Enable double jump"),
-                                        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                                        16,
-                                        18,
-                                        190,
-                                        28,
-                                        g_settingsWindow,
-                                        reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_DOUBLE_JUMP_CHECKBOX)),
-                                        GetModuleHandle(NULL),
-                                        NULL);
-    assert(g_doubleJumpCheckBox != NULL);
-    SyncSettingsDialog();
-}
-
 void ResetPlayer()
 {
     PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
@@ -571,7 +535,6 @@ void ResetPlayer()
     settings.airDamping = 1.0f;
     g_playerMover.SetSettings(settings);
     g_playerMover.Reset(kPlayerStartPosition);
-    SyncSettingsDialog();
 }
 
 void UpdatePlayer()
@@ -1231,24 +1194,6 @@ void SetDoubleJumpEnabled(bool enabled)
     PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
     settings.doubleJumpEnabled = enabled;
     g_playerMover.SetSettings(settings);
-    SyncSettingsDialog();
-}
-
-void SyncSettingsDialog()
-{
-    if (g_doubleJumpCheckBox == NULL)
-    {
-        return;
-    }
-
-    PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
-    WPARAM checkState = BST_UNCHECKED;
-    if (settings.doubleJumpEnabled)
-    {
-        checkState = BST_CHECKED;
-    }
-
-    SendMessage(g_doubleJumpCheckBox, BM_SETCHECK, checkState, 0);
 }
 
 float ClampFloat(float value, float minValue, float maxValue)
@@ -1270,15 +1215,6 @@ LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDC_DOUBLE_JUMP_CHECKBOX && HIWORD(wParam) == BN_CLICKED)
-        {
-            const LRESULT checkState = SendMessage(g_doubleJumpCheckBox, BM_GETCHECK, 0, 0);
-            SetDoubleJumpEnabled(checkState == BST_CHECKED);
-            return 0;
-        }
-        break;
-
     case WM_MOUSEMOVE:
         OnMouseMove(lParam);
         return 0;
