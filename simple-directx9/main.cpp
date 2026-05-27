@@ -25,6 +25,9 @@ const int IDC_DOUBLE_JUMP_CHECKBOX = 1001;
 const int WINDOW_SIZE_W = 1600;
 const int WINDOW_SIZE_H = 900;
 const double kTargetFrameSeconds = 1.0 / 60.0;
+const float kMinCameraDistance = 2.0f;
+const float kMaxCameraDistance = 30.0f;
+const float kCameraWheelZoomStep = 0.5f;
 const float kPlayerSpeed = 5.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
@@ -1040,8 +1043,9 @@ LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         return 0;
 
     case WM_MOUSEWHEEL:
-        g_cameraDistance -= static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA;
-        g_cameraDistance = ClampFloat(g_cameraDistance, 4.0f, 30.0f);
+        g_cameraDistance -=
+            static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA * kCameraWheelZoomStep;
+        g_cameraDistance = ClampFloat(g_cameraDistance, kMinCameraDistance, kMaxCameraDistance);
         return 0;
 
     case WM_DESTROY:
