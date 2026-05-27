@@ -26,6 +26,9 @@
     <ClCompile Include="PhysicsLib.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="PhysicsLibOld.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="PhysicsLibSettingsDialog.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

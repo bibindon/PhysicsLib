@@ -1049,170 +1049,143 @@ bool CheckCollideInternal(const D3DXVECTOR3& currentPosition,
 }
 }
 
-
-bool IsDoubleJumpEnabled()
+void PhysicsLibOld::Initialize()
 {
-    return g_doubleJumpEnabled;
-}
+#if defined(_OPENMP)
+    omp_set_num_threads(THREAD_NUM);
+#endif
 
-void SetDoubleJumpEnabled(bool enabled)
-{
-    g_doubleJumpEnabled = enabled;
-}
-
-bool IsInfiniteJumpEnabled()
-{
-    return g_infiniteJumpEnabled;
-}
-
-void SetInfiniteJumpEnabled(bool enabled)
-{
-    g_infiniteJumpEnabled = enabled;
-}
-
-bool IsGravityEnabled()
-{
-    return g_gravityEnabled;
-}
-
-void SetGravityEnabled(bool enabled)
-{
-    g_gravityEnabled = enabled;
-}
-
-bool IsInertiaEnabled()
-{
-    return g_inertiaEnabled;
-}
-
-void SetInertiaEnabled(bool enabled)
-{
-    g_inertiaEnabled = enabled;
-}
-
-bool IsContactEnabled()
-{
-    return g_contactEnabled;
-}
-
-void SetContactEnabled(bool enabled)
-{
-    g_contactEnabled = enabled;
-}
-
-bool IsSurfaceContactEnabled()
-{
-    return g_surfaceContactEnabled;
-}
-
-void SetSurfaceContactEnabled(bool enabled)
-{
-    g_surfaceContactEnabled = enabled;
-}
-
-void PhysicsLib::Initialize()
-{
-    if (!g_initialized)
+    if (g_initialized)
     {
-        PhysicsLibOld::Initialize();
+        return;
     }
 
-    g_simpleObjects.clear();
-    g_simpleNextId = 1;
-}
-
-void PhysicsLib::Finalize()
-{
-    DestroySettingsDialog();
-    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    g_direct3d = Direct3DCreate9(D3D_SDK_VERSION);
+    if (g_direct3d == NULL)
     {
-        SafeRelease(g_simpleObjects[i].mesh);
-        g_simpleObjects[i].mesh = NULL;
+        throw std::runtime_error("Direct3DCreate9 failed.");
     }
-    g_simpleObjects.clear();
-    g_simpleNextId = 1;
-    PhysicsLibOld::Finalize();
+
+    D3DPRESENT_PARAMETERS presentParameters;
+    ZeroMemory(&presentParameters, sizeof(presentParameters));
+    presentParameters.Windowed = TRUE;
+    presentParameters.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    presentParameters.BackBufferFormat = D3DFMT_UNKNOWN;
+    presentParameters.EnableAutoDepthStencil = FALSE;
+    presentParameters.hDeviceWindow = GetDesktopWindow();
+
+    HRESULT result = g_direct3d->CreateDevice(D3DADAPTER_DEFAULT,
+                                              D3DDEVTYPE_HAL,
+                                              presentParameters.hDeviceWindow,
+                                              D3DCREATE_SOFTWARE_VERTEXPROCESSING,
+                                              &presentParameters,
+                                              &g_device);
+
+    if (FAILED(result))
+    {
+        SafeRelease(g_direct3d);
+        g_direct3d = NULL;
+        throw std::runtime_error("Failed to create internal Direct3D device.");
+    }
+
+    ReleaseLoadedObjects();
+    g_nextId = 1;
+    g_initialized = true;
 }
 
-void PhysicsLib::Update(float deltaSeconds)
+void PhysicsLibOld::Finalize()
 {
-    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    ReleaseLoadedObjects();
+    g_nextId = 1;
+    g_initialized = false;
+
+    SafeRelease(g_device);
+    SafeRelease(g_direct3d);
+    g_device = NULL;
+    g_direct3d = NULL;
+}
+
+void PhysicsLibOld::Update(float deltaSeconds)
+{
+    EnsureInitialized();
+
+    for (size_t i = 0; i < g_objects.size(); ++i)
     {
-        if (g_simpleObjects[i].objectType == ObjectType::MovingSlide)
+        if (g_objects[i].objectType == ObjectType::MovingSlide)
         {
-            g_simpleObjects[i].transform.position += g_simpleObjects[i].transform.velocity * deltaSeconds;
+            g_objects[i].transform.position += g_objects[i].transform.velocity * deltaSeconds;
         }
     }
 }
 
-void PhysicsLib::SetIntersectMultithreadEnabled(bool enabled)
+void PhysicsLibOld::SetIntersectMultithreadEnabled(bool enabled)
 {
-    g_simpleIntersectMultithreadEnabled = enabled;
+    g_intersectMultithreadEnabled = enabled;
 }
 
-bool PhysicsLib::IsIntersectMultithreadEnabled()
+bool PhysicsLibOld::IsIntersectMultithreadEnabled()
 {
-    return g_simpleIntersectMultithreadEnabled;
+    return g_intersectMultithreadEnabled;
 }
 
-int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
+int PhysicsLibOld::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
 {
-    UNREFERENCED_PARAMETER(friction);
+    EnsureInitialized();
 
-    SimpleObject object;
-    object.id = g_simpleNextId++;
-    object.objectType = objectType;
-    if (modelPath != nullptr && modelPath[0] != _T('\0'))
+    if (modelPath == nullptr || modelPath[0] == _T('\0'))
     {
-        LoadMesh(modelPath, &object.mesh);
+        throw std::invalid_argument("modelPath must not be empty.");
     }
-    g_simpleObjects.push_back(object);
+
+    if (friction < 0.0f || friction > 1.0f)
+    {
+        throw std::out_of_range("friction must be within 0.0f to 1.0f.");
+    }
+
+    LoadedObject object;
+    object.id = g_nextId++;
+    object.objectType = objectType;
+    object.friction = friction;
+
+    LoadMesh(modelPath, &object.mesh);
+    if (!ComputeMeshBounds(object.mesh, &object.localBoundsMin, &object.localBoundsMax))
+    {
+        SafeRelease(object.mesh);
+        throw std::runtime_error("Failed to compute collision mesh bounds.");
+    }
+
+    g_objects.push_back(object);
     return object.id;
 }
 
-void PhysicsLib::SetTransform(int id,
+void PhysicsLibOld::SetTransform(int id,
                               const D3DXVECTOR3& position,
                               const D3DXVECTOR3& rotation,
                               const D3DXVECTOR3& scale)
 {
-    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
-    {
-        if (g_simpleObjects[i].id == id)
-        {
-            g_simpleObjects[i].transform.position = position;
-            g_simpleObjects[i].transform.rotation = rotation;
-            g_simpleObjects[i].transform.scale = scale;
-            return;
-        }
-    }
+    EnsureInitialized();
+
+    LoadedObject& object = FindObject(id);
+    object.transform.position = position;
+    object.transform.rotation = rotation;
+    object.transform.scale = scale;
 }
 
-void PhysicsLib::SetVelocity(int id, const D3DXVECTOR3& velocity)
+void PhysicsLibOld::SetVelocity(int id, const D3DXVECTOR3& velocity)
 {
-    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
-    {
-        if (g_simpleObjects[i].id == id)
-        {
-            g_simpleObjects[i].transform.velocity = velocity;
-            return;
-        }
-    }
+    EnsureInitialized();
+
+    LoadedObject& object = FindObject(id);
+    object.transform.velocity = velocity;
 }
 
-PhysicsLib::Transform PhysicsLib::GetTransform(int id)
+PhysicsLibOld::Transform PhysicsLibOld::GetTransform(int id)
 {
-    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
-    {
-        if (g_simpleObjects[i].id == id)
-        {
-            return g_simpleObjects[i].transform;
-        }
-    }
-
-    return Transform();
+    EnsureInitialized();
+    return FindObject(id).transform;
 }
 
-bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
+bool PhysicsLibOld::CheckCollide(const D3DXVECTOR3& currentPosition,
                               const D3DXVECTOR3& moveVector,
                               ShapeType shapeType,
                               D3DXVECTOR3* outPosition,
@@ -1222,333 +1195,19 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               float radius,
                               float height)
 {
-    UNREFERENCED_PARAMETER(shapeType);
-    UNREFERENCED_PARAMETER(radius);
-    UNREFERENCED_PARAMETER(height);
-
-    D3DXVECTOR3 nextPosition = currentPosition + moveVector * kDeltaSeconds;
-    D3DXVECTOR3 nextMoveVector = moveVector;
-    bool collided = false;
-
-    if (outPassThroughIds != nullptr)
-    {
-        outPassThroughIds->clear();
-    }
-    if (outSolidIds != nullptr)
-    {
-        outSolidIds->clear();
-    }
-
-    if (IsSurfaceContactEnabled())
-    {
-        const D3DXVECTOR3 frameMove = nextPosition - currentPosition;
-        const float frameMoveLength = D3DXVec3Length(&frameMove);
-        if (frameMoveLength > 0.0001f)
-        {
-            RaycastHit nearestHit;
-            bool foundHit = false;
-            float nearestDistance = std::numeric_limits<float>::max();
-            for (size_t i = 0; i < g_simpleObjects.size(); ++i)
-            {
-                if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
-                {
-                    continue;
-                }
-
-                LoadedObject object;
-                object.id = g_simpleObjects[i].id;
-                object.objectType = PhysicsLibOld::ObjectType::Slide;
-                object.mesh = g_simpleObjects[i].mesh;
-                object.transform.position = g_simpleObjects[i].transform.position;
-                object.transform.rotation = g_simpleObjects[i].transform.rotation;
-                object.transform.scale = g_simpleObjects[i].transform.scale;
-                object.transform.velocity = g_simpleObjects[i].transform.velocity;
-
-                RaycastHit hit;
-                if (RaycastObject(object, currentPosition, nextPosition, &hit) &&
-                    hit.distance > 0.001f &&
-                    hit.distance < nearestDistance)
-                {
-                    foundHit = true;
-                    nearestDistance = hit.distance;
-                    nearestHit = hit;
-                }
-            }
-
-            if (foundHit)
-            {
-                nextPosition = nearestHit.point;
-                nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-                collided = true;
-            }
-        }
-    }
-
-    if (outPosition != nullptr)
-    {
-        *outPosition = nextPosition;
-    }
-    if (outNextMoveVector != nullptr)
-    {
-        *outNextMoveVector = nextMoveVector;
-    }
-
-    return collided;
-}
-
-bool PhysicsLib::CheckContact(int id, const D3DXVECTOR3& position, float distance)
-{
-    if (!IsContactEnabled() || distance < 0.0f)
-    {
-        return false;
-    }
-
-    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
-    {
-        if (g_simpleObjects[i].id != id)
-        {
-            continue;
-        }
-
-        const D3DXVECTOR3 difference = g_simpleObjects[i].transform.position - position;
-        return D3DXVec3Length(&difference) <= distance;
-    }
-
-    return false;
-}
-
-CameraMover::CameraMover()
-{
-}
-
-void CameraMover::SetSettings(const Settings& settings)
-{
-    if (settings.minimumDistance < 0.0f)
-    {
-        throw std::out_of_range("CameraMover minimumDistance must not be negative.");
-    }
-
-    if (settings.obstacleOffset < 0.0f)
-    {
-        throw std::out_of_range("CameraMover obstacleOffset must not be negative.");
-    }
-
-    m_settings = settings;
-}
-
-CameraMover::Settings CameraMover::GetSettings() const
-{
-    return m_settings;
-}
-
-D3DXVECTOR3 CameraMover::ResolvePosition(const D3DXVECTOR3& targetPosition,
-                                         const D3DXVECTOR3& desiredCameraPosition) const
-{
-    UNREFERENCED_PARAMETER(targetPosition);
-    return desiredCameraPosition;
-}
-
-CharacterMover::CharacterMover()
-    : m_position(0.0f, 0.0f, 0.0f),
-      m_velocity(0.0f, 0.0f, 0.0f),
-      m_isGrounded(true),
-      m_isTouchingWall(false),
-      m_supportObjectId(-1),
-      m_remainingAirJumps(0)
-{
-}
-
-CharacterMover::CharacterMover(const D3DXVECTOR3& position)
-    : m_position(position),
-      m_velocity(0.0f, 0.0f, 0.0f),
-      m_isGrounded(true),
-      m_isTouchingWall(false),
-      m_supportObjectId(-1),
-      m_remainingAirJumps(0)
-{
-}
-
-void CharacterMover::SetSettings(const Settings& settings)
-{
-    if (settings.radius < 0.0f)
-    {
-        throw std::out_of_range("CharacterMover radius must not be negative.");
-    }
-
-    if (settings.height < 0.0f)
-    {
-        throw std::out_of_range("CharacterMover height must not be negative.");
-    }
-
-    if (settings.groundDamping < 0.0f || settings.airDamping < 0.0f)
-    {
-        throw std::out_of_range("CharacterMover damping must not be negative.");
-    }
-
-    if (settings.groundAcceleration < 0.0f || settings.airAcceleration < 0.0f)
-    {
-        throw std::out_of_range("CharacterMover acceleration must not be negative.");
-    }
-
-    m_settings = settings;
-}
-
-CharacterMover::Settings CharacterMover::GetSettings() const
-{
-    return m_settings;
-}
-
-void CharacterMover::Reset(const D3DXVECTOR3& position)
-{
-    m_position = position;
-    m_velocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    m_isGrounded = true;
-    m_isTouchingWall = false;
-    m_supportObjectId = -1;
-    m_remainingAirJumps = 1;
-    m_debugInfo = DebugInfo();
-}
-
-void CharacterMover::SetPosition(const D3DXVECTOR3& position)
-{
-    m_position = position;
-}
-
-D3DXVECTOR3 CharacterMover::GetPosition() const
-{
-    return m_position;
-}
-
-void CharacterMover::SetVelocity(const D3DXVECTOR3& velocity)
-{
-    m_velocity = velocity;
-}
-
-D3DXVECTOR3 CharacterMover::GetVelocity() const
-{
-    return m_velocity;
-}
-
-bool CharacterMover::IsGrounded() const
-{
-    return m_isGrounded;
-}
-
-bool CharacterMover::IsTouchingWall() const
-{
-    return m_isTouchingWall;
-}
-
-int CharacterMover::GetSupportObjectId() const
-{
-    return m_supportObjectId;
-}
-
-CharacterMover::DebugInfo CharacterMover::GetDebugInfo() const
-{
-    return m_debugInfo;
-}
-
-bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
-                            bool jump,
-                            std::vector<int>* outPassThroughIds,
-                            std::vector<int>* outSolidIds)
-{
-    if (outPassThroughIds != nullptr)
-    {
-        outPassThroughIds->clear();
-    }
-    if (outSolidIds != nullptr)
-    {
-        outSolidIds->clear();
-    }
-
-    D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
-    if (D3DXVec3Length(&inputMove) > 0.0001f)
-    {
-        D3DXVec3Normalize(&inputMove, &inputMove);
-        inputMove *= m_settings.moveSpeed;
-    }
-
-    if (IsInertiaEnabled())
-    {
-        if (D3DXVec3Length(&inputMove) > 0.0001f)
-        {
-            MoveHorizontalVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
-        }
-    }
-    else
-    {
-        m_velocity.x = inputMove.x;
-        m_velocity.z = inputMove.z;
-    }
-
-    const bool isGroundJump = jump && m_isGrounded;
-    bool canJump = false;
-    if (jump && m_isGrounded)
-    {
-        canJump = true;
-    }
-    else if (jump && IsInfiniteJumpEnabled())
-    {
-        canJump = true;
-    }
-    else if (jump && IsDoubleJumpEnabled() && m_remainingAirJumps > 0)
-    {
-        canJump = true;
-        --m_remainingAirJumps;
-    }
-
-    if (canJump)
-    {
-        if (isGroundJump)
-        {
-            m_remainingAirJumps = 1;
-        }
-
-        m_velocity.y = m_settings.jumpVelocity;
-        m_isGrounded = false;
-    }
-
-    if (IsGravityEnabled())
-    {
-        m_velocity.y -= 9.8f * kDeltaSeconds;
-    }
-    else
-    {
-        m_velocity.y = 0.0f;
-    }
-    D3DXVECTOR3 nextPosition = m_position;
-    D3DXVECTOR3 nextVelocity = m_velocity;
-    const D3DXVECTOR3 attemptedVelocity = m_velocity;
-    const bool collided = PhysicsLib::CheckCollide(m_position,
-                                                   m_velocity,
-                                                   m_settings.shapeType,
-                                                   &nextPosition,
-                                                   &nextVelocity,
-                                                   outPassThroughIds,
-                                                   outSolidIds,
-                                                   m_settings.radius,
-                                                   m_settings.height);
-    m_position = nextPosition;
-    m_velocity = nextVelocity;
-    if (IsGravityEnabled())
-    {
-        m_isGrounded = false;
-    }
-    if (collided && attemptedVelocity.y <= 0.0f)
-    {
-        m_isGrounded = true;
-        m_remainingAirJumps = 1;
-    }
-    m_isTouchingWall = false;
-    m_supportObjectId = -1;
-    m_debugInfo = DebugInfo();
-    if (collided)
-    {
-        m_debugInfo.collideCheckCount = 1;
-        m_debugInfo.hitCount = 1;
-    }
-    return collided;
+    return CheckCollideInternal(currentPosition,
+                                moveVector,
+                                shapeType,
+                                outPosition,
+                                outNextMoveVector,
+                                outPassThroughIds,
+                                outSolidIds,
+                                radius,
+                                height,
+                                true,
+                                false,
+                                nullptr,
+                                nullptr,
+                                nullptr);
 }
 }

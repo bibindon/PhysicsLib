@@ -136,6 +136,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PhysicsLib.cpp" />
+    <ClCompile Include="PhysicsLibOld.cpp" />
     <ClCompile Include="PhysicsLibSettingsDialog.cpp" />
   </ItemGroup>
   <ItemGroup>
