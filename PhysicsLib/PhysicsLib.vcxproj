@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -131,10 +131,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="PhysicsLibInternal.h" />
     <ClInclude Include="PhysicsLib.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PhysicsLib.cpp" />
+    <ClCompile Include="PhysicsLibSettingsDialog.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

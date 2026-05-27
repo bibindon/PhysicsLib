@@ -2,6 +2,8 @@
 
 #include <d3d9.h>
 
+#include "PhysicsLibInternal.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -75,80 +77,10 @@ struct SimpleObject
 std::vector<SimpleObject> g_simpleObjects;
 int g_simpleNextId = 1;
 bool g_simpleIntersectMultithreadEnabled = false;
-HWND g_settingsDialog = NULL;
-void (*g_resetCallback)() = nullptr;
 bool g_doubleJumpEnabled = false;
 bool g_infiniteJumpEnabled = false;
 bool g_gravityEnabled = true;
 bool g_inertiaEnabled = false;
-
-const int kSettingsCheckboxStartId = 4100;
-const int kDoubleJumpCheckboxId = kSettingsCheckboxStartId + 0;
-const int kInfiniteJumpCheckboxId = kSettingsCheckboxStartId + 1;
-const int kGravityCheckboxId = kSettingsCheckboxStartId + 2;
-const int kInertiaCheckboxId = kSettingsCheckboxStartId + 6;
-const int kSettingsResetButtonId = 4200;
-const TCHAR* kSettingsCheckboxLabels[] =
-{
-    _T("2段ジャンプ"),
-    _T("多段ジャンプ"),
-    _T("重力"),
-    _T("スライド"),
-    _T("高速化"),
-    _T("初期化"),
-    _T("慣性"),
-};
-
-LRESULT CALLBACK SettingsDialogProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    if (message == WM_COMMAND)
-    {
-        if (LOWORD(wParam) == kSettingsResetButtonId && HIWORD(wParam) == BN_CLICKED)
-        {
-            if (g_resetCallback != nullptr)
-            {
-                g_resetCallback();
-            }
-            return 0;
-        }
-
-        if (LOWORD(wParam) == kGravityCheckboxId && HIWORD(wParam) == BN_CLICKED)
-        {
-            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            g_gravityEnabled = checkState == BST_CHECKED;
-            return 0;
-        }
-
-        if (LOWORD(wParam) == kDoubleJumpCheckboxId && HIWORD(wParam) == BN_CLICKED)
-        {
-            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            g_doubleJumpEnabled = checkState == BST_CHECKED;
-            return 0;
-        }
-
-        if (LOWORD(wParam) == kInfiniteJumpCheckboxId && HIWORD(wParam) == BN_CLICKED)
-        {
-            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            g_infiniteJumpEnabled = checkState == BST_CHECKED;
-            return 0;
-        }
-
-        if (LOWORD(wParam) == kInertiaCheckboxId && HIWORD(wParam) == BN_CLICKED)
-        {
-            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            g_inertiaEnabled = checkState == BST_CHECKED;
-            return 0;
-        }
-    }
-
-    if (message == WM_CLOSE)
-    {
-        ShowWindow(window, SW_HIDE);
-        return 0;
-    }
-
-    return DefWindowProc(window, message, wParam, lParam);
-}
 
 struct HitCollection
 {
@@ -1276,6 +1208,46 @@ bool PhysicsLibOld::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 nullptr);
 }
 
+bool IsDoubleJumpEnabled()
+{
+    return g_doubleJumpEnabled;
+}
+
+void SetDoubleJumpEnabled(bool enabled)
+{
+    g_doubleJumpEnabled = enabled;
+}
+
+bool IsInfiniteJumpEnabled()
+{
+    return g_infiniteJumpEnabled;
+}
+
+void SetInfiniteJumpEnabled(bool enabled)
+{
+    g_infiniteJumpEnabled = enabled;
+}
+
+bool IsGravityEnabled()
+{
+    return g_gravityEnabled;
+}
+
+void SetGravityEnabled(bool enabled)
+{
+    g_gravityEnabled = enabled;
+}
+
+bool IsInertiaEnabled()
+{
+    return g_inertiaEnabled;
+}
+
+void SetInertiaEnabled(bool enabled)
+{
+    g_inertiaEnabled = enabled;
+}
+
 void PhysicsLib::Initialize()
 {
     g_simpleObjects.clear();
@@ -1284,12 +1256,7 @@ void PhysicsLib::Initialize()
 
 void PhysicsLib::Finalize()
 {
-    if (g_settingsDialog != NULL)
-    {
-        DestroyWindow(g_settingsDialog);
-        g_settingsDialog = NULL;
-    }
-
+    DestroySettingsDialog();
     g_simpleObjects.clear();
     g_simpleNextId = 1;
 }
@@ -1313,94 +1280,6 @@ void PhysicsLib::SetIntersectMultithreadEnabled(bool enabled)
 bool PhysicsLib::IsIntersectMultithreadEnabled()
 {
     return g_simpleIntersectMultithreadEnabled;
-}
-
-void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
-{
-    if (g_settingsDialog != NULL)
-    {
-        ShowWindow(g_settingsDialog, SW_SHOW);
-        SetForegroundWindow(g_settingsDialog);
-        return;
-    }
-
-    HINSTANCE instance = GetModuleHandle(NULL);
-    const TCHAR* className = _T("PhysicsLibSettingsDialog");
-
-    WNDCLASSEX windowClass = {};
-    windowClass.cbSize = sizeof(WNDCLASSEX);
-    windowClass.lpfnWndProc = SettingsDialogProc;
-    windowClass.hInstance = instance;
-    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
-    windowClass.lpszClassName = className;
-    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    RegisterClassEx(&windowClass);
-
-    g_settingsDialog = CreateWindowEx(WS_EX_TOOLWINDOW,
-                                      className,
-                                      _T("PhysicsLib Settings"),
-                                      WS_CAPTION | WS_BORDER | WS_VISIBLE,
-                                      40,
-                                      40,
-                                      340,
-                                      330,
-                                      ownerWindow,
-                                      NULL,
-                                      instance,
-                                      NULL);
-
-    if (g_settingsDialog == NULL)
-    {
-        return;
-    }
-
-    for (int i = 0; i < static_cast<int>(sizeof(kSettingsCheckboxLabels) / sizeof(kSettingsCheckboxLabels[0])); ++i)
-    {
-        HWND checkbox = CreateWindow(_T("BUTTON"),
-                                     kSettingsCheckboxLabels[i],
-                                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                                     16,
-                                     18 + i * 30,
-                                     210,
-                                     24,
-                                     g_settingsDialog,
-                                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsCheckboxStartId + i)),
-                                     instance,
-                                     NULL);
-        if (kSettingsCheckboxStartId + i == kGravityCheckboxId)
-        {
-            SendMessage(checkbox, BM_SETCHECK, g_gravityEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
-        }
-        else if (kSettingsCheckboxStartId + i == kDoubleJumpCheckboxId)
-        {
-            SendMessage(checkbox, BM_SETCHECK, g_doubleJumpEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
-        }
-        else if (kSettingsCheckboxStartId + i == kInfiniteJumpCheckboxId)
-        {
-            SendMessage(checkbox, BM_SETCHECK, g_infiniteJumpEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
-        }
-        else if (kSettingsCheckboxStartId + i == kInertiaCheckboxId)
-        {
-            SendMessage(checkbox, BM_SETCHECK, g_inertiaEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
-        }
-    }
-
-    CreateWindow(_T("BUTTON"),
-                 _T("リセット"),
-                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                 16,
-                 240,
-                 130,
-                 32,
-                 g_settingsDialog,
-                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsResetButtonId)),
-                 instance,
-                 NULL);
-}
-
-void PhysicsLib::SetResetCallback(void (*callback)())
-{
-    g_resetCallback = callback;
 }
 
 int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float friction)
@@ -1644,7 +1523,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         inputMove *= m_settings.moveSpeed;
     }
 
-    if (g_inertiaEnabled)
+    if (IsInertiaEnabled())
     {
         if (D3DXVec3Length(&inputMove) > 0.0001f)
         {
@@ -1663,11 +1542,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     {
         canJump = true;
     }
-    else if (jump && g_infiniteJumpEnabled)
+    else if (jump && IsInfiniteJumpEnabled())
     {
         canJump = true;
     }
-    else if (jump && g_doubleJumpEnabled && m_remainingAirJumps > 0)
+    else if (jump && IsDoubleJumpEnabled() && m_remainingAirJumps > 0)
     {
         canJump = true;
         --m_remainingAirJumps;
@@ -1684,7 +1563,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_isGrounded = false;
     }
 
-    if (g_gravityEnabled)
+    if (IsGravityEnabled())
     {
         m_velocity.y -= 9.8f * kDeltaSeconds;
     }
@@ -1693,7 +1572,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_velocity.y = 0.0f;
     }
     m_position += m_velocity * kDeltaSeconds;
-    if (g_gravityEnabled)
+    if (IsGravityEnabled())
     {
         m_isGrounded = false;
     }

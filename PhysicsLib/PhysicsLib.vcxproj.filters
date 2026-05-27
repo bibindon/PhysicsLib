@@ -18,9 +18,15 @@
     <ClInclude Include="PhysicsLib.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="PhysicsLibInternal.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PhysicsLib.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsLibSettingsDialog.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
