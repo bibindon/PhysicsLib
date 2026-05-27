@@ -571,6 +571,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
             D3DXVECTOR3 nearestPoint = currentPosition;
             bool foundHit = false;
             float nearestDistance = std::numeric_limits<float>::max();
+
             for (size_t i = 0; i < g_simpleObjects.size(); ++i)
             {
                 if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
@@ -581,6 +582,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                 D3DXVECTOR3 hitPoint;
                 D3DXVECTOR3 surfaceNormal;
                 float hitDistance = 0.0f;
+
                 if (RayCastObject(g_simpleObjects[i].mesh,
                                   g_simpleObjects[i].transform,
                                   currentPosition,
@@ -605,6 +607,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
             if (foundHit)
             {
                 nextPosition = nearestPoint;
+
                 nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
                 collided = true;
             }
