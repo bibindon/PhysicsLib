@@ -618,19 +618,23 @@ void UpdatePlayer()
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
 
-    if (isWindowActive && (GetAsyncKeyState('W') & 0x8000))
+    if (isWindowActive && ((GetAsyncKeyState('W') & 0x8000) ||
+                           (GetAsyncKeyState(VK_UP) & 0x8000)))
     {
         inputMove.z += 1.0f;
     }
-    if (isWindowActive && (GetAsyncKeyState('S') & 0x8000))
+    if (isWindowActive && ((GetAsyncKeyState('S') & 0x8000) ||
+                           (GetAsyncKeyState(VK_DOWN) & 0x8000)))
     {
         inputMove.z -= 1.0f;
     }
-    if (isWindowActive && (GetAsyncKeyState('A') & 0x8000))
+    if (isWindowActive && ((GetAsyncKeyState('A') & 0x8000) ||
+                           (GetAsyncKeyState(VK_LEFT) & 0x8000)))
     {
         inputMove.x -= 1.0f;
     }
-    if (isWindowActive && (GetAsyncKeyState('D') & 0x8000))
+    if (isWindowActive && ((GetAsyncKeyState('D') & 0x8000) ||
+                           (GetAsyncKeyState(VK_RIGHT) & 0x8000)))
     {
         inputMove.x += 1.0f;
     }
