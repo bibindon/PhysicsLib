@@ -51,7 +51,7 @@ bool g_tangentMoveEnabled = true;
 bool g_airMoveEnabled = true;
 bool g_optimizationEnabled = true;
 bool g_movingFloorEnabled = true;
-bool g_cameraAutoMoveEnabled = true;
+bool g_cameraAutoMoveEnabled = false;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 
