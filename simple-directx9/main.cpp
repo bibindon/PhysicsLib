@@ -644,7 +644,7 @@ void UpdatePlayer()
             g_playerYaw = MoveAngleToward(g_playerYaw,
                                           targetPlayerYaw,
                                           kPlayerTurnRadiansPerSecond * static_cast<float>(kTargetFrameSeconds));
-            inputMove = D3DXVECTOR3(sinf(g_playerYaw), 0.0f, cosf(g_playerYaw));
+            inputMove = desiredMove;
         }
     }
 
