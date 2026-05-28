@@ -52,6 +52,7 @@ bool g_airMoveEnabled = true;
 bool g_optimizationEnabled = true;
 bool g_movingFloorEnabled = true;
 bool g_cameraAutoMoveEnabled = false;
+bool g_focusModeEnabled = true;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 
@@ -896,6 +897,16 @@ void SettingsState::SetCameraAutoMoveEnabled(bool enabled)
     g_cameraAutoMoveEnabled = enabled;
 }
 
+bool SettingsState::IsFocusModeEnabled()
+{
+    return g_focusModeEnabled;
+}
+
+void SettingsState::SetFocusModeEnabled(bool enabled)
+{
+    g_focusModeEnabled = enabled;
+}
+
 bool SettingsState::IsContactEnabled()
 {
     return g_contactEnabled;
@@ -914,6 +925,11 @@ bool SettingsState::IsSurfaceContactEnabled()
 void SettingsState::SetSurfaceContactEnabled(bool enabled)
 {
     g_surfaceContactEnabled = enabled;
+}
+
+bool PhysicsLib::IsFocusModeEnabled()
+{
+    return SettingsState::IsFocusModeEnabled();
 }
 
 void PhysicsLib::Initialize()

@@ -29,6 +29,7 @@ const float kMaxCameraDistance = 30.0f;
 const float kCameraWheelZoomStep = 0.5f;
 const float kPlayerSpeed = 5.0f;
 const float kPlayerSpeedBoostMultiplier = 3.0f;
+const float kPlayerTurnRadiansPerSecond = D3DX_PI * 3.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
 
@@ -73,6 +74,7 @@ D3DXMATRIX g_cameraProjection;
 float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
 float g_cameraDistance = 4.0f;
+float g_playerYaw = 0.0f;
 bool g_isMouseCursorVisible = true;
 bool g_prevEscPressed = false;
 POINT g_lastMousePosition = { 0, 0 };
@@ -97,6 +99,8 @@ static void Render();
 static void OnMouseMove(LPARAM lParam);
 static void SetMouseCursorVisible(bool visible);
 static float ClampFloat(float value, float minValue, float maxValue);
+static float NormalizeAngle(float angle);
+static float MoveAngleToward(float currentAngle, float targetAngle, float maxStep);
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 extern int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
@@ -550,6 +554,7 @@ void ResetPlayer()
     settings.airDamping = 1.0f;
     g_playerMover.SetSettings(settings);
     g_playerMover.Reset(kPlayerStartPosition);
+    g_playerYaw = 0.0f;
 }
 
 void UpdatePlayer()
@@ -597,33 +602,50 @@ void UpdatePlayer()
     }
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
+    D3DXVECTOR3 localInputMove(0.0f, 0.0f, 0.0f);
 
-    if (isWindowActive && ((GetAsyncKeyState('W') & 0x8000) ||
-                           (GetAsyncKeyState(VK_UP) & 0x8000)))
+    const bool forwardPressed = isWindowActive && ((GetAsyncKeyState('W') & 0x8000) ||
+                                                   (GetAsyncKeyState(VK_UP) & 0x8000));
+    const bool backwardPressed = isWindowActive && ((GetAsyncKeyState('S') & 0x8000) ||
+                                                    (GetAsyncKeyState(VK_DOWN) & 0x8000));
+    const bool focusModeEnabled = PhysicsLib::PhysicsLib::IsFocusModeEnabled();
+
+    if (forwardPressed)
     {
-        inputMove.z += 1.0f;
+        localInputMove.z += 1.0f;
     }
-    if (isWindowActive && ((GetAsyncKeyState('S') & 0x8000) ||
-                           (GetAsyncKeyState(VK_DOWN) & 0x8000)))
+    if (backwardPressed)
     {
-        inputMove.z -= 1.0f;
+        localInputMove.z -= 1.0f;
     }
     if (isWindowActive && ((GetAsyncKeyState('A') & 0x8000) ||
                            (GetAsyncKeyState(VK_LEFT) & 0x8000)))
     {
-        inputMove.x -= 1.0f;
+        localInputMove.x -= 1.0f;
     }
     if (isWindowActive && ((GetAsyncKeyState('D') & 0x8000) ||
                            (GetAsyncKeyState(VK_RIGHT) & 0x8000)))
     {
-        inputMove.x += 1.0f;
+        localInputMove.x += 1.0f;
     }
 
-    if (inputMove.x != 0.0f || inputMove.z != 0.0f)
+    if (localInputMove.x != 0.0f || localInputMove.z != 0.0f)
     {
         const D3DXVECTOR3 cameraForward(-sinf(g_cameraYaw), 0.0f, cosf(g_cameraYaw));
         const D3DXVECTOR3 cameraRight(cosf(g_cameraYaw), 0.0f, sinf(g_cameraYaw));
-        inputMove = cameraRight * inputMove.x + cameraForward * inputMove.z;
+        const D3DXVECTOR3 desiredMove = cameraRight * localInputMove.x + cameraForward * localInputMove.z;
+        if (focusModeEnabled)
+        {
+            inputMove = desiredMove;
+        }
+        else
+        {
+            const float targetPlayerYaw = atan2f(desiredMove.x, desiredMove.z);
+            g_playerYaw = MoveAngleToward(g_playerYaw,
+                                          targetPlayerYaw,
+                                          kPlayerTurnRadiansPerSecond * static_cast<float>(kTargetFrameSeconds));
+            inputMove = D3DXVECTOR3(sinf(g_playerYaw), 0.0f, cosf(g_playerYaw));
+        }
     }
 
     std::vector<int> passThroughIds;
@@ -953,7 +975,7 @@ void Render()
     DrawMesh(g_pCubeMesh,
              g_playerMover.GetPosition() + D3DXVECTOR3(0.0f, 0.5f, 0.0f),
              D3DXVECTOR3(1.0f, 1.0f, 1.0f),
-             D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+             D3DXVECTOR3(0.0f, g_playerYaw, 0.0f),
              D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f),
              true);
 
@@ -1022,6 +1044,37 @@ float ClampFloat(float value, float minValue, float maxValue)
     }
 
     return value;
+}
+
+float NormalizeAngle(float angle)
+{
+    while (angle > D3DX_PI)
+    {
+        angle -= D3DX_PI * 2.0f;
+    }
+
+    while (angle < -D3DX_PI)
+    {
+        angle += D3DX_PI * 2.0f;
+    }
+
+    return angle;
+}
+
+float MoveAngleToward(float currentAngle, float targetAngle, float maxStep)
+{
+    const float deltaAngle = NormalizeAngle(targetAngle - currentAngle);
+    if (fabsf(deltaAngle) <= maxStep)
+    {
+        return NormalizeAngle(targetAngle);
+    }
+
+    if (deltaAngle > 0.0f)
+    {
+        return NormalizeAngle(currentAngle + maxStep);
+    }
+
+    return NormalizeAngle(currentAngle - maxStep);
 }
 
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)

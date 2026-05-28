@@ -24,6 +24,7 @@ const int kAirMoveCheckboxId = kSettingsCheckboxStartId + 9;
 const int kMovingFloorCheckboxId = kSettingsCheckboxStartId + 10;
 const int kSlideCheckCheckboxId = kSettingsCheckboxStartId + 11;
 const int kCameraAutoMoveCheckboxId = kSettingsCheckboxStartId + 12;
+const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
 const int kSettingsResetButtonId = 4200;
 
 const TCHAR* kSettingsCheckboxLabels[] =
@@ -41,6 +42,7 @@ const TCHAR* kSettingsCheckboxLabels[] =
     _T("移動する床"),
     _T("スライドチェック"),
     _T("カメラ自動移動"),
+    _T("フォーカスモード"),
 };
 
 }
@@ -135,6 +137,13 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             return 0;
         }
 
+        if (LOWORD(wParam) == kFocusModeCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SettingsState::SetFocusModeEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+
         if (LOWORD(wParam) == kContactCheckboxId && HIWORD(wParam) == BN_CLICKED)
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
@@ -187,7 +196,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                       40,
                                       40,
                                       340,
-                                      510,
+                                      540,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -309,6 +318,15 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
             }
             SendMessage(checkbox, BM_SETCHECK, checkState, 0);
         }
+        else if (kSettingsCheckboxStartId + i == kFocusModeCheckboxId)
+        {
+            LRESULT checkState = BST_UNCHECKED;
+            if (SettingsState::IsFocusModeEnabled())
+            {
+                checkState = BST_CHECKED;
+            }
+            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
+        }
         else if (kSettingsCheckboxStartId + i == kContactCheckboxId)
         {
             LRESULT checkState = BST_UNCHECKED;
@@ -333,7 +351,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 420,
+                 450,
                  130,
                  32,
                  g_settingsDialog,

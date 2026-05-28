@@ -63,6 +63,9 @@ public:
     // ライブラリ側の設定ダイアログを表示する。
     static void ShowSettingsDialog(HWND ownerWindow);
 
+    // フォーカスモードが有効かどうかを取得する。
+    static bool IsFocusModeEnabled();
+
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 
