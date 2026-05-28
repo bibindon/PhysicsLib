@@ -902,7 +902,7 @@ void Render()
     TCHAR collisionDebugText[256];
     const PhysicsLib::CharacterMover::DebugInfo debugInfo = g_playerMover.GetDebugInfo();
     _stprintf_s(collisionDebugText,
-                _T("CollideChecks=%d  Hits=%d  Slides=%d  HitDist=%.3f  NormalMove=%.3f  HitN(%.2f, %.2f, %.2f)  Slide(%.3f, %.3f, %.3f)"),
+                _T("CollideChecks=%d  Hits=%d  SlidePasses=%d  HitDist=%.3f  NormalMove=%.3f  HitN(%.2f, %.2f, %.2f)  Slide(%.3f, %.3f, %.3f)"),
                 debugInfo.collideCheckCount,
                 debugInfo.hitCount,
                 debugInfo.slideCount,
