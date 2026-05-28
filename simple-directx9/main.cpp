@@ -398,19 +398,20 @@ void InitScene()
                                                      PhysicsLib::PhysicsLib::ObjectType::Slide,
                                                      0.0f);
     PhysicsLib::PhysicsLib::SetTransform(slopeId,
-                                         D3DXVECTOR3(4.0f, 0.75f, 0.0f),
-                                         D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
-                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
-    g_worldObjects.push_back({ slopeMesh, slopeId, D3DXVECTOR3(4.0f, 0.75f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
-
-    const int secondSlopeId = PhysicsLib::PhysicsLib::Load(_T("collision_slope.x"),
-                                                           PhysicsLib::PhysicsLib::ObjectType::Slide,
-                                                           0.0f);
-    PhysicsLib::PhysicsLib::SetTransform(secondSlopeId,
                                          D3DXVECTOR3(10.0f, 0.75f, -4.0f),
                                          D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
                                          D3DXVECTOR3(1.0f, 1.0f, 1.0f));
-    g_worldObjects.push_back({ slopeMesh, secondSlopeId, D3DXVECTOR3(10.0f, 0.75f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
+    g_worldObjects.push_back({ slopeMesh, slopeId, D3DXVECTOR3(10.0f, 0.75f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
+
+    LPD3DXMESH slopeMesh2 = LoadSceneMeshFromX(_T("scollision_slope2.x"));
+    const int slopeId2 = PhysicsLib::PhysicsLib::Load(_T("scollision_slope2.x"),
+                                                      PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                      0.0f);
+    PhysicsLib::PhysicsLib::SetTransform(slopeId2,
+                                         D3DXVECTOR3(22.0f, 0.75f, -8.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(10.0f)),
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ slopeMesh2, slopeId2, D3DXVECTOR3(22.0f, 0.75f, -8.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(10.0f)), D3DXCOLOR(0.68f, 0.72f, 0.42f, 1.0f), false });
 
     LPD3DXMESH wallMesh = LoadSceneMeshFromX(_T("collision_wall.x"));
     const int wallId = PhysicsLib::PhysicsLib::Load(_T("collision_wall.x"),
