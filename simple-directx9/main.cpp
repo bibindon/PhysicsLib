@@ -408,7 +408,7 @@ void InitScene()
                                          D3DXVECTOR3(1.0f, 1.0f, 1.0f));
     g_worldObjects.push_back({ bumpyGroundMesh, bumpyGroundId, D3DXVECTOR3(70.0f, 0.0f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.42f, 0.62f, 0.30f, 1.0f), false });
 
-    LPD3DXMESH slopeMesh = CreateBoxMesh(6.0f, 0.8f, 4.0f);
+    LPD3DXMESH slopeMesh = CreateBoxMesh(12.0f, 0.8f, 8.0f);
     SaveCollisionMesh(slopeMesh, _T("collision_slope.x"));
     const int slopeId = PhysicsLib::PhysicsLib::Load(_T("collision_slope.x"),
                                                      PhysicsLib::PhysicsLib::ObjectType::Slide,
@@ -418,6 +418,15 @@ void InitScene()
                                          D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
                                          D3DXVECTOR3(1.0f, 1.0f, 1.0f));
     g_worldObjects.push_back({ slopeMesh, slopeId, D3DXVECTOR3(4.0f, 0.75f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
+
+    const int secondSlopeId = PhysicsLib::PhysicsLib::Load(_T("collision_slope.x"),
+                                                           PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                           0.0f);
+    PhysicsLib::PhysicsLib::SetTransform(secondSlopeId,
+                                         D3DXVECTOR3(10.0f, 0.75f, -4.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f),
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ slopeMesh, secondSlopeId, D3DXVECTOR3(10.0f, 0.75f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
 
     LPD3DXMESH wallMesh = CreateBoxMesh(1.0f, 3.0f, 8.0f);
     SaveCollisionMesh(wallMesh, _T("collision_wall.x"));
