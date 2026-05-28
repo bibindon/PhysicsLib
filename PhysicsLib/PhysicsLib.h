@@ -144,13 +144,25 @@ private:
                               D3DXVECTOR3* outSurfaceNormal,
                               float* outDistance);
 
+    // プレイヤー形状を代表点の集合として扱い、線分と単一メッシュの接面判定を行う補助関数である。
+    static bool RayCastShapeObject(LPD3DXMESH mesh,
+                                   const Transform& transform,
+                                   const D3DXVECTOR3& rayOriginWorld,
+                                   const D3DXVECTOR3& rayEndWorld,
+                                   ShapeType shapeType,
+                                   float radius,
+                                   float height,
+                                   D3DXVECTOR3* outPoint,
+                                   D3DXVECTOR3* outSurfaceNormal,
+                                   float* outDistance);
+
     // 速度から接触面へ向かう成分だけを取り除く補助関数である。
     static D3DXVECTOR3 RemoveIntoSurfaceVelocity(const D3DXVECTOR3& velocity,
                                                  const D3DXVECTOR3& surfaceNormal);
 
     static bool IntersectsAabb2D(const Aabb2D& a, const Aabb2D& b);
     static bool ContainsAabb2D(const Aabb2D& outer, const Aabb2D& inner);
-    static Aabb2D MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end);
+    static Aabb2D MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end, float padding = 0.0f);
     static Aabb2D MakeWorldAabb2D(const D3DXVECTOR3& localBoundsMin,
                                   const D3DXVECTOR3& localBoundsMax,
                                   const Transform& transform);
@@ -167,8 +179,10 @@ private:
     static void QueryQuadTree(const QuadTreeNode& node,
                               const Aabb2D& queryBounds,
                               std::vector<size_t>* outIndices);
+    static std::vector<D3DXVECTOR3> BuildShapeCastOffsets(ShapeType shapeType, float radius, float height);
     static std::vector<size_t> BuildCollisionCandidateIndices(const D3DXVECTOR3& start,
-                                                              const D3DXVECTOR3& end);
+                                                              const D3DXVECTOR3& end,
+                                                              float padding = 0.0f);
 
     // Xファイルからメッシュを読み込む補助関数である。
     static void LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh);
@@ -196,7 +210,7 @@ public:
     struct Settings
     {
 
-        // 現在は主に Point を想定している。Sphere/Cylinder は今後の判定拡張用である。
+        // プレイヤーの接面判定に使う形状である。
         PhysicsLib::ShapeType shapeType = PhysicsLib::ShapeType::Sphere;
 
         // 判定形状をプレイヤー位置からずらすためのオフセットである。
@@ -206,7 +220,7 @@ public:
         float radius = 0.5f;
 
         // Cylinder 用の高さである。
-        float height = 0.0f;
+        float height = 1.0f;
 
         // 水平方向の最高速度である。
         float moveSpeed = 6.0f;

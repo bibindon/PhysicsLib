@@ -80,13 +80,14 @@ bool PhysicsLib::ContainsAabb2D(const Aabb2D& outer, const Aabb2D& inner)
            inner.maxZ <= outer.maxZ;
 }
 
-PhysicsLib::Aabb2D PhysicsLib::MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
+PhysicsLib::Aabb2D PhysicsLib::MakeSegmentAabb2D(const D3DXVECTOR3& start, const D3DXVECTOR3& end, float padding)
 {
     Aabb2D bounds;
-    bounds.minX = std::min(start.x, end.x) - kGroundContactOffset;
-    bounds.maxX = std::max(start.x, end.x) + kGroundContactOffset;
-    bounds.minZ = std::min(start.z, end.z) - kGroundContactOffset;
-    bounds.maxZ = std::max(start.z, end.z) + kGroundContactOffset;
+    const float totalPadding = kGroundContactOffset + padding;
+    bounds.minX = std::min(start.x, end.x) - totalPadding;
+    bounds.maxX = std::max(start.x, end.x) + totalPadding;
+    bounds.minZ = std::min(start.z, end.z) - totalPadding;
+    bounds.maxZ = std::max(start.z, end.z) + totalPadding;
     return bounds;
 }
 
@@ -281,7 +282,9 @@ void PhysicsLib::QueryQuadTree(const QuadTreeNode& node,
     }
 }
 
-std::vector<size_t> PhysicsLib::BuildCollisionCandidateIndices(const D3DXVECTOR3& start, const D3DXVECTOR3& end)
+std::vector<size_t> PhysicsLib::BuildCollisionCandidateIndices(const D3DXVECTOR3& start,
+                                                               const D3DXVECTOR3& end,
+                                                               float padding)
 {
     std::vector<size_t> candidates;
     if (!SettingsState::IsOptimizationEnabled())
@@ -344,7 +347,7 @@ std::vector<size_t> PhysicsLib::BuildCollisionCandidateIndices(const D3DXVECTOR3
         InsertQuadTreeObject(&root, i, objectBounds[i], objectBounds);
     }
 
-    QueryQuadTree(root, MakeSegmentAabb2D(start, end), &candidates);
+    QueryQuadTree(root, MakeSegmentAabb2D(start, end, padding), &candidates);
     return candidates;
 }
 
@@ -626,6 +629,117 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     }
 
     // ここまで到達したので判定成功である。
+    return true;
+}
+
+std::vector<D3DXVECTOR3> PhysicsLib::BuildShapeCastOffsets(ShapeType shapeType, float radius, float height)
+{
+    std::vector<D3DXVECTOR3> offsets;
+    offsets.push_back(D3DXVECTOR3(0.0f, 0.0f, 0.0f));
+
+    if (shapeType == ShapeType::Point || radius <= 0.0f)
+    {
+        return offsets;
+    }
+
+    const float diagonal = radius * 0.70710678f;
+    if (shapeType == ShapeType::Sphere)
+    {
+        offsets.push_back(D3DXVECTOR3(radius, 0.0f, 0.0f));
+        offsets.push_back(D3DXVECTOR3(-radius, 0.0f, 0.0f));
+        offsets.push_back(D3DXVECTOR3(0.0f, radius, 0.0f));
+        offsets.push_back(D3DXVECTOR3(0.0f, -radius, 0.0f));
+        offsets.push_back(D3DXVECTOR3(0.0f, 0.0f, radius));
+        offsets.push_back(D3DXVECTOR3(0.0f, 0.0f, -radius));
+        offsets.push_back(D3DXVECTOR3(diagonal, 0.0f, diagonal));
+        offsets.push_back(D3DXVECTOR3(diagonal, 0.0f, -diagonal));
+        offsets.push_back(D3DXVECTOR3(-diagonal, 0.0f, diagonal));
+        offsets.push_back(D3DXVECTOR3(-diagonal, 0.0f, -diagonal));
+        return offsets;
+    }
+
+    const float halfHeight = height * 0.5f;
+    const float yLevels[] = { -halfHeight, 0.0f, halfHeight };
+    for (int yIndex = 0; yIndex < 3; ++yIndex)
+    {
+        const float y = yLevels[yIndex];
+        offsets.push_back(D3DXVECTOR3(0.0f, y, 0.0f));
+        offsets.push_back(D3DXVECTOR3(radius, y, 0.0f));
+        offsets.push_back(D3DXVECTOR3(-radius, y, 0.0f));
+        offsets.push_back(D3DXVECTOR3(0.0f, y, radius));
+        offsets.push_back(D3DXVECTOR3(0.0f, y, -radius));
+        offsets.push_back(D3DXVECTOR3(diagonal, y, diagonal));
+        offsets.push_back(D3DXVECTOR3(diagonal, y, -diagonal));
+        offsets.push_back(D3DXVECTOR3(-diagonal, y, diagonal));
+        offsets.push_back(D3DXVECTOR3(-diagonal, y, -diagonal));
+    }
+
+    return offsets;
+}
+
+bool PhysicsLib::RayCastShapeObject(LPD3DXMESH mesh,
+                                    const Transform& transform,
+                                    const D3DXVECTOR3& rayOriginWorld,
+                                    const D3DXVECTOR3& rayEndWorld,
+                                    ShapeType shapeType,
+                                    float radius,
+                                    float height,
+                                    D3DXVECTOR3* outPoint,
+                                    D3DXVECTOR3* outSurfaceNormal,
+                                    float* outDistance)
+{
+    const std::vector<D3DXVECTOR3> offsets = BuildShapeCastOffsets(shapeType, radius, height);
+    bool foundHit = false;
+    D3DXVECTOR3 nearestPoint = rayEndWorld;
+    D3DXVECTOR3 nearestNormal(0.0f, 1.0f, 0.0f);
+    float nearestDistance = std::numeric_limits<float>::max();
+
+    for (size_t i = 0; i < offsets.size(); ++i)
+    {
+        D3DXVECTOR3 offsetHitPoint;
+        D3DXVECTOR3 offsetHitNormal;
+        float offsetHitDistance = 0.0f;
+        if (RayCastObject(mesh,
+                          transform,
+                          rayOriginWorld + offsets[i],
+                          rayEndWorld + offsets[i],
+                          &offsetHitPoint,
+                          &offsetHitNormal,
+                          &offsetHitDistance))
+        {
+            const D3DXVECTOR3 centerHitPoint = offsetHitPoint - offsets[i];
+            const D3DXVECTOR3 centerHitOffset = centerHitPoint - rayOriginWorld;
+            const float centerHitDistance = D3DXVec3Length(&centerHitOffset);
+            if (centerHitDistance >= nearestDistance)
+            {
+                continue;
+            }
+
+            nearestPoint = centerHitPoint;
+            nearestNormal = offsetHitNormal;
+            nearestDistance = centerHitDistance;
+            foundHit = true;
+        }
+    }
+
+    if (!foundHit)
+    {
+        return false;
+    }
+
+    if (outPoint != nullptr)
+    {
+        *outPoint = nearestPoint;
+    }
+    if (outSurfaceNormal != nullptr)
+    {
+        *outSurfaceNormal = nearestNormal;
+    }
+    if (outDistance != nullptr)
+    {
+        *outDistance = nearestDistance;
+    }
+
     return true;
 }
 
@@ -947,10 +1061,6 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               int* outSupportObjectId,
                               D3DXVECTOR3* outSupportVelocity)
 {
-    UNREFERENCED_PARAMETER(shapeType);
-    UNREFERENCED_PARAMETER(radius);
-    UNREFERENCED_PARAMETER(height);
-
     D3DXVECTOR3 nextPosition = currentPosition + moveVector * kDeltaSeconds;
     D3DXVECTOR3 nextMoveVector = moveVector;
     bool collided = false;
@@ -985,7 +1095,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
             ObjectType nearestObjectType = ObjectType::Slide;
             D3DXVECTOR3 nearestVelocity(0.0f, 0.0f, 0.0f);
 
-            const std::vector<size_t> candidateIndices = BuildCollisionCandidateIndices(currentPosition, nextPosition);
+            const std::vector<size_t> candidateIndices = BuildCollisionCandidateIndices(currentPosition, nextPosition, radius);
             for (size_t candidateIndex = 0; candidateIndex < candidateIndices.size(); ++candidateIndex)
             {
                 const size_t i = candidateIndices[candidateIndex];
@@ -998,13 +1108,16 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                 D3DXVECTOR3 surfaceNormal;
                 float hitDistance = 0.0f;
 
-                if (RayCastObject(g_simpleObjects[i].mesh,
-                                  g_simpleObjects[i].transform,
-                                  currentPosition,
-                                  nextPosition,
-                                  &hitPoint,
-                                  &surfaceNormal,
-                                  &hitDistance) &&
+                if (RayCastShapeObject(g_simpleObjects[i].mesh,
+                                       g_simpleObjects[i].transform,
+                                       currentPosition,
+                                       nextPosition,
+                                       shapeType,
+                                       radius,
+                                       height,
+                                       &hitPoint,
+                                       &surfaceNormal,
+                                       &hitDistance) &&
                     hitDistance < nearestDistance)
                 {
                     const float normalMove = D3DXVec3Dot(&frameMove, &surfaceNormal);
@@ -1055,7 +1168,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                         D3DXVECTOR3 nearestSlideNormal(0.0f, 1.0f, 0.0f);
                         float nearestSlideDistance = std::numeric_limits<float>::max();
                         const std::vector<size_t> slideCandidateIndices =
-                            BuildCollisionCandidateIndices(nextPosition, slideEndPosition);
+                            BuildCollisionCandidateIndices(nextPosition, slideEndPosition, radius);
                         for (size_t candidateIndex = 0; candidateIndex < slideCandidateIndices.size(); ++candidateIndex)
                         {
                             const size_t i = slideCandidateIndices[candidateIndex];
@@ -1064,13 +1177,16 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 continue;
                             }
 
-                            if (RayCastObject(g_simpleObjects[i].mesh,
-                                              g_simpleObjects[i].transform,
-                                              nextPosition,
-                                              slideEndPosition,
-                                              &slideHitPoint,
-                                              &slideHitNormal,
-                                              &slideHitDistance))
+                            if (RayCastShapeObject(g_simpleObjects[i].mesh,
+                                                   g_simpleObjects[i].transform,
+                                                   nextPosition,
+                                                   slideEndPosition,
+                                                   shapeType,
+                                                   radius,
+                                                   height,
+                                                   &slideHitPoint,
+                                                   &slideHitNormal,
+                                                   &slideHitDistance))
                             {
                                 if (slideHitDistance >= nearestSlideDistance)
                                 {
@@ -1110,7 +1226,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                 D3DXVECTOR3 nearestSecondSlideNormal(0.0f, 1.0f, 0.0f);
                                 float nearestSecondSlideDistance = std::numeric_limits<float>::max();
                                 const std::vector<size_t> secondSlideCandidateIndices =
-                                    BuildCollisionCandidateIndices(currentPosition, slideEndPosition);
+                                    BuildCollisionCandidateIndices(currentPosition, slideEndPosition, radius);
                                 for (size_t candidateIndex = 0; candidateIndex < secondSlideCandidateIndices.size(); ++candidateIndex)
                                 {
                                     const size_t i = secondSlideCandidateIndices[candidateIndex];
@@ -1119,13 +1235,16 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                         continue;
                                     }
 
-                                    if (RayCastObject(g_simpleObjects[i].mesh,
-                                                      g_simpleObjects[i].transform,
-                                                      currentPosition,
-                                                      slideEndPosition,
-                                                      &secondSlideHitPoint,
-                                                      &secondSlideHitNormal,
-                                                      &secondSlideHitDistance))
+                                    if (RayCastShapeObject(g_simpleObjects[i].mesh,
+                                                           g_simpleObjects[i].transform,
+                                                           currentPosition,
+                                                           slideEndPosition,
+                                                           shapeType,
+                                                           radius,
+                                                           height,
+                                                           &secondSlideHitPoint,
+                                                           &secondSlideHitNormal,
+                                                           &secondSlideHitDistance))
                                     {
                                         if (secondSlideHitDistance >= nearestSecondSlideDistance)
                                         {

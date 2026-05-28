@@ -536,11 +536,10 @@ void InitScene()
 void ResetPlayer()
 {
     PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
-    //settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Sphere;
-    settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Point;
+    settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Cylinder;
     settings.shapeOffset = D3DXVECTOR3(0.0f, 0.5f, 0.0f);
     settings.radius = 0.5f;
-    settings.height = 0.0f;
+    settings.height = 1.0f;
     settings.moveSpeed = kPlayerSpeed;
     settings.groundAcceleration = kPlayerSpeed * 2.0f;
     settings.airAcceleration = kPlayerSpeed * 0.35f;

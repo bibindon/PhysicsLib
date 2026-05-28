@@ -298,7 +298,8 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_velocity.y = 0.0f;
     }
 
-    D3DXVECTOR3 nextPosition = m_position;
+    const D3DXVECTOR3 collisionPosition = m_position + m_settings.shapeOffset;
+    D3DXVECTOR3 nextCollisionPosition = collisionPosition;
     D3DXVECTOR3 nextVelocity = m_velocity;
     float lastNormalMove = 0.0f;
     D3DXVECTOR3 lastHitNormal(0.0f, 0.0f, 0.0f);
@@ -307,10 +308,10 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     int slideCount = 0;
     int supportObjectId = -1;
     D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
-    const bool collided = PhysicsLib::CheckCollide(m_position,
+    const bool collided = PhysicsLib::CheckCollide(collisionPosition,
                                                    m_velocity,
                                                    m_settings.shapeType,
-                                                   &nextPosition,
+                                                   &nextCollisionPosition,
                                                    &nextVelocity,
                                                    outPassThroughIds,
                                                    outSolidIds,
@@ -323,7 +324,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &slideCount,
                                                    &supportObjectId,
                                                    &supportVelocity);
-    m_position = nextPosition;
+    m_position = nextCollisionPosition - m_settings.shapeOffset;
     m_velocity = nextVelocity;
     if (SettingsState::IsGravityEnabled())
     {
