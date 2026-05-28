@@ -636,6 +636,7 @@ void UpdatePlayer()
         const D3DXVECTOR3 desiredMove = cameraRight * localInputMove.x + cameraForward * localInputMove.z;
         if (focusModeEnabled)
         {
+            g_playerYaw = atan2f(cameraForward.x, cameraForward.z);
             inputMove = desiredMove;
         }
         else
