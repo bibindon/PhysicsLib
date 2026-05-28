@@ -1,4 +1,11 @@
-﻿# PhysicsLib
+
+
+https://github.com/user-attachments/assets/e9586ce5-25a7-495f-8f62-7a17666bc9b9
+
+※スライドチェックをONにしないと、上り坂に裏からぶつかった時に、時々、地面を突き抜けてしまう。
+動画では再現していないが。
+ 
+ # PhysicsLib
 
 DirectX 9 向けの簡易キャラクター移動・衝突判定ライブラリである。
 
