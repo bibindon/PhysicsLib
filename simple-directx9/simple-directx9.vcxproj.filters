@@ -27,4 +27,8 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="cube.png" />
+    <Content Include="cube.x" />
+  </ItemGroup>
 </Project>

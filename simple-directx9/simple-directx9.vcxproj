@@ -166,6 +166,14 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="cube.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="cube.x">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\PhysicsLib\PhysicsLib.vcxproj">
       <Project>{b3effbe0-0c53-40fa-a961-b2856809a23c}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
