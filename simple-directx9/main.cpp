@@ -63,9 +63,6 @@ PhysicsLib::CharacterMover g_playerMover(kPlayerStartPosition);
 PhysicsLib::CameraMover g_cameraMover;
 int g_movingPlatformId = -1;
 std::set<int> g_collectedItemIds;
-bool g_prevF1Pressed = false;
-bool g_prevF3Pressed = false;
-bool g_prevF4Pressed = false;
 bool g_prevSpacePressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
@@ -99,7 +96,6 @@ static void Cleanup();
 static void Render();
 static void OnMouseMove(LPARAM lParam);
 static void SetMouseCursorVisible(bool visible);
-static void SetDoubleJumpEnabled(bool enabled);
 static float ClampFloat(float value, float minValue, float maxValue);
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -413,6 +409,16 @@ void InitScene()
                                          D3DXVECTOR3(1.0f, 1.0f, 1.0f));
     g_worldObjects.push_back({ slopeMesh2, slopeId2, D3DXVECTOR3(22.0f, 0.75f, -8.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(10.0f)), D3DXCOLOR(0.68f, 0.72f, 0.42f, 1.0f), false });
 
+    LPD3DXMESH slopeMesh3 = LoadSceneMeshFromX(_T("scollision_slope3.x"));
+    const int slopeId3 = PhysicsLib::PhysicsLib::Load(_T("scollision_slope3.x"),
+                                                      PhysicsLib::PhysicsLib::ObjectType::Slide,
+                                                      0.0f);
+    PhysicsLib::PhysicsLib::SetTransform(slopeId3,
+                                         D3DXVECTOR3(34.0f, 0.75f, -10.0f),
+                                         D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(5.0f)),
+                                         D3DXVECTOR3(1.0f, 1.0f, 1.0f));
+    g_worldObjects.push_back({ slopeMesh3, slopeId3, D3DXVECTOR3(34.0f, 0.75f, -10.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(5.0f)), D3DXCOLOR(0.58f, 0.74f, 0.50f, 1.0f), false });
+
     LPD3DXMESH wallMesh = LoadSceneMeshFromX(_T("collision_wall.x"));
     const int wallId = PhysicsLib::PhysicsLib::Load(_T("collision_wall.x"),
                                                     PhysicsLib::PhysicsLib::ObjectType::Slide,
@@ -550,29 +556,6 @@ void ResetPlayer()
 void UpdatePlayer()
 {
     const bool isWindowActive = (GetForegroundWindow() == g_mainWindow);
-    bool isF1Pressed = isWindowActive && ((GetAsyncKeyState(VK_F1) & 0x8000) != 0);
-    if (isF1Pressed && !g_prevF1Pressed)
-    {
-        ResetPlayer();
-    }
-    g_prevF1Pressed = isF1Pressed;
-
-    bool isF3Pressed = isWindowActive && ((GetAsyncKeyState(VK_F3) & 0x8000) != 0);
-    if (isF3Pressed && !g_prevF3Pressed)
-    {
-        PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
-        settings.airControlEnabled = !settings.airControlEnabled;
-        g_playerMover.SetSettings(settings);
-    }
-    g_prevF3Pressed = isF3Pressed;
-
-    bool isF4Pressed = isWindowActive && ((GetAsyncKeyState(VK_F4) & 0x8000) != 0);
-    if (isF4Pressed && !g_prevF4Pressed)
-    {
-        PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
-        SetDoubleJumpEnabled(!settings.doubleJumpEnabled);
-    }
-    g_prevF4Pressed = isF4Pressed;
 
     float speedMultiplier = 1.0f;
     if (isWindowActive && ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0))
@@ -878,29 +861,14 @@ void Render()
 
     TCHAR msg[256];
     const D3DXVECTOR3 playerPosition = g_playerMover.GetPosition();
-    const PhysicsLib::CharacterMover::Settings moverSettings = g_playerMover.GetSettings();
-    const bool airControlEnabled = moverSettings.airControlEnabled;
-    const bool doubleJumpEnabled = moverSettings.doubleJumpEnabled;
     const TCHAR* cursorText = _T("OFF");
     if (g_isMouseCursorVisible)
     {
         cursorText = _T("ON");
     }
-    const TCHAR* airControlText = _T("OFF");
-    if (airControlEnabled)
-    {
-        airControlText = _T("ON");
-    }
-    const TCHAR* doubleJumpText = _T("OFF");
-    if (doubleJumpEnabled)
-    {
-        doubleJumpText = _T("ON");
-    }
     _stprintf_s(msg,
-                _T("WASD: move  SHIFT: speed x3  SPACE: jump  ESC: cursor=%s  F1: reset  F3: AirControl=%s  F4: DoubleJump=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SHIFT: speed x3  SPACE: jump  ESC: cursor=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
                 cursorText,
-                airControlText,
-                doubleJumpText,
                 (int)g_collectedItemIds.size(),
                 playerPosition.x,
                 playerPosition.y,
@@ -1040,13 +1008,6 @@ void SetMouseCursorVisible(bool visible)
         ScreenToClient(g_mainWindow, &cursorPosition);
         g_lastMousePosition = cursorPosition;
     }
-}
-
-void SetDoubleJumpEnabled(bool enabled)
-{
-    PhysicsLib::CharacterMover::Settings settings = g_playerMover.GetSettings();
-    settings.doubleJumpEnabled = enabled;
-    g_playerMover.SetSettings(settings);
 }
 
 float ClampFloat(float value, float minValue, float maxValue)
