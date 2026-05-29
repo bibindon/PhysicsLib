@@ -318,7 +318,7 @@ public:
     {
 
         // 注視点へ近づける場合の最短距離である。
-        float minimumDistance = 2.0f;
+        float minimumDistance = 0.5f;
 
         // 障害物から少し手前に止めるための余白である。
         float obstacleOffset = 0.1f;
