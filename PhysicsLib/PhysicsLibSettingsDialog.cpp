@@ -600,7 +600,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  NULL);
 
     CreateWindow(_T("STATIC"),
-                 _T("直方体の縦:"),
+                 _T("直方体の高さ:"),
                  WS_CHILD | WS_VISIBLE,
                  16,
                  600,
@@ -626,7 +626,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  NULL);
 
     CreateWindow(_T("STATIC"),
-                 _T("直方体の高さ:"),
+                 _T("直方体の奥行き:"),
                  WS_CHILD | WS_VISIBLE,
                  16,
                  630,
