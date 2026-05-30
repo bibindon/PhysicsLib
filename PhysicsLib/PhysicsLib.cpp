@@ -56,6 +56,7 @@ bool g_focusModeEnabled = false;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 PhysicsLib::ShapeType g_shapeType = PhysicsLib::ShapeType::Sphere;
+float g_radius = 0.5f;
 
 }
 
@@ -938,6 +939,16 @@ void SettingsState::SetShapeType(PhysicsLib::ShapeType shapeType)
     g_shapeType = shapeType;
 }
 
+float SettingsState::GetRadius()
+{
+    return g_radius;
+}
+
+void SettingsState::SetRadius(float radius)
+{
+    g_radius = radius;
+}
+
 bool PhysicsLib::IsFocusModeEnabled()
 {
     return SettingsState::IsFocusModeEnabled();
@@ -946,6 +957,11 @@ bool PhysicsLib::IsFocusModeEnabled()
 PhysicsLib::ShapeType PhysicsLib::GetShapeType()
 {
     return SettingsState::GetShapeType();
+}
+
+float PhysicsLib::GetRadius()
+{
+    return SettingsState::GetRadius();
 }
 
 void PhysicsLib::Initialize()

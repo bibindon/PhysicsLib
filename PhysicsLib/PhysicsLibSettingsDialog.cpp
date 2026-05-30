@@ -27,6 +27,7 @@ const int kCameraAutoMoveCheckboxId = kSettingsCheckboxStartId + 12;
 const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
 const int kSettingsResetButtonId = 4200;
 const int kShapeTypeComboBoxId = 4300;
+const int kRadiusEditBoxId = 4400;
 
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -168,6 +169,18 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             }
             return 0;
         }
+
+        if (LOWORD(wParam) == kRadiusEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float value = static_cast<float>(_tstof(buffer));
+            if (value > 0.0f)
+            {
+                SettingsState::SetRadius(value);
+            }
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -207,7 +220,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                        340,
-                                       600,
+                                       640,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -389,11 +402,37 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         SendMessage(comboBox, CB_SETCURSEL, static_cast<WPARAM>(SettingsState::GetShapeType()), 0);
     }
 
+    CreateWindow(_T("STATIC"),
+                 _T("半径:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 480,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR radiusText[32];
+    _stprintf_s(radiusText, _T("%g"), SettingsState::GetRadius());
+    CreateWindow(_T("EDIT"),
+                 radiusText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT,
+                 100,
+                 480,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kRadiusEditBoxId)),
+                 instance,
+                 NULL);
+
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 510,
+                 540,
                  130,
                  32,
                  g_settingsDialog,

@@ -69,6 +69,9 @@ public:
     // 現在のプレイヤー判定形状を取得する。
     static ShapeType GetShapeType();
 
+    // 現在の判定半径を取得する。
+    static float GetRadius();
+
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 

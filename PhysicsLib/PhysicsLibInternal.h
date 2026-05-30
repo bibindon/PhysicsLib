@@ -38,6 +38,8 @@ public:
     static void SetSurfaceContactEnabled(bool enabled);
     static PhysicsLib::ShapeType GetShapeType();
     static void SetShapeType(PhysicsLib::ShapeType shapeType);
+    static float GetRadius();
+    static void SetRadius(float radius);
 };
 
 class SettingsDialog
