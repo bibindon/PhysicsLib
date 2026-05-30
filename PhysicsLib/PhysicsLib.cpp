@@ -59,6 +59,12 @@ PhysicsLib::ShapeType g_shapeType = PhysicsLib::ShapeType::Sphere;
 float g_radius = 0.5f;
 float g_cylinderRadius = 0.5f;
 float g_cylinderHeight = 1.0f;
+float g_cuboidWidth = 1.0f;
+float g_cuboidHeight = 1.0f;
+float g_cuboidDepth = 1.0f;
+float g_cuboidRotX = 0.0f;
+float g_cuboidRotY = 0.0f;
+float g_cuboidRotZ = 0.0f;
 
 }
 
@@ -681,16 +687,28 @@ std::vector<D3DXVECTOR3> PhysicsLib::BuildShapeCastOffsets(ShapeType shapeType, 
 
     if (shapeType == ShapeType::Cuboid)
     {
-        const float cx[2] = { -0.5f, 0.5f };
-        const float cy[2] = { -0.5f, 0.5f };
-        const float cz[2] = { -0.5f, 0.5f };
+        const float hx = SettingsState::GetCuboidWidth() * 0.5f;
+        const float hy = SettingsState::GetCuboidHeight() * 0.5f;
+        const float hz = SettingsState::GetCuboidDepth() * 0.5f;
+        const float cx[2] = { -hx, hx };
+        const float cy[2] = { -hy, hy };
+        const float cz[2] = { -hz, hz };
+
+        D3DXMATRIX rotationMatrix;
+        D3DXMatrixRotationYawPitchRoll(&rotationMatrix,
+                                       D3DXToRadian(SettingsState::GetCuboidRotY()),
+                                       D3DXToRadian(SettingsState::GetCuboidRotX()),
+                                       D3DXToRadian(SettingsState::GetCuboidRotZ()));
         for (int xi = 0; xi < 2; ++xi)
         {
             for (int yi = 0; yi < 2; ++yi)
             {
                 for (int zi = 0; zi < 2; ++zi)
                 {
-                    offsets.push_back(D3DXVECTOR3(cx[xi], cy[yi], cz[zi]));
+                    D3DXVECTOR3 localOffset(cx[xi], cy[yi], cz[zi]);
+                    D3DXVECTOR3 rotatedOffset;
+                    D3DXVec3TransformCoord(&rotatedOffset, &localOffset, &rotationMatrix);
+                    offsets.push_back(rotatedOffset);
                 }
             }
         }
@@ -988,6 +1006,66 @@ void SettingsState::SetCylinderHeight(float cylinderHeight)
     g_cylinderHeight = cylinderHeight;
 }
 
+float SettingsState::GetCuboidWidth()
+{
+    return g_cuboidWidth;
+}
+
+void SettingsState::SetCuboidWidth(float cuboidWidth)
+{
+    g_cuboidWidth = cuboidWidth;
+}
+
+float SettingsState::GetCuboidHeight()
+{
+    return g_cuboidHeight;
+}
+
+void SettingsState::SetCuboidHeight(float cuboidHeight)
+{
+    g_cuboidHeight = cuboidHeight;
+}
+
+float SettingsState::GetCuboidDepth()
+{
+    return g_cuboidDepth;
+}
+
+void SettingsState::SetCuboidDepth(float cuboidDepth)
+{
+    g_cuboidDepth = cuboidDepth;
+}
+
+float SettingsState::GetCuboidRotX()
+{
+    return g_cuboidRotX;
+}
+
+void SettingsState::SetCuboidRotX(float cuboidRotX)
+{
+    g_cuboidRotX = cuboidRotX;
+}
+
+float SettingsState::GetCuboidRotY()
+{
+    return g_cuboidRotY;
+}
+
+void SettingsState::SetCuboidRotY(float cuboidRotY)
+{
+    g_cuboidRotY = cuboidRotY;
+}
+
+float SettingsState::GetCuboidRotZ()
+{
+    return g_cuboidRotZ;
+}
+
+void SettingsState::SetCuboidRotZ(float cuboidRotZ)
+{
+    g_cuboidRotZ = cuboidRotZ;
+}
+
 bool PhysicsLib::IsFocusModeEnabled()
 {
     return SettingsState::IsFocusModeEnabled();
@@ -1011,6 +1089,36 @@ float PhysicsLib::GetCylinderRadius()
 float PhysicsLib::GetCylinderHeight()
 {
     return SettingsState::GetCylinderHeight();
+}
+
+float PhysicsLib::GetCuboidWidth()
+{
+    return SettingsState::GetCuboidWidth();
+}
+
+float PhysicsLib::GetCuboidHeight()
+{
+    return SettingsState::GetCuboidHeight();
+}
+
+float PhysicsLib::GetCuboidDepth()
+{
+    return SettingsState::GetCuboidDepth();
+}
+
+float PhysicsLib::GetCuboidRotX()
+{
+    return SettingsState::GetCuboidRotX();
+}
+
+float PhysicsLib::GetCuboidRotY()
+{
+    return SettingsState::GetCuboidRotY();
+}
+
+float PhysicsLib::GetCuboidRotZ()
+{
+    return SettingsState::GetCuboidRotZ();
 }
 
 void PhysicsLib::Initialize()

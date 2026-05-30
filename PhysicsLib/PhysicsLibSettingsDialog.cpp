@@ -30,6 +30,12 @@ const int kShapeTypeComboBoxId = 4300;
 const int kRadiusEditBoxId = 4400;
 const int kCylinderRadiusEditBoxId = 4401;
 const int kCylinderHeightEditBoxId = 4402;
+const int kCuboidWidthEditBoxId = 4403;
+const int kCuboidHeightEditBoxId = 4404;
+const int kCuboidDepthEditBoxId = 4405;
+const int kCuboidRotXEditBoxId = 4406;
+const int kCuboidRotYEditBoxId = 4407;
+const int kCuboidRotZEditBoxId = 4408;
 
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -207,6 +213,66 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             }
             return 0;
         }
+
+        if (LOWORD(wParam) == kCuboidWidthEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float value = static_cast<float>(_tstof(buffer));
+            if (value > 0.0f)
+            {
+                SettingsState::SetCuboidWidth(value);
+            }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kCuboidHeightEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float value = static_cast<float>(_tstof(buffer));
+            if (value > 0.0f)
+            {
+                SettingsState::SetCuboidHeight(value);
+            }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kCuboidDepthEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float value = static_cast<float>(_tstof(buffer));
+            if (value > 0.0f)
+            {
+                SettingsState::SetCuboidDepth(value);
+            }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kCuboidRotXEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            SettingsState::SetCuboidRotX(static_cast<float>(_tstof(buffer)));
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kCuboidRotYEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            SettingsState::SetCuboidRotY(static_cast<float>(_tstof(buffer)));
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kCuboidRotZEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            SettingsState::SetCuboidRotZ(static_cast<float>(_tstof(buffer)));
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -246,7 +312,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                        340,
-                                       680,
+                                       830,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -505,13 +571,169 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                   g_settingsDialog,
                   reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCylinderHeightEditBoxId)),
                  instance,
+                  NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("直方体の横:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 570,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cuboidWidthText[32];
+    _stprintf_s(cuboidWidthText, _T("%.1f"), SettingsState::GetCuboidWidth());
+    CreateWindow(_T("EDIT"),
+                 cuboidWidthText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 570,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCuboidWidthEditBoxId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("直方体の縦:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 600,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cuboidHeightText[32];
+    _stprintf_s(cuboidHeightText, _T("%.1f"), SettingsState::GetCuboidHeight());
+    CreateWindow(_T("EDIT"),
+                 cuboidHeightText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 600,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCuboidHeightEditBoxId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("直方体の高さ:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 630,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cuboidDepthText[32];
+    _stprintf_s(cuboidDepthText, _T("%.1f"), SettingsState::GetCuboidDepth());
+    CreateWindow(_T("EDIT"),
+                 cuboidDepthText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 630,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCuboidDepthEditBoxId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("Rotate X:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 660,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cuboidRotXText[32];
+    _stprintf_s(cuboidRotXText, _T("%.1f"), SettingsState::GetCuboidRotX());
+    CreateWindow(_T("EDIT"),
+                 cuboidRotXText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 660,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCuboidRotXEditBoxId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("Rotate Y:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 690,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cuboidRotYText[32];
+    _stprintf_s(cuboidRotYText, _T("%.1f"), SettingsState::GetCuboidRotY());
+    CreateWindow(_T("EDIT"),
+                 cuboidRotYText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 690,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCuboidRotYEditBoxId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("Rotate Z:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 720,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cuboidRotZText[32];
+    _stprintf_s(cuboidRotZText, _T("%.1f"), SettingsState::GetCuboidRotZ());
+    CreateWindow(_T("EDIT"),
+                 cuboidRotZText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 720,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCuboidRotZEditBoxId)),
+                 instance,
                  NULL);
 
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 590,
+                 770,
                  130,
                  32,
                  g_settingsDialog,

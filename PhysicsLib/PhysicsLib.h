@@ -81,6 +81,24 @@ public:
     // 円柱判定用の高さを取得する。
     static float GetCylinderHeight();
 
+    // 直方体判定用の横を取得する。
+    static float GetCuboidWidth();
+
+    // 直方体判定用の縦を取得する。
+    static float GetCuboidHeight();
+
+    // 直方体判定用の高さを取得する。
+    static float GetCuboidDepth();
+
+    // 直方体判定用の X 軸回転を取得する。
+    static float GetCuboidRotX();
+
+    // 直方体判定用の Y 軸回転を取得する。
+    static float GetCuboidRotY();
+
+    // 直方体判定用の Z 軸回転を取得する。
+    static float GetCuboidRotZ();
+
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 

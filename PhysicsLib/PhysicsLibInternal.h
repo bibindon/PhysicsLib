@@ -44,6 +44,18 @@ public:
     static void SetCylinderRadius(float cylinderRadius);
     static float GetCylinderHeight();
     static void SetCylinderHeight(float cylinderHeight);
+    static float GetCuboidWidth();
+    static void SetCuboidWidth(float cuboidWidth);
+    static float GetCuboidHeight();
+    static void SetCuboidHeight(float cuboidHeight);
+    static float GetCuboidDepth();
+    static void SetCuboidDepth(float cuboidDepth);
+    static float GetCuboidRotX();
+    static void SetCuboidRotX(float cuboidRotX);
+    static float GetCuboidRotY();
+    static void SetCuboidRotY(float cuboidRotY);
+    static float GetCuboidRotZ();
+    static void SetCuboidRotZ(float cuboidRotZ);
 };
 
 class SettingsDialog
