@@ -147,3 +147,5 @@ MSBuild.exe simple-directx9.sln /t:Build /p:Configuration=Debug /p:Platform=x64
 - 厳密な汎用物理エンジンではない
 - 球と円柱の接面判定は代表点による近似である
 - 一部の古いDirectX Effect機能を使っているため、ビルド時に `FXC : warning X4717` が出る場合がある
+
+衝突判定のタイプで直方体を選べるが全くまともに動作しない。
