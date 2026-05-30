@@ -671,19 +671,6 @@ std::vector<D3DXVECTOR3> PhysicsLib::BuildShapeCastOffsets(ShapeType shapeType, 
 
     const float halfHeight = height * 0.5f;
     const float yLevels[] = { -halfHeight, 0.0f, halfHeight };
-    for (int yIndex = 0; yIndex < 3; ++yIndex)
-    {
-        const float y = yLevels[yIndex];
-        offsets.push_back(D3DXVECTOR3(0.0f, y, 0.0f));
-        offsets.push_back(D3DXVECTOR3(radius, y, 0.0f));
-        offsets.push_back(D3DXVECTOR3(-radius, y, 0.0f));
-        offsets.push_back(D3DXVECTOR3(0.0f, y, radius));
-        offsets.push_back(D3DXVECTOR3(0.0f, y, -radius));
-        offsets.push_back(D3DXVECTOR3(diagonal, y, diagonal));
-        offsets.push_back(D3DXVECTOR3(diagonal, y, -diagonal));
-        offsets.push_back(D3DXVECTOR3(-diagonal, y, diagonal));
-        offsets.push_back(D3DXVECTOR3(-diagonal, y, -diagonal));
-    }
 
     if (shapeType == ShapeType::Cuboid)
     {
@@ -711,6 +698,22 @@ std::vector<D3DXVECTOR3> PhysicsLib::BuildShapeCastOffsets(ShapeType shapeType, 
                     offsets.push_back(rotatedOffset);
                 }
             }
+        }
+    }
+    else
+    {
+        for (int yIndex = 0; yIndex < 3; ++yIndex)
+        {
+            const float y = yLevels[yIndex];
+            offsets.push_back(D3DXVECTOR3(0.0f, y, 0.0f));
+            offsets.push_back(D3DXVECTOR3(radius, y, 0.0f));
+            offsets.push_back(D3DXVECTOR3(-radius, y, 0.0f));
+            offsets.push_back(D3DXVECTOR3(0.0f, y, radius));
+            offsets.push_back(D3DXVECTOR3(0.0f, y, -radius));
+            offsets.push_back(D3DXVECTOR3(diagonal, y, diagonal));
+            offsets.push_back(D3DXVECTOR3(diagonal, y, -diagonal));
+            offsets.push_back(D3DXVECTOR3(-diagonal, y, diagonal));
+            offsets.push_back(D3DXVECTOR3(-diagonal, y, -diagonal));
         }
     }
 
