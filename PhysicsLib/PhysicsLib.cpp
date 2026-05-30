@@ -679,6 +679,23 @@ std::vector<D3DXVECTOR3> PhysicsLib::BuildShapeCastOffsets(ShapeType shapeType, 
         offsets.push_back(D3DXVECTOR3(-diagonal, y, -diagonal));
     }
 
+    if (shapeType == ShapeType::Cuboid)
+    {
+        const float cx[2] = { -0.5f, 0.5f };
+        const float cy[2] = { -0.5f, 0.5f };
+        const float cz[2] = { -0.5f, 0.5f };
+        for (int xi = 0; xi < 2; ++xi)
+        {
+            for (int yi = 0; yi < 2; ++yi)
+            {
+                for (int zi = 0; zi < 2; ++zi)
+                {
+                    offsets.push_back(D3DXVECTOR3(cx[xi], cy[yi], cz[zi]));
+                }
+            }
+        }
+    }
+
     return offsets;
 }
 

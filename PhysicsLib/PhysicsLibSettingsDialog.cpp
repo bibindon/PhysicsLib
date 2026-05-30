@@ -165,7 +165,7 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
         if (LOWORD(wParam) == kShapeTypeComboBoxId && HIWORD(wParam) == CBN_SELCHANGE)
         {
             const LRESULT selectedIndex = SendMessage(reinterpret_cast<HWND>(lParam), CB_GETCURSEL, 0, 0);
-            if (selectedIndex >= 0 && selectedIndex <= 2)
+            if (selectedIndex >= 0 && selectedIndex <= 3)
             {
                 SettingsState::SetShapeType(static_cast<PhysicsLib::ShapeType>(selectedIndex));
             }
@@ -425,6 +425,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         SendMessage(comboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("Point")));
         SendMessage(comboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("Sphere")));
         SendMessage(comboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("Cylinder")));
+        SendMessage(comboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("Cuboid")));
         SendMessage(comboBox, CB_SETCURSEL, static_cast<WPARAM>(SettingsState::GetShapeType()), 0);
     }
 
