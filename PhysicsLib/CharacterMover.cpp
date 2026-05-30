@@ -309,8 +309,8 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     int supportObjectId = -1;
     D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
     const bool collided = PhysicsLib::CheckCollide(collisionPosition,
-                                                   m_velocity,
-                                                   m_settings.shapeType,
+                                                    m_velocity,
+                                                    SettingsState::GetShapeType(),
                                                    &nextCollisionPosition,
                                                    &nextVelocity,
                                                    outPassThroughIds,
