@@ -213,14 +213,14 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
     windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
     RegisterClassEx(&windowClass);
 
-    g_settingsDialog = CreateWindowEx(WS_EX_TOOLWINDOW,
+    g_settingsDialog = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_CONTROLPARENT,
                                        className,
                                        _T("PhysicsLib Settings"),
                                        WS_CAPTION | WS_BORDER | WS_VISIBLE,
                                        40,
                                        40,
                                        340,
-                                       640,
+                                       600,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -415,10 +415,10 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  NULL);
 
     TCHAR radiusText[32];
-    _stprintf_s(radiusText, _T("%g"), SettingsState::GetRadius());
+    _stprintf_s(radiusText, _T("%.1f"), SettingsState::GetRadius());
     CreateWindow(_T("EDIT"),
                  radiusText,
-                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
                  100,
                  480,
                  80,
