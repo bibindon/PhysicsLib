@@ -652,7 +652,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  NULL);
 
     CreateWindow(_T("STATIC"),
-                 _T("Rotate X:"),
+                 _T("直方体の回転X:"),
                  WS_CHILD | WS_VISIBLE,
                  16,
                  660,
@@ -678,7 +678,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  NULL);
 
     CreateWindow(_T("STATIC"),
-                 _T("Rotate Y:"),
+                 _T("直方体の回転Y:"),
                  WS_CHILD | WS_VISIBLE,
                  16,
                  690,
@@ -704,7 +704,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  NULL);
 
     CreateWindow(_T("STATIC"),
-                 _T("Rotate Z:"),
+                 _T("直方体の回転Z:"),
                  WS_CHILD | WS_VISIBLE,
                  16,
                  720,
