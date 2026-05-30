@@ -40,6 +40,10 @@ public:
     static void SetShapeType(PhysicsLib::ShapeType shapeType);
     static float GetRadius();
     static void SetRadius(float radius);
+    static float GetCylinderRadius();
+    static void SetCylinderRadius(float cylinderRadius);
+    static float GetCylinderHeight();
+    static void SetCylinderHeight(float cylinderHeight);
 };
 
 class SettingsDialog

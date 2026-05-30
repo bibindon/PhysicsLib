@@ -72,6 +72,12 @@ public:
     // 現在の判定半径を取得する。
     static float GetRadius();
 
+    // 円柱判定用の半径を取得する。
+    static float GetCylinderRadius();
+
+    // 円柱判定用の高さを取得する。
+    static float GetCylinderHeight();
+
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 

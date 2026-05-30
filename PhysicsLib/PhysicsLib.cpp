@@ -57,6 +57,8 @@ bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 PhysicsLib::ShapeType g_shapeType = PhysicsLib::ShapeType::Sphere;
 float g_radius = 0.5f;
+float g_cylinderRadius = 0.5f;
+float g_cylinderHeight = 1.0f;
 
 }
 
@@ -949,6 +951,26 @@ void SettingsState::SetRadius(float radius)
     g_radius = radius;
 }
 
+float SettingsState::GetCylinderRadius()
+{
+    return g_cylinderRadius;
+}
+
+void SettingsState::SetCylinderRadius(float cylinderRadius)
+{
+    g_cylinderRadius = cylinderRadius;
+}
+
+float SettingsState::GetCylinderHeight()
+{
+    return g_cylinderHeight;
+}
+
+void SettingsState::SetCylinderHeight(float cylinderHeight)
+{
+    g_cylinderHeight = cylinderHeight;
+}
+
 bool PhysicsLib::IsFocusModeEnabled()
 {
     return SettingsState::IsFocusModeEnabled();
@@ -962,6 +984,16 @@ PhysicsLib::ShapeType PhysicsLib::GetShapeType()
 float PhysicsLib::GetRadius()
 {
     return SettingsState::GetRadius();
+}
+
+float PhysicsLib::GetCylinderRadius()
+{
+    return SettingsState::GetCylinderRadius();
+}
+
+float PhysicsLib::GetCylinderHeight()
+{
+    return SettingsState::GetCylinderHeight();
 }
 
 void PhysicsLib::Initialize()

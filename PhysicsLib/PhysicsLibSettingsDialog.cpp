@@ -28,6 +28,8 @@ const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
 const int kSettingsResetButtonId = 4200;
 const int kShapeTypeComboBoxId = 4300;
 const int kRadiusEditBoxId = 4400;
+const int kCylinderRadiusEditBoxId = 4401;
+const int kCylinderHeightEditBoxId = 4402;
 
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -181,6 +183,30 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             }
             return 0;
         }
+
+        if (LOWORD(wParam) == kCylinderRadiusEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float value = static_cast<float>(_tstof(buffer));
+            if (value > 0.0f)
+            {
+                SettingsState::SetCylinderRadius(value);
+            }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kCylinderHeightEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float value = static_cast<float>(_tstof(buffer));
+            if (value > 0.0f)
+            {
+                SettingsState::SetCylinderHeight(value);
+            }
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -220,7 +246,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                        340,
-                                       600,
+                                       650,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -403,7 +429,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
     }
 
     CreateWindow(_T("STATIC"),
-                 _T("半径:"),
+                 _T("球の半径:"),
                  WS_CHILD | WS_VISIBLE,
                  16,
                  480,
@@ -428,11 +454,63 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  instance,
                  NULL);
 
+    CreateWindow(_T("STATIC"),
+                 _T("円柱の半径:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 510,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cylinderRadiusText[32];
+    _stprintf_s(cylinderRadiusText, _T("%.1f"), SettingsState::GetCylinderRadius());
+    CreateWindow(_T("EDIT"),
+                 cylinderRadiusText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 100,
+                 510,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCylinderRadiusEditBoxId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("円柱の高さ:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 540,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR cylinderHeightText[32];
+    _stprintf_s(cylinderHeightText, _T("%.1f"), SettingsState::GetCylinderHeight());
+    CreateWindow(_T("EDIT"),
+                 cylinderHeightText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 100,
+                 540,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCylinderHeightEditBoxId)),
+                 instance,
+                 NULL);
+
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 540,
+                 590,
                  130,
                  32,
                  g_settingsDialog,

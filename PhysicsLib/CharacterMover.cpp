@@ -308,15 +308,23 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     int slideCount = 0;
     int supportObjectId = -1;
     D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
+    const PhysicsLib::ShapeType shapeType = SettingsState::GetShapeType();
+    float radius = SettingsState::GetRadius();
+    float height = m_settings.height;
+    if (shapeType == PhysicsLib::ShapeType::Cylinder)
+    {
+        radius = SettingsState::GetCylinderRadius();
+        height = SettingsState::GetCylinderHeight();
+    }
     const bool collided = PhysicsLib::CheckCollide(collisionPosition,
                                                     m_velocity,
-                                                    SettingsState::GetShapeType(),
+                                                    shapeType,
                                                    &nextCollisionPosition,
                                                    &nextVelocity,
                                                    outPassThroughIds,
                                                    outSolidIds,
-                                                    SettingsState::GetRadius(),
-                                                   m_settings.height,
+                                                    radius,
+                                                    height,
                                                    &lastNormalMove,
                                                    &lastHitNormal,
                                                    &lastHitDistance,
