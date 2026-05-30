@@ -65,6 +65,7 @@ float g_cuboidDepth = 1.0f;
 float g_cuboidRotX = 0.0f;
 float g_cuboidRotY = 0.0f;
 float g_cuboidRotZ = 0.0f;
+float g_playerFacingYaw = 0.0f;
 
 }
 
@@ -683,7 +684,7 @@ std::vector<D3DXVECTOR3> PhysicsLib::BuildShapeCastOffsets(ShapeType shapeType, 
 
         D3DXMATRIX rotationMatrix;
         D3DXMatrixRotationYawPitchRoll(&rotationMatrix,
-                                       D3DXToRadian(SettingsState::GetCuboidRotY()),
+                                       D3DXToRadian(SettingsState::GetPlayerFacingYaw() + SettingsState::GetCuboidRotY()),
                                        D3DXToRadian(SettingsState::GetCuboidRotX()),
                                        D3DXToRadian(SettingsState::GetCuboidRotZ()));
         for (int xi = 0; xi < 2; ++xi)
@@ -1067,6 +1068,16 @@ float SettingsState::GetCuboidRotZ()
 void SettingsState::SetCuboidRotZ(float cuboidRotZ)
 {
     g_cuboidRotZ = cuboidRotZ;
+}
+
+float SettingsState::GetPlayerFacingYaw()
+{
+    return g_playerFacingYaw;
+}
+
+void SettingsState::SetPlayerFacingYaw(float playerFacingYaw)
+{
+    g_playerFacingYaw = playerFacingYaw;
 }
 
 bool PhysicsLib::IsFocusModeEnabled()

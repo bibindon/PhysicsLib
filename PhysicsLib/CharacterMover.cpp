@@ -316,6 +316,16 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         radius = SettingsState::GetCylinderRadius();
         height = SettingsState::GetCylinderHeight();
     }
+    if (shapeType == PhysicsLib::ShapeType::Cuboid)
+    {
+        const D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
+        const float inputLength = D3DXVec3Length(&inputMove);
+        if (inputLength > 0.0001f)
+        {
+            const float facingYaw = atan2f(inputMove.x, inputMove.z);
+            SettingsState::SetPlayerFacingYaw(facingYaw);
+        }
+    }
     const bool collided = PhysicsLib::CheckCollide(collisionPosition,
                                                     m_velocity,
                                                     shapeType,

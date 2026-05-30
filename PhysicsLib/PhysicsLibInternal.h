@@ -56,6 +56,8 @@ public:
     static void SetCuboidRotY(float cuboidRotY);
     static float GetCuboidRotZ();
     static void SetCuboidRotZ(float cuboidRotZ);
+    static float GetPlayerFacingYaw();
+    static void SetPlayerFacingYaw(float playerFacingYaw);
 };
 
 class SettingsDialog
