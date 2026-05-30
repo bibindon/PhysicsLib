@@ -66,6 +66,9 @@ public:
     // フォーカスモードが有効かどうかを取得する。
     static bool IsFocusModeEnabled();
 
+    // 現在のプレイヤー判定形状を取得する。
+    static ShapeType GetShapeType();
+
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 

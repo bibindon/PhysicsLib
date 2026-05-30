@@ -51,10 +51,11 @@ bool g_tangentMoveEnabled = true;
 bool g_airMoveEnabled = true;
 bool g_optimizationEnabled = true;
 bool g_movingFloorEnabled = true;
-bool g_cameraAutoMoveEnabled = false;
-bool g_focusModeEnabled = true;
+bool g_cameraAutoMoveEnabled = true;
+bool g_focusModeEnabled = false;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
+PhysicsLib::ShapeType g_shapeType = PhysicsLib::ShapeType::Sphere;
 
 }
 
@@ -927,9 +928,24 @@ void SettingsState::SetSurfaceContactEnabled(bool enabled)
     g_surfaceContactEnabled = enabled;
 }
 
+PhysicsLib::ShapeType SettingsState::GetShapeType()
+{
+    return g_shapeType;
+}
+
+void SettingsState::SetShapeType(PhysicsLib::ShapeType shapeType)
+{
+    g_shapeType = shapeType;
+}
+
 bool PhysicsLib::IsFocusModeEnabled()
 {
     return SettingsState::IsFocusModeEnabled();
+}
+
+PhysicsLib::ShapeType PhysicsLib::GetShapeType()
+{
+    return SettingsState::GetShapeType();
 }
 
 void PhysicsLib::Initialize()

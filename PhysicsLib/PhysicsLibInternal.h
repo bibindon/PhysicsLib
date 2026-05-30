@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <windows.h>
+#include "PhysicsLib.h"
 
 namespace PhysicsLib
 {
@@ -35,6 +36,8 @@ public:
     static void SetContactEnabled(bool enabled);
     static bool IsSurfaceContactEnabled();
     static void SetSurfaceContactEnabled(bool enabled);
+    static PhysicsLib::ShapeType GetShapeType();
+    static void SetShapeType(PhysicsLib::ShapeType shapeType);
 };
 
 class SettingsDialog

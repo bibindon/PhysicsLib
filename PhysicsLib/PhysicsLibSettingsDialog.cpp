@@ -26,6 +26,7 @@ const int kSlideCheckCheckboxId = kSettingsCheckboxStartId + 11;
 const int kCameraAutoMoveCheckboxId = kSettingsCheckboxStartId + 12;
 const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
 const int kSettingsResetButtonId = 4200;
+const int kShapeTypeComboBoxId = 4300;
 
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -157,6 +158,16 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             SettingsState::SetSurfaceContactEnabled(checkState == BST_CHECKED);
             return 0;
         }
+
+        if (LOWORD(wParam) == kShapeTypeComboBoxId && HIWORD(wParam) == CBN_SELCHANGE)
+        {
+            const LRESULT selectedIndex = SendMessage(reinterpret_cast<HWND>(lParam), CB_GETCURSEL, 0, 0);
+            if (selectedIndex >= 0 && selectedIndex <= 2)
+            {
+                SettingsState::SetShapeType(static_cast<PhysicsLib::ShapeType>(selectedIndex));
+            }
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -190,13 +201,13 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
     RegisterClassEx(&windowClass);
 
     g_settingsDialog = CreateWindowEx(WS_EX_TOOLWINDOW,
-                                      className,
-                                      _T("PhysicsLib Settings"),
-                                      WS_CAPTION | WS_BORDER | WS_VISIBLE,
-                                      40,
-                                      40,
-                                      340,
-                                      540,
+                                       className,
+                                       _T("PhysicsLib Settings"),
+                                       WS_CAPTION | WS_BORDER | WS_VISIBLE,
+                                       40,
+                                       40,
+                                       340,
+                                       590,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -347,11 +358,42 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         }
     }
 
+    CreateWindow(_T("STATIC"),
+                 _T("判定形状:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 420,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    HWND comboBox = CreateWindow(_T("COMBOBOX"),
+                                 NULL,
+                                 WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
+                                 100,
+                                 420,
+                                 130,
+                                 200,
+                                 g_settingsDialog,
+                                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kShapeTypeComboBoxId)),
+                                 instance,
+                                 NULL);
+    if (comboBox != NULL)
+    {
+        SendMessage(comboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("Point")));
+        SendMessage(comboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("Sphere")));
+        SendMessage(comboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("Cylinder")));
+        SendMessage(comboBox, CB_SETCURSEL, static_cast<WPARAM>(SettingsState::GetShapeType()), 0);
+    }
+
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 450,
+                 490,
                  130,
                  32,
                  g_settingsDialog,
