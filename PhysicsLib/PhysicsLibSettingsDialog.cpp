@@ -85,6 +85,16 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             if (GetOpenFileName(&openFileName))
             {
                 PhysicsLib::LoadFromCsv(filePath);
+
+                TCHAR movePath[MAX_PATH];
+                _tcscpy_s(movePath, filePath);
+                TCHAR* lastSlash = _tcsrchr(movePath, _T('\\'));
+                if (lastSlash != NULL)
+                {
+                    *(lastSlash + 1) = _T('\0');
+                }
+                _tcscat_s(movePath, _T("XFileListMove.csv"));
+                PhysicsLib::LoadMoveFromCsv(movePath);
             }
             return 0;
         }

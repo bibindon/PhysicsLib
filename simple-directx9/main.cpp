@@ -66,7 +66,6 @@ float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
 float g_cameraDistance = 4.0f;
 size_t g_movingPlatformIndex = 0;
-float g_movingPlatformDirection = 1.0f;
 bool g_prevSpacePressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
@@ -487,20 +486,40 @@ void UpdatePlayer()
 
     PhysicsLib::PhysicsLib::Update();
 
+    for (size_t i = 0; i < PhysicsLib::PhysicsLib::GetMovingObjectCount(); ++i)
     {
-        const float kPlatformSpeed = 1.5f;
-        const float kPlatformMinX = -4.0f;
-        const float kPlatformMaxX = 4.0f;
-        g_worldObjects[g_movingPlatformIndex].position.x += g_movingPlatformDirection * kPlatformSpeed * (1.0f / 60.0f);
-        if (g_worldObjects[g_movingPlatformIndex].position.x > kPlatformMaxX)
+        const int id = PhysicsLib::PhysicsLib::GetMovingObjectId(i);
+        const D3DXVECTOR3 startPos = PhysicsLib::PhysicsLib::GetMovingObjectStart(i);
+        const D3DXVECTOR3 endPos = PhysicsLib::PhysicsLib::GetMovingObjectEnd(i);
+        const PhysicsLib::PhysicsLib::Transform transform = PhysicsLib::PhysicsLib::GetTransform(id);
+
+        const D3DXVECTOR3 moveDir = endPos - startPos;
+        const float moveLength = D3DXVec3Length(&moveDir);
+
+        const D3DXVECTOR3 vecFromStart = transform.position - startPos;
+        const float distFromStart = D3DXVec3Length(&vecFromStart);
+        if (distFromStart >= moveLength)
         {
-            g_worldObjects[g_movingPlatformIndex].position.x = kPlatformMaxX;
-            g_movingPlatformDirection = -1.0f;
+            D3DXVECTOR3 backDir = startPos - endPos;
+            D3DXVec3Normalize(&backDir, &backDir);
+            const float currentSpeed = D3DXVec3Length(&transform.velocity);
+            PhysicsLib::PhysicsLib::SetVelocity(id, backDir * currentSpeed);
         }
-        else if (g_worldObjects[g_movingPlatformIndex].position.x < kPlatformMinX)
+
+        const D3DXVECTOR3 vecFromEnd = transform.position - endPos;
+        const float distFromEnd = D3DXVec3Length(&vecFromEnd);
+        if (distFromEnd >= moveLength)
         {
-            g_worldObjects[g_movingPlatformIndex].position.x = kPlatformMinX;
-            g_movingPlatformDirection = 1.0f;
+            D3DXVECTOR3 forwardDir = endPos - startPos;
+            D3DXVec3Normalize(&forwardDir, &forwardDir);
+            const float currentSpeed = D3DXVec3Length(&transform.velocity);
+            PhysicsLib::PhysicsLib::SetVelocity(id, forwardDir * currentSpeed);
+        }
+
+        if (g_movingPlatformIndex < g_worldObjects.size())
+        {
+            g_worldObjects[g_movingPlatformIndex].position = transform.position;
+            g_worldObjects[g_movingPlatformIndex].rotation = transform.rotation;
         }
     }
 
