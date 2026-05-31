@@ -58,6 +58,8 @@ public:
     static void SetCuboidRotZ(float cuboidRotZ);
     static float GetPlayerFacingYaw();
     static void SetPlayerFacingYaw(float playerFacingYaw);
+    static float GetInertiaStrength();
+    static void SetInertiaStrength(float strength);
 };
 
 class SettingsDialog

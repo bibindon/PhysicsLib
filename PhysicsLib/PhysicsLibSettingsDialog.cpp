@@ -38,6 +38,7 @@ const int kCuboidDepthEditBoxId = 4405;
 const int kCuboidRotXEditBoxId = 4406;
 const int kCuboidRotYEditBoxId = 4407;
 const int kCuboidRotZEditBoxId = 4408;
+const int kInertiaStrengthEditBoxId = 4409;
 
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -302,6 +303,15 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             SettingsState::SetCuboidRotZ(static_cast<float>(_tstof(buffer)));
             return 0;
         }
+
+        if (LOWORD(wParam) == kInertiaStrengthEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float strength = static_cast<float>(_tstof(buffer));
+            SettingsState::SetInertiaStrength(strength);
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -341,7 +351,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                        340,
-                                       830,
+                                       860,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -758,11 +768,37 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  instance,
                  NULL);
 
+    CreateWindow(_T("STATIC"),
+                 _T("慣性:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 750,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR inertiaText[32];
+    _stprintf_s(inertiaText, _T("%.2f"), SettingsState::GetInertiaStrength());
+    CreateWindow(_T("EDIT"),
+                 inertiaText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 750,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInertiaStrengthEditBoxId)),
+                 instance,
+                 NULL);
+
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 770,
+                 795,
                  130,
                  32,
                  g_settingsDialog,
@@ -774,7 +810,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("ファイル読込"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  156,
-                 770,
+                 795,
                  130,
                  32,
                  g_settingsDialog,

@@ -67,6 +67,7 @@ float g_cuboidRotX = 0.0f;
 float g_cuboidRotY = 0.0f;
 float g_cuboidRotZ = 0.0f;
 float g_playerFacingYaw = 0.0f;
+float g_inertiaStrength = 1.0f;
 
 struct MovingObjectInfo
 {
@@ -1087,6 +1088,16 @@ float SettingsState::GetPlayerFacingYaw()
 void SettingsState::SetPlayerFacingYaw(float playerFacingYaw)
 {
     g_playerFacingYaw = playerFacingYaw;
+}
+
+float SettingsState::GetInertiaStrength()
+{
+    return g_inertiaStrength;
+}
+
+void SettingsState::SetInertiaStrength(float strength)
+{
+    g_inertiaStrength = strength;
 }
 
 bool PhysicsLib::IsFocusModeEnabled()

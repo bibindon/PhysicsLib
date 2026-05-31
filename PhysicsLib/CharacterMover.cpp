@@ -248,6 +248,12 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                              m_settings.groundAcceleration);
             }
         }
+        if (m_isGrounded && D3DXVec3Length(&inputMove) < 0.0001f)
+        {
+            const float strength = SettingsState::GetInertiaStrength();
+            m_velocity.x *= strength;
+            m_velocity.z *= strength;
+        }
     }
     else
     {
