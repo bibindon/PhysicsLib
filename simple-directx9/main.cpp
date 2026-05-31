@@ -12,6 +12,7 @@
 #include <tchar.h>
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <crtdbg.h>
 #include <set>
 #include <string>
@@ -367,78 +368,67 @@ void InitScene()
     g_itemObjects.clear();
     g_collectedItemIds.clear();
 
-    LPD3DXMESH groundMesh = LoadSceneMeshFromX(_T("plateGround.x"));
-    g_worldObjects.push_back({ groundMesh, D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.35f, 0.70f, 0.35f, 1.0f), false });
-
-    LPD3DXMESH bumpyGroundMesh = LoadSceneMeshFromX(_T("collision_bumpy_ground.x"));
-    g_worldObjects.push_back({ bumpyGroundMesh, D3DXVECTOR3(70.0f, 0.0f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.42f, 0.62f, 0.30f, 1.0f), false });
-
-    LPD3DXMESH slopeMesh = LoadSceneMeshFromX(_T("collision_slope.x"));
-    g_worldObjects.push_back({ slopeMesh, D3DXVECTOR3(10.0f, 0.75f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
-
-    LPD3DXMESH slopeMesh2 = LoadSceneMeshFromX(_T("collision_slope2.x"));
-    g_worldObjects.push_back({ slopeMesh2, D3DXVECTOR3(22.0f, 0.75f, -8.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(10.0f)), D3DXCOLOR(0.68f, 0.72f, 0.42f, 1.0f), false });
-
-    LPD3DXMESH slopeMesh3 = LoadSceneMeshFromX(_T("collision_slope3.x"));
-    g_worldObjects.push_back({ slopeMesh3, D3DXVECTOR3(34.0f, 0.75f, -10.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(5.0f)), D3DXCOLOR(0.58f, 0.74f, 0.50f, 1.0f), false });
-
-    LPD3DXMESH wallMesh = LoadSceneMeshFromX(_T("collision_wall.x"));
-    g_worldObjects.push_back({ wallMesh, D3DXVECTOR3(-6.0f, 1.5f, 0.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, D3DXToRadian(18.0f), 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
-    g_worldObjects.push_back({ wallMesh, D3DXVECTOR3(-2.0f, 1.5f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, D3DXToRadian(45.0f), 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
-    g_worldObjects.push_back({ wallMesh, D3DXVECTOR3(-2.0f, 1.5f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, D3DXToRadian(-45.0f), 0.0f), D3DXCOLOR(0.55f, 0.58f, 0.65f, 1.0f), false });
-
-    LPD3DXMESH bigSphereMesh = LoadSceneMeshFromX(_T("collision_big_sphere.x"));
-    g_worldObjects.push_back({ bigSphereMesh, D3DXVECTOR3(6.5f, 2.0f, 4.5f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.75f, 0.45f, 0.30f, 1.0f), false });
-
-    LPD3DXMESH movingPlatformMesh = LoadSceneMeshFromX(_T("collision_moving_platform.x"));
-    g_worldObjects.push_back({ movingPlatformMesh, D3DXVECTOR3(0.0f, 2.5f, 7.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f), false });
-    g_movingPlatformIndex = g_worldObjects.size() - 1;
-
-    LPD3DXMESH manyEdgesMesh = LoadSceneMeshFromX(_T("cubeManyEdges.x"));
-    const float manyEdgesSpacingX = 7.2f;
-    const float manyEdgesSpacingZ = 7.2f;
-    const D3DXVECTOR3 manyEdgesBase(-7.2f, 0.75f, -5.4f);
-    for (int row = 0; row < kCubeNumber; ++row)
+    FILE* file = NULL;
+    if (_tfopen_s(&file, _T("XFileListRender.csv"), _T("rt")) != 0 || file == NULL)
     {
-        for (int col = 0; col < kCubeNumber; ++col)
+        ResetPlayer();
+        return;
+    }
+
+    TCHAR line[512];
+    _fgetts(line, 512, file);
+
+    while (_fgetts(line, 512, file) != NULL)
+    {
+        TCHAR* context = NULL;
+        TCHAR* token = _tcstok_s(line, _T(",\n"), &context);
+        if (token == NULL)
         {
-            const D3DXVECTOR3 objectPosition(manyEdgesBase.x + col * manyEdgesSpacingX,
-                                             manyEdgesBase.y,
-                                             manyEdgesBase.z + row * manyEdgesSpacingZ);
-            const D3DXVECTOR3 objectRotation(0.0f,
-                                             (row * 5 + col) * (D3DX_PI / 10.0f),
-                                             0.0f);
-            const D3DXVECTOR3 objectScale(0.75f, 0.75f, 0.75f);
-            const D3DXCOLOR objectColor(0.30f + 0.12f * col,
-                                        0.35f + 0.10f * row,
-                                        0.85f - 0.10f * row,
-                                        1.0f);
-            g_worldObjects.push_back({ manyEdgesMesh, objectPosition, objectScale, objectRotation, objectColor, false });
+            continue;
+        }
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const TCHAR* fileName = token;
+        if (fileName == NULL)
+        {
+            continue;
+        }
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float posX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float posY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float posZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float rotX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float rotY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float rotZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float scale = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
+
+        const D3DXVECTOR3 position(posX, posY, posZ);
+        const D3DXVECTOR3 rotation(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ));
+        const D3DXVECTOR3 scaleVec(scale, scale, scale);
+
+        LPD3DXMESH mesh = LoadSceneMeshFromX(fileName);
+
+        if (_tcsstr(fileName, _T("item_sphere")) != NULL)
+        {
+            g_itemObjects.push_back({ mesh, position, scaleVec, rotation, D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f), false });
+        }
+        else
+        {
+            g_worldObjects.push_back({ mesh, position, scaleVec, rotation, D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f), false });
+            if (_tcsstr(fileName, _T("moving_platform")) != NULL)
+            {
+                g_movingPlatformIndex = g_worldObjects.size() - 1;
+            }
         }
     }
 
-    const D3DXVECTOR3 itemPositions[] =
-    {
-        D3DXVECTOR3(-2.0f, 0.5f, 2.0f),
-        D3DXVECTOR3(0.5f, 0.5f, 3.5f),
-        D3DXVECTOR3(3.0f, 0.5f, -1.0f),
-        D3DXVECTOR3(5.0f, 0.8f, 1.5f),
-        D3DXVECTOR3(7.0f, 0.5f, -3.5f),
-    };
-    const D3DXCOLOR itemColors[] =
-    {
-        D3DXCOLOR(0.95f, 0.86f, 0.30f, 1.0f),
-        D3DXCOLOR(0.90f, 0.30f, 0.40f, 1.0f),
-        D3DXCOLOR(0.30f, 0.75f, 0.95f, 1.0f),
-        D3DXCOLOR(0.55f, 0.90f, 0.50f, 1.0f),
-        D3DXCOLOR(0.75f, 0.55f, 0.95f, 1.0f),
-    };
-
-    LPD3DXMESH itemSphereMesh = LoadSceneMeshFromX(_T("collision_item_sphere.x"));
-    for (int i = 0; i < 5; ++i)
-    {
-        g_itemObjects.push_back({ itemSphereMesh, itemPositions[i], D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), itemColors[i], false });
-    }
+    fclose(file);
 
     ResetPlayer();
 }

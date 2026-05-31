@@ -1,0 +1,17 @@
+ID,FileName,PosX,PosY,PosZ,RotX,RotY,RotZ,Scale
+1,plateGround.x,0,0,0,0,0,0,1
+2,collision_bumpy_ground.x,70,0,0,0,0,0,1
+3,collision_slope.x,10,0.75,-4,0,0,-25.7,1
+4,collision_slope2.x,22,0.75,-8,0,0,-10,1
+5,collision_slope3.x,34,0.75,-10,0,0,-5,1
+6,collision_wall.x,-6,1.5,0,0,18,0,1
+7,collision_wall.x,-2,1.5,-4,0,45,0,1
+8,collision_wall.x,-2,1.5,-4,0,-45,0,1
+9,collision_big_sphere.x,6.5,2,4.5,0,0,0,1
+10,collision_moving_platform.x,0,2.5,7,0,0,0,1
+11,cubeManyEdges.x,-7.2,0.75,-5.4,0,0,0,0.75
+12,collision_item_sphere.x,-2,0.5,2,0,0,0,1
+13,collision_item_sphere.x,0.5,0.5,3.5,0,0,0,1
+14,collision_item_sphere.x,3,0.5,-1,0,0,0,1
+15,collision_item_sphere.x,5,0.8,1.5,0,0,0,1
+16,collision_item_sphere.x,7,0.5,-3.5,0,0,0,1
