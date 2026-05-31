@@ -1181,10 +1181,6 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
         token = _tcstok_s(NULL, _T(",\n"), &context);
         const float scaleX = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
         token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float scaleY = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float scaleZ = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
 
         PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
         if (token != NULL && _tcsstr(token, _T("NonCollision")) != NULL)
@@ -1196,7 +1192,7 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
         PhysicsLib::SetTransform(id,
                                  D3DXVECTOR3(posX, posY, posZ),
                                  D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ)),
-                                 D3DXVECTOR3(scaleX, scaleY, scaleZ));
+                                 D3DXVECTOR3(scaleX, scaleX, scaleX));
     }
 
     fclose(file);
