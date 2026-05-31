@@ -2,8 +2,8 @@ ID,FileName,PosX,PosY,PosZ,RotX,RotY,RotZ,Scale,Type
 1,plateGround.x,0,0,0,0,0,0,1,Collision
 2,collision_bumpy_ground.x,70,0,0,0,0,0,1,Collision
 3,collision_slope.x,10,0.75,-4,0,0,-25.7,1,Collision
-4,scollision_slope2.x,22,0.75,-8,0,0,-10,1,Collision
-5,scollision_slope3.x,34,0.75,-10,0,0,-5,1,Collision
+4,collision_slope2.x,22,0.75,-8,0,0,-10,1,Collision
+5,collision_slope3.x,34,0.75,-10,0,0,-5,1,Collision
 6,collision_wall.x,-6,1.5,0,0,18,0,1,Collision
 7,collision_wall.x,-2,1.5,-4,0,45,0,1,Collision
 8,collision_wall.x,-2,1.5,-4,0,-45,0,1,Collision

@@ -65,6 +65,8 @@ PhysicsLib::CameraMover g_cameraMover;
 float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
 float g_cameraDistance = 4.0f;
+size_t g_movingPlatformIndex = 0;
+float g_movingPlatformDirection = 1.0f;
 bool g_prevSpacePressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
@@ -391,6 +393,7 @@ void InitScene()
 
     LPD3DXMESH movingPlatformMesh = LoadSceneMeshFromX(_T("collision_moving_platform.x"));
     g_worldObjects.push_back({ movingPlatformMesh, D3DXVECTOR3(0.0f, 2.5f, 7.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, 0.0f), D3DXCOLOR(0.25f, 0.72f, 0.78f, 1.0f), false });
+    g_movingPlatformIndex = g_worldObjects.size() - 1;
 
     LPD3DXMESH manyEdgesMesh = LoadSceneMeshFromX(_T("cubeManyEdges.x"));
     const float manyEdgesSpacingX = 7.2f;
@@ -483,6 +486,23 @@ void UpdatePlayer()
     g_prevEscPressed = isEscPressed;
 
     PhysicsLib::PhysicsLib::Update();
+
+    {
+        const float kPlatformSpeed = 1.5f;
+        const float kPlatformMinX = -4.0f;
+        const float kPlatformMaxX = 4.0f;
+        g_worldObjects[g_movingPlatformIndex].position.x += g_movingPlatformDirection * kPlatformSpeed * (1.0f / 60.0f);
+        if (g_worldObjects[g_movingPlatformIndex].position.x > kPlatformMaxX)
+        {
+            g_worldObjects[g_movingPlatformIndex].position.x = kPlatformMaxX;
+            g_movingPlatformDirection = -1.0f;
+        }
+        else if (g_worldObjects[g_movingPlatformIndex].position.x < kPlatformMinX)
+        {
+            g_worldObjects[g_movingPlatformIndex].position.x = kPlatformMinX;
+            g_movingPlatformDirection = 1.0f;
+        }
+    }
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 localInputMove(0.0f, 0.0f, 0.0f);
