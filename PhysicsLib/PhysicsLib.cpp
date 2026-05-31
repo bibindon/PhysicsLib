@@ -81,6 +81,20 @@ struct MovingObjectInfo
 std::vector<MovingObjectInfo> g_movingObjects;
 
 std::map<int, std::basic_string<TCHAR> > g_csvFileNames;
+std::map<int, int> g_csvObjectIds;
+
+SimpleObject* FindSimpleObjectById(int id)
+{
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].id == id)
+        {
+            return &g_simpleObjects[i];
+        }
+    }
+
+    return nullptr;
+}
 
 }
 
@@ -1193,6 +1207,7 @@ float PhysicsLib::GetDashSpeed()
 void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
 {
     g_csvFileNames.clear();
+    g_csvObjectIds.clear();
     g_movingObjects.clear();
 
     FILE* file = NULL;
@@ -1253,6 +1268,7 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
                                  D3DXVECTOR3(scaleX, scaleX, scaleX));
 
         g_csvFileNames[csvId] = fileName;
+        g_csvObjectIds[csvId] = id;
     }
 
     fclose(file);
@@ -1342,8 +1358,28 @@ void PhysicsLib::LoadMoveFromCsv(const TCHAR* csvPath)
             direction /= dirLength;
         }
 
-        const float speed = (duration > 0.0001f) ? (2.0f * dirLength / duration) : 1.5f;
-        const int id = PhysicsLib::Load(physicsFileName, PhysicsLib::ObjectType::MovingSlide, 0.0f);
+        float speed = 1.5f;
+        if (duration > 0.0001f)
+        {
+            speed = 2.0f * dirLength / duration;
+        }
+
+        int id = -1;
+        std::map<int, int>::const_iterator objectIt = g_csvObjectIds.find(physicsId);
+        if (objectIt != g_csvObjectIds.end())
+        {
+            id = objectIt->second;
+            SimpleObject* object = FindSimpleObjectById(id);
+            if (object != nullptr)
+            {
+                object->objectType = PhysicsLib::ObjectType::MovingSlide;
+            }
+        }
+        if (id < 0)
+        {
+            id = PhysicsLib::Load(physicsFileName, PhysicsLib::ObjectType::MovingSlide, 0.0f);
+        }
+
         PhysicsLib::SetTransform(id,
                                  D3DXVECTOR3(posX, posY, posZ),
                                  D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ)),
