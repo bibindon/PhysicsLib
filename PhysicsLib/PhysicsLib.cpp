@@ -1173,7 +1173,11 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
         token = _tcstok_s(NULL, _T(",\n"), &context);
         const float posZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
         token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float rotX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
         const float rotY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float rotZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
         token = _tcstok_s(NULL, _T(",\n"), &context);
         const float scaleX = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
         token = _tcstok_s(NULL, _T(",\n"), &context);
@@ -1191,7 +1195,7 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
         const int id = PhysicsLib::Load(fileName, objectType, 0.0f);
         PhysicsLib::SetTransform(id,
                                  D3DXVECTOR3(posX, posY, posZ),
-                                 D3DXVECTOR3(0.0f, D3DXToRadian(rotY), 0.0f),
+                                 D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ)),
                                  D3DXVECTOR3(scaleX, scaleY, scaleZ));
     }
 

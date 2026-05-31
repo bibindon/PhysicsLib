@@ -375,10 +375,10 @@ void InitScene()
     LPD3DXMESH slopeMesh = LoadSceneMeshFromX(_T("collision_slope.x"));
     g_worldObjects.push_back({ slopeMesh, D3DXVECTOR3(10.0f, 0.75f, -4.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DX_PI / 7.0f), D3DXCOLOR(0.76f, 0.62f, 0.36f, 1.0f), false });
 
-    LPD3DXMESH slopeMesh2 = LoadSceneMeshFromX(_T("scollision_slope2.x"));
+    LPD3DXMESH slopeMesh2 = LoadSceneMeshFromX(_T("collision_slope2.x"));
     g_worldObjects.push_back({ slopeMesh2, D3DXVECTOR3(22.0f, 0.75f, -8.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(10.0f)), D3DXCOLOR(0.68f, 0.72f, 0.42f, 1.0f), false });
 
-    LPD3DXMESH slopeMesh3 = LoadSceneMeshFromX(_T("scollision_slope3.x"));
+    LPD3DXMESH slopeMesh3 = LoadSceneMeshFromX(_T("collision_slope3.x"));
     g_worldObjects.push_back({ slopeMesh3, D3DXVECTOR3(34.0f, 0.75f, -10.0f), D3DXVECTOR3(1.0f, 1.0f, 1.0f), D3DXVECTOR3(0.0f, 0.0f, -D3DXToRadian(5.0f)), D3DXCOLOR(0.58f, 0.74f, 0.50f, 1.0f), false });
 
     LPD3DXMESH wallMesh = LoadSceneMeshFromX(_T("collision_wall.x"));
