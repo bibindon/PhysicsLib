@@ -39,6 +39,8 @@ const int kCuboidRotXEditBoxId = 4406;
 const int kCuboidRotYEditBoxId = 4407;
 const int kCuboidRotZEditBoxId = 4408;
 const int kInertiaStrengthEditBoxId = 4409;
+const int kWalkSpeedEditBoxId = 4410;
+const int kDashSpeedEditBoxId = 4411;
 
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -312,6 +314,30 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             SettingsState::SetInertiaStrength(strength);
             return 0;
         }
+
+        if (LOWORD(wParam) == kWalkSpeedEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float speed = static_cast<float>(_tstof(buffer));
+            if (speed > 0.0f)
+            {
+                SettingsState::SetWalkSpeed(speed);
+            }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kDashSpeedEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float speed = static_cast<float>(_tstof(buffer));
+            if (speed > 0.0f)
+            {
+                SettingsState::SetDashSpeed(speed);
+            }
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -351,7 +377,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                        340,
-                                       860,
+                                       920,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -792,13 +818,65 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  g_settingsDialog,
                  reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInertiaStrengthEditBoxId)),
                  instance,
+                  NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("歩き速度:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 780,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR walkText[32];
+    _stprintf_s(walkText, _T("%.1f"), SettingsState::GetWalkSpeed());
+    CreateWindow(_T("EDIT"),
+                 walkText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 780,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kWalkSpeedEditBoxId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("STATIC"),
+                 _T("ダッシュ速度:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 810,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR dashText[32];
+    _stprintf_s(dashText, _T("%.1f"), SettingsState::GetDashSpeed());
+    CreateWindow(_T("EDIT"),
+                 dashText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 810,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kDashSpeedEditBoxId)),
+                 instance,
                  NULL);
 
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 795,
+                 850,
                  130,
                  32,
                  g_settingsDialog,
@@ -810,7 +888,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("ファイル読込"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  156,
-                 795,
+                 850,
                  130,
                  32,
                  g_settingsDialog,

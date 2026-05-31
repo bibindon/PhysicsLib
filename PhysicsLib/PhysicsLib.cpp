@@ -68,6 +68,8 @@ float g_cuboidRotY = 0.0f;
 float g_cuboidRotZ = 0.0f;
 float g_playerFacingYaw = 0.0f;
 float g_inertiaStrength = 1.0f;
+float g_walkSpeed = 6.0f;
+float g_dashSpeed = 18.0f;
 
 struct MovingObjectInfo
 {
@@ -1100,6 +1102,26 @@ void SettingsState::SetInertiaStrength(float strength)
     g_inertiaStrength = strength;
 }
 
+float SettingsState::GetWalkSpeed()
+{
+    return g_walkSpeed;
+}
+
+void SettingsState::SetWalkSpeed(float speed)
+{
+    g_walkSpeed = speed;
+}
+
+float SettingsState::GetDashSpeed()
+{
+    return g_dashSpeed;
+}
+
+void SettingsState::SetDashSpeed(float speed)
+{
+    g_dashSpeed = speed;
+}
+
 bool PhysicsLib::IsFocusModeEnabled()
 {
     return SettingsState::IsFocusModeEnabled();
@@ -1153,6 +1175,16 @@ float PhysicsLib::GetCuboidRotY()
 float PhysicsLib::GetCuboidRotZ()
 {
     return SettingsState::GetCuboidRotZ();
+}
+
+float PhysicsLib::GetWalkSpeed()
+{
+    return SettingsState::GetWalkSpeed();
+}
+
+float PhysicsLib::GetDashSpeed()
+{
+    return SettingsState::GetDashSpeed();
 }
 
 void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)

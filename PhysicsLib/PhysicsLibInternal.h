@@ -60,6 +60,10 @@ public:
     static void SetPlayerFacingYaw(float playerFacingYaw);
     static float GetInertiaStrength();
     static void SetInertiaStrength(float strength);
+    static float GetWalkSpeed();
+    static void SetWalkSpeed(float speed);
+    static float GetDashSpeed();
+    static void SetDashSpeed(float speed);
 };
 
 class SettingsDialog

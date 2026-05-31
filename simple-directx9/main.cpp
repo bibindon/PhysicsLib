@@ -28,8 +28,6 @@ const double kTargetFrameSeconds = 1.0 / 60.0;
 const float kMinCameraDistance = 2.0f;
 const float kMaxCameraDistance = 30.0f;
 const float kCameraWheelZoomStep = 0.5f;
-const float kPlayerSpeed = 5.0f;
-const float kPlayerSpeedBoostMultiplier = 3.0f;
 const float kPlayerTurnRadiansPerSecond = D3DX_PI * 3.0f;
 const float kJumpVelocity = 7.0f;
 const D3DXVECTOR3 kPlayerStartPosition(0.0f, 5.0f, 0.0f);
@@ -440,9 +438,10 @@ void ResetPlayer()
     settings.shapeType = PhysicsLib::PhysicsLib::ShapeType::Cylinder;
     settings.radius = 0.5f;
     settings.height = 1.0f;
-    settings.moveSpeed = kPlayerSpeed;
-    settings.groundAcceleration = kPlayerSpeed * 2.0f;
-    settings.airAcceleration = kPlayerSpeed * 0.35f;
+    const float walkSpeed = PhysicsLib::PhysicsLib::GetWalkSpeed();
+    settings.moveSpeed = walkSpeed;
+    settings.groundAcceleration = walkSpeed * 2.0f;
+    settings.airAcceleration = walkSpeed * 0.35f;
     settings.jumpVelocity = kJumpVelocity;
     settings.doubleJumpEnabled = false;
     settings.keepHorizontalVelocityOnJump = true;
@@ -457,15 +456,15 @@ void UpdatePlayer()
 {
     const bool isWindowActive = (GetForegroundWindow() == g_mainWindow);
 
-    float speedMultiplier = 1.0f;
+    float targetSpeed = PhysicsLib::PhysicsLib::GetWalkSpeed();
     if (isWindowActive && ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0))
     {
-        speedMultiplier = kPlayerSpeedBoostMultiplier;
+        targetSpeed = PhysicsLib::PhysicsLib::GetDashSpeed();
     }
     PhysicsLib::CharacterMover::Settings speedSettings = g_playerMover.GetSettings();
-    speedSettings.moveSpeed = kPlayerSpeed * speedMultiplier;
-    speedSettings.groundAcceleration = kPlayerSpeed * 2.0f * speedMultiplier;
-    speedSettings.airAcceleration = kPlayerSpeed * 0.35f * speedMultiplier;
+    speedSettings.moveSpeed = targetSpeed;
+    speedSettings.groundAcceleration = targetSpeed * 2.0f;
+    speedSettings.airAcceleration = targetSpeed * 0.35f;
     g_playerMover.SetSettings(speedSettings);
 
     bool isEscPressed = isWindowActive && ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);

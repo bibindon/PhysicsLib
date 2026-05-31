@@ -99,6 +99,12 @@ public:
     // 直方体判定用の Z 軸回転を取得する。
     static float GetCuboidRotZ();
 
+    // 歩行速度を取得する。
+    static float GetWalkSpeed();
+
+    // ダッシュ速度を取得する。
+    static float GetDashSpeed();
+
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 
