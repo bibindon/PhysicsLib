@@ -1334,7 +1334,6 @@ void PhysicsLib::LoadMoveFromCsv(const TCHAR* csvPath)
         token = _tcstok_s(NULL, _T(",\n"), &context);
         const float scale = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
         token = _tcstok_s(NULL, _T(",\n"), &context);
-        token = _tcstok_s(NULL, _T(",\n"), &context);
         const float startX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
         token = _tcstok_s(NULL, _T(",\n"), &context);
         const float startY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
