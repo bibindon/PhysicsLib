@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <vector>
 
@@ -78,6 +79,8 @@ struct MovingObjectInfo
     D3DXVECTOR3 endPos;
 };
 std::vector<MovingObjectInfo> g_movingObjects;
+
+std::map<int, std::basic_string<TCHAR> > g_csvFileNames;
 
 }
 
@@ -1210,6 +1213,7 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
         {
             continue;
         }
+        const int csvId = _tstoi(token);
         token = _tcstok_s(NULL, _T(",\n"), &context);
         if (token == NULL)
         {
@@ -1244,9 +1248,21 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
                                  D3DXVECTOR3(posX, posY, posZ),
                                  D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ)),
                                  D3DXVECTOR3(scaleX, scaleX, scaleX));
+
+        g_csvFileNames[csvId] = fileName;
     }
 
     fclose(file);
+}
+
+const TCHAR* PhysicsLib::GetCsvFileName(int id)
+{
+    std::map<int, std::basic_string<TCHAR> >::const_iterator it = g_csvFileNames.find(id);
+    if (it != g_csvFileNames.end())
+    {
+        return it->second.c_str();
+    }
+    return NULL;
 }
 
 void PhysicsLib::LoadMoveFromCsv(const TCHAR* csvPath)
@@ -1273,10 +1289,11 @@ void PhysicsLib::LoadMoveFromCsv(const TCHAR* csvPath)
             continue;
         }
         token = _tcstok_s(NULL, _T(",\n"), &context);
-        const TCHAR* renderFileName = token;
+        const int renderId = token != NULL ? _tstoi(token) : -1;
         token = _tcstok_s(NULL, _T(",\n"), &context);
-        const TCHAR* physicsFileName = token;
-        if (renderFileName == NULL || physicsFileName == NULL)
+        const int physicsId = token != NULL ? _tstoi(token) : -1;
+        const TCHAR* physicsFileName = PhysicsLib::GetCsvFileName(physicsId);
+        if (physicsFileName == NULL)
         {
             continue;
         }

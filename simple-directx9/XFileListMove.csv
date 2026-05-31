@@ -1,2 +1,2 @@
 ID,RenderID,PhysicsID,PosX,PosY,PosZ,RotX,RotY,RotZ,Scale,Type,StartX,StartY,StartZ,EndX,EndY,EndZ,Duration
-1,collision_moving_platform.x,collision_moving_platform.x,0,2.5,7,0,0,0,1,Moving,-4,2.5,7,4,2.5,7,10
+1,10,10,0,2.5,7,0,0,0,1,Moving,-4,2.5,7,4,2.5,7,10

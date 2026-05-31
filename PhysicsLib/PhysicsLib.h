@@ -111,6 +111,9 @@ public:
     // CSV ファイルから衝突オブジェクトを一括読み込みする。
     static void LoadFromCsv(const TCHAR* csvPath);
 
+    // CSV の ID に対応するファイル名を取得する。
+    static const TCHAR* GetCsvFileName(int id);
+
     // 移動体 CSV から MovingSlide オブジェクトを読み込む。
     static void LoadMoveFromCsv(const TCHAR* csvPath);
 
