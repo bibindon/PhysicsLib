@@ -974,7 +974,7 @@ void Render()
     }
 
     DrawMesh(g_pCubeMesh,
-             g_playerMover.GetPosition() + D3DXVECTOR3(0.0f, 0.5f, 0.0f),
+             g_playerMover.GetPosition(),
              D3DXVECTOR3(1.0f, 1.0f, 1.0f),
              D3DXVECTOR3(0.0f, g_playerYaw, 0.0f),
              D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f),
