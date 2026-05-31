@@ -5,6 +5,7 @@
 #include "PhysicsLibInternal.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -1133,6 +1134,68 @@ float PhysicsLib::GetCuboidRotY()
 float PhysicsLib::GetCuboidRotZ()
 {
     return SettingsState::GetCuboidRotZ();
+}
+
+void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
+{
+    FILE* file = NULL;
+    if (_tfopen_s(&file, csvPath, _T("rt")) != 0 || file == NULL)
+    {
+        return;
+    }
+
+    TCHAR line[512];
+    if (_fgetts(line, 512, file) == NULL)
+    {
+        fclose(file);
+        return;
+    }
+
+    while (_fgetts(line, 512, file) != NULL)
+    {
+        TCHAR* context = NULL;
+        TCHAR* token = _tcstok_s(line, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const TCHAR* fileName = token;
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float posX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float posY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float posZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float rotY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float scaleX = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float scaleY = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const float scaleZ = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+
+        PhysicsLib::ObjectType objectType = PhysicsLib::ObjectType::Slide;
+        if (token != NULL && _tcsstr(token, _T("NonCollision")) != NULL)
+        {
+            objectType = PhysicsLib::ObjectType::PassThrough;
+        }
+
+        const int id = PhysicsLib::Load(fileName, objectType, 0.0f);
+        PhysicsLib::SetTransform(id,
+                                 D3DXVECTOR3(posX, posY, posZ),
+                                 D3DXVECTOR3(0.0f, D3DXToRadian(rotY), 0.0f),
+                                 D3DXVECTOR3(scaleX, scaleY, scaleZ));
+    }
+
+    fclose(file);
 }
 
 void PhysicsLib::Initialize()

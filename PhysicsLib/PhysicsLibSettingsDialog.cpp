@@ -2,6 +2,7 @@
 #include "PhysicsLibInternal.h"
 
 #include <windows.h>
+#include <commdlg.h>
 
 namespace PhysicsLib
 {
@@ -26,6 +27,7 @@ const int kSlideCheckCheckboxId = kSettingsCheckboxStartId + 11;
 const int kCameraAutoMoveCheckboxId = kSettingsCheckboxStartId + 12;
 const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
 const int kSettingsResetButtonId = 4200;
+const int kFileLoadButtonId = 4210;
 const int kShapeTypeComboBoxId = 4300;
 const int kRadiusEditBoxId = 4400;
 const int kCylinderRadiusEditBoxId = 4401;
@@ -66,6 +68,23 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             if (g_resetCallback != nullptr)
             {
                 g_resetCallback();
+            }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kFileLoadButtonId && HIWORD(wParam) == BN_CLICKED)
+        {
+            TCHAR filePath[MAX_PATH] = _T("");
+            OPENFILENAME openFileName = {};
+            openFileName.lStructSize = sizeof(OPENFILENAME);
+            openFileName.hwndOwner = window;
+            openFileName.lpstrFilter = _T("CSV Files (*.csv)\0*.csv\0All Files (*.*)\0*.*\0");
+            openFileName.lpstrFile = filePath;
+            openFileName.nMaxFile = MAX_PATH;
+            openFileName.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+            if (GetOpenFileName(&openFileName))
+            {
+                PhysicsLib::LoadFromCsv(filePath);
             }
             return 0;
         }
@@ -738,6 +757,18 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  32,
                  g_settingsDialog,
                  reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsResetButtonId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("BUTTON"),
+                 _T("ファイル読込"),
+                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                 156,
+                 770,
+                 130,
+                 32,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFileLoadButtonId)),
                  instance,
                  NULL);
 }

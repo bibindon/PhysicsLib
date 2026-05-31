@@ -102,6 +102,9 @@ public:
     // 設定ダイアログの初期化ボタンから呼ばれるリセット処理を登録する。
     static void SetResetCallback(void (*callback)());
 
+    // CSV ファイルから衝突オブジェクトを一括読み込みする。
+    static void LoadFromCsv(const TCHAR* csvPath);
+
     // Xファイルを読み込み、衝突オブジェクトとして登録する。戻り値は登録IDである。
     static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
 
