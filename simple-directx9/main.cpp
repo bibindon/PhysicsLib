@@ -86,7 +86,7 @@ static void InitScene();
 static void ResetPlayer();
 static void UpdatePlayer();
 static void UpdateCamera();
-static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path);
+static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor = NULL);
 static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXVECTOR3& position,
                      const D3DXVECTOR3& scale,
@@ -412,15 +412,16 @@ void InitScene()
         const D3DXVECTOR3 rotation(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ));
         const D3DXVECTOR3 scaleVec(scale, scale, scale);
 
-        LPD3DXMESH mesh = LoadSceneMeshFromX(fileName);
+        D3DXCOLOR matColor(1.0f, 1.0f, 1.0f, 1.0f);
+        LPD3DXMESH mesh = LoadSceneMeshFromX(fileName, &matColor);
 
         if (_tcsstr(fileName, _T("item_sphere")) != NULL)
         {
-            g_itemObjects.push_back({ mesh, position, scaleVec, rotation, D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f), false });
+            g_itemObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false });
         }
         else
         {
-            g_worldObjects.push_back({ mesh, position, scaleVec, rotation, D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f), false });
+            g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false });
             if (_tcsstr(fileName, _T("moving_platform")) != NULL)
             {
                 g_movingPlatformIndex = g_worldObjects.size() - 1;
@@ -607,18 +608,35 @@ void UpdateCamera()
                                1000.0f);
 }
 
-LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path)
+LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor)
 {
     LPD3DXMESH mesh = NULL;
+    LPD3DXBUFFER materialBuffer = NULL;
     HRESULT hResult = D3DXLoadMeshFromX(path,
                                         D3DXMESH_SYSTEMMEM,
                                         g_pd3dDevice,
                                         NULL,
-                                        NULL,
+                                        &materialBuffer,
                                         NULL,
                                         NULL,
                                         &mesh);
     assert(hResult == S_OK);
+    if (outColor != NULL && materialBuffer != NULL)
+    {
+        const D3DXMATERIAL* materials = static_cast<const D3DXMATERIAL*>(materialBuffer->GetBufferPointer());
+        const DWORD numMaterials = materialBuffer->GetBufferSize() / sizeof(D3DXMATERIAL);
+        if (numMaterials > 0)
+        {
+            outColor->r = materials[0].MatD3D.Diffuse.r;
+            outColor->g = materials[0].MatD3D.Diffuse.g;
+            outColor->b = materials[0].MatD3D.Diffuse.b;
+            outColor->a = 1.0f;
+        }
+    }
+    if (materialBuffer != NULL)
+    {
+        materialBuffer->Release();
+    }
     g_ownedSceneMeshes.push_back(mesh);
     return mesh;
 }
