@@ -249,11 +249,11 @@ public:
         // プレイヤーの接面判定に使う形状である。
         PhysicsLib::ShapeType shapeType = PhysicsLib::ShapeType::Sphere;
 
-        // 判定形状をプレイヤー位置からずらすためのオフセットである。
-        D3DXVECTOR3 shapeOffset = D3DXVECTOR3(0.0f, 0.5f, 0.0f);
-
         // Sphere/Cylinder 用の半径である。
         float radius = 0.5f;
+
+        // 衝突判定の中心 Y 座標（足元からの高さ）である。
+        float collisionCenterY = 0.5f;
 
         // Cylinder 用の高さである。
         float height = 1.0f;
