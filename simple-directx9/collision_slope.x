@@ -30,10 +30,27 @@ template MeshNormals {
 }
 
 template VertexDuplicationIndices {
- <b8d65549-d7c9-4995-89cf-53a9a8b031e3>
- DWORD nIndices;
- DWORD nOriginalVertices;
- array DWORD indices[nIndices];
+  <b8d65549-d7c9-4995-89cf-53a9a8b031e3>
+  DWORD nIndices;
+  DWORD nOriginalVertices;
+  array DWORD indices[nIndices];
+}
+
+template Material {
+  <3d82ab4d-62da-11cf-ab39-0020af71e433>
+  ColorRGBA faceColor;
+  FLOAT power;
+  ColorRGB specularColor;
+  ColorRGB emissiveColor;
+  [...]
+}
+
+template MeshMaterialList {
+  <f6f23f42-7686-11cf-8f52-0040333594a3>
+  DWORD nMaterials;
+  DWORD nFaceIndexes;
+  array DWORD faceIndexes[nFaceIndexes];
+  [Material <3d82ab4d-62da-11cf-ab39-0020af71e433>]
 }
 
 
@@ -149,7 +166,18 @@ Mesh {
   MeshMaterialList {
     1;
     12;
-    0,0,0,0,0,0,0,0,0,0,0,0;
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0;
     Material Material {
         0.760000; 0.620000; 0.360000; 1.000000;;
         96.078431;
