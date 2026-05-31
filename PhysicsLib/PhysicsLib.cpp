@@ -1192,6 +1192,9 @@ float PhysicsLib::GetDashSpeed()
 
 void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
 {
+    g_csvFileNames.clear();
+    g_movingObjects.clear();
+
     FILE* file = NULL;
     if (_tfopen_s(&file, csvPath, _T("rt")) != 0 || file == NULL)
     {
@@ -1267,6 +1270,8 @@ const TCHAR* PhysicsLib::GetCsvFileName(int id)
 
 void PhysicsLib::LoadMoveFromCsv(const TCHAR* csvPath)
 {
+    g_movingObjects.clear();
+
     FILE* file = NULL;
     if (_tfopen_s(&file, csvPath, _T("rt")) != 0 || file == NULL)
     {
