@@ -145,6 +145,14 @@ std::basic_string<TCHAR> ResolveAssetPath(const TCHAR* fileName)
         {
             return exeRelativePath;
         }
+
+        std::basic_string<TCHAR> exeProjectRelativePath = modulePath;
+        exeProjectRelativePath += _T("..\\..\\simple-directx9\\");
+        exeProjectRelativePath += fileName;
+        if (GetFileAttributes(exeProjectRelativePath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            return exeProjectRelativePath;
+        }
     }
 
     std::basic_string<TCHAR> projectRelativePath = _T("simple-directx9\\");
@@ -388,8 +396,9 @@ void InitScene()
     g_itemObjects.clear();
     g_collectedItemIds.clear();
 
+    const std::basic_string<TCHAR> renderListPath = ResolveAssetPath(_T("XFileListRender.csv"));
     FILE* file = NULL;
-    if (_tfopen_s(&file, _T("XFileListRender.csv"), _T("rt")) != 0 || file == NULL)
+    if (_tfopen_s(&file, renderListPath.c_str(), _T("rt")) != 0 || file == NULL)
     {
         ResetPlayer();
         return;
@@ -719,7 +728,7 @@ LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor, DWORD* out
     LPD3DXBUFFER materialBuffer = NULL;
     DWORD numMaterials = 0;
     HRESULT hResult = D3DXLoadMeshFromX(path,
-                                        D3DXMESH_SYSTEMMEM,
+                                        D3DXMESH_MANAGED,
                                         g_pd3dDevice,
                                         NULL,
                                         &materialBuffer,
