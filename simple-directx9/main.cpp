@@ -128,24 +128,12 @@ extern int WINAPI _tWinMain(_In_ HINSTANCE hInstance,
 
 std::basic_string<TCHAR> ResolveAssetPath(const TCHAR* fileName)
 {
-    if (GetFileAttributes(fileName) != INVALID_FILE_ATTRIBUTES)
-    {
-        return fileName;
-    }
-
     TCHAR modulePath[MAX_PATH] = {};
     GetModuleFileName(NULL, modulePath, MAX_PATH);
     TCHAR* lastSlash = _tcsrchr(modulePath, _T('\\'));
     if (lastSlash != nullptr)
     {
         *(lastSlash + 1) = _T('\0');
-        std::basic_string<TCHAR> exeRelativePath = modulePath;
-        exeRelativePath += fileName;
-        if (GetFileAttributes(exeRelativePath.c_str()) != INVALID_FILE_ATTRIBUTES)
-        {
-            return exeRelativePath;
-        }
-
         std::basic_string<TCHAR> exeProjectRelativePath = modulePath;
         exeProjectRelativePath += _T("..\\..\\simple-directx9\\");
         exeProjectRelativePath += fileName;
@@ -153,6 +141,18 @@ std::basic_string<TCHAR> ResolveAssetPath(const TCHAR* fileName)
         {
             return exeProjectRelativePath;
         }
+
+        std::basic_string<TCHAR> exeRelativePath = modulePath;
+        exeRelativePath += fileName;
+        if (GetFileAttributes(exeRelativePath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            return exeRelativePath;
+        }
+    }
+
+    if (GetFileAttributes(fileName) != INVALID_FILE_ATTRIBUTES)
+    {
+        return fileName;
     }
 
     std::basic_string<TCHAR> projectRelativePath = _T("simple-directx9\\");
@@ -378,8 +378,9 @@ void InitD3D(HWND hWnd)
     hResult = pD3DXMtrlBuffer->Release();
     assert(hResult == S_OK);
 
+    const std::basic_string<TCHAR> effectPath = ResolveAssetPath(_T("simple.fx"));
     hResult = D3DXCreateEffectFromFile(g_pd3dDevice,
-                                       _T("simple.fx"),
+                                       effectPath.c_str(),
                                        NULL,
                                        NULL,
                                        D3DXSHADER_DEBUG,
@@ -727,7 +728,8 @@ LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor, DWORD* out
     LPD3DXMESH mesh = NULL;
     LPD3DXBUFFER materialBuffer = NULL;
     DWORD numMaterials = 0;
-    HRESULT hResult = D3DXLoadMeshFromX(path,
+    const std::basic_string<TCHAR> meshPath = ResolveAssetPath(path);
+    HRESULT hResult = D3DXLoadMeshFromX(meshPath.c_str(),
                                         D3DXMESH_MANAGED,
                                         g_pd3dDevice,
                                         NULL,
