@@ -76,6 +76,159 @@ std::map<int, std::basic_string<TCHAR> > g_csvFileNames;
 std::map<int, int> g_csvObjectIds;
 std::map<int, D3DXVECTOR3> g_csvPrevPositions;
 
+std::basic_string<TCHAR> MakePathWithExtension(const TCHAR* path, const TCHAR* extension)
+{
+    std::basic_string<TCHAR> result = path;
+    const size_t slashPos = result.find_last_of(_T("\\/"));
+    const size_t dotPos = result.find_last_of(_T('.'));
+    if (dotPos != std::basic_string<TCHAR>::npos &&
+        (slashPos == std::basic_string<TCHAR>::npos || dotPos > slashPos))
+    {
+        result.erase(dotPos);
+    }
+    result += extension;
+    return result;
+}
+
+std::basic_string<TCHAR> ResolveCsvRelativePath(const TCHAR* csvPath, const TCHAR* relativePath)
+{
+    if (GetFileAttributes(relativePath) != INVALID_FILE_ATTRIBUTES)
+    {
+        return relativePath;
+    }
+
+    std::basic_string<TCHAR> result = csvPath;
+    const size_t slashPos = result.find_last_of(_T("\\/"));
+    if (slashPos == std::basic_string<TCHAR>::npos)
+    {
+        return relativePath;
+    }
+
+    result.erase(slashPos + 1);
+    result += relativePath;
+    return result;
+}
+
+bool IsYesToken(const TCHAR* token)
+{
+    if (token == NULL)
+    {
+        return false;
+    }
+
+    return token[0] == _T('y') || token[0] == _T('Y');
+}
+
+int LoadCsvObject(const TCHAR* fileName,
+                  PhysicsLib::ObjectType objectType,
+                  const D3DXVECTOR3& position,
+                  const D3DXVECTOR3& rotation,
+                  const D3DXVECTOR3& scale)
+{
+    const int id = PhysicsLib::Load(fileName, objectType, 0.0f);
+    PhysicsLib::SetTransform(id, position, rotation, scale);
+    return id;
+}
+
+bool LoadInstancedCsvObjects(const TCHAR* physicsCsvPath,
+                             const TCHAR* fileName,
+                             PhysicsLib::ObjectType objectType,
+                             const D3DXVECTOR3& basePosition,
+                             const D3DXVECTOR3& baseRotation,
+                             const D3DXVECTOR3& baseScale,
+                             int* outFirstId)
+{
+    if (outFirstId != nullptr)
+    {
+        *outFirstId = -1;
+    }
+
+    const std::basic_string<TCHAR> instancingCsvName = MakePathWithExtension(fileName, _T(".csv"));
+    const std::basic_string<TCHAR> instancingCsvPath = ResolveCsvRelativePath(physicsCsvPath, instancingCsvName.c_str());
+
+    FILE* instancingFile = NULL;
+    if (_tfopen_s(&instancingFile, instancingCsvPath.c_str(), _T("rt")) != 0 || instancingFile == NULL)
+    {
+        return false;
+    }
+
+    D3DXMATRIX baseScaleMatrix;
+    D3DXMATRIX baseRotationMatrix;
+    D3DXMATRIX baseTranslationMatrix;
+    D3DXMatrixScaling(&baseScaleMatrix, baseScale.x, baseScale.y, baseScale.z);
+    D3DXMatrixRotationYawPitchRoll(&baseRotationMatrix, baseRotation.y, baseRotation.x, baseRotation.z);
+    D3DXMatrixTranslation(&baseTranslationMatrix, basePosition.x, basePosition.y, basePosition.z);
+    const D3DXMATRIX baseMatrix = baseScaleMatrix * baseRotationMatrix * baseTranslationMatrix;
+
+    bool loaded = false;
+    TCHAR line[512];
+    _fgetts(line, 512, instancingFile);
+
+    while (_fgetts(line, 512, instancingFile) != NULL)
+    {
+        if (line[0] == _T('#'))
+        {
+            continue;
+        }
+
+        TCHAR* context = NULL;
+        TCHAR* token = _tcstok_s(line, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float localX = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float localY = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float localZ = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float localRotY = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float localScale = static_cast<float>(_tstof(token));
+
+        D3DXVECTOR3 position;
+        const D3DXVECTOR3 localPosition(localX, localY, localZ);
+        D3DXVec3TransformCoord(&position, &localPosition, &baseMatrix);
+
+        const D3DXVECTOR3 rotation(baseRotation.x,
+                                   baseRotation.y + D3DXToRadian(localRotY),
+                                   baseRotation.z);
+        const D3DXVECTOR3 scale(baseScale.x * localScale,
+                                baseScale.y * localScale,
+                                baseScale.z * localScale);
+        const int id = LoadCsvObject(fileName, objectType, position, rotation, scale);
+        if (!loaded && outFirstId != nullptr)
+        {
+            *outFirstId = id;
+        }
+        loaded = true;
+    }
+
+    fclose(instancingFile);
+    return loaded;
+}
+
 SimpleObject* FindSimpleObjectById(int id)
 {
     for (size_t i = 0; i < g_simpleObjects.size(); ++i)
@@ -1253,16 +1406,35 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
         }
 
         token = _tcstok_s(NULL, _T(",\n"), &context);
-        if (token != NULL && (token[0] == _T('y') || token[0] == _T('Y')))
+        if (IsYesToken(token))
         {
             objectType = PhysicsLib::ObjectType::MovingSlide;
         }
 
-        const int id = PhysicsLib::Load(fileName, objectType, 0.0f);
-        PhysicsLib::SetTransform(id,
-                                 D3DXVECTOR3(posX, posY, posZ),
-                                 D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ)),
-                                 D3DXVECTOR3(scaleX, scaleX, scaleX));
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        const bool isInstancing = IsYesToken(token);
+
+        const D3DXVECTOR3 position(posX, posY, posZ);
+        const D3DXVECTOR3 rotation(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ));
+        const D3DXVECTOR3 scale(scaleX, scaleX, scaleX);
+
+        int id = -1;
+        bool loaded = false;
+        if (isInstancing)
+        {
+            loaded = LoadInstancedCsvObjects(csvPath,
+                                             fileName,
+                                             objectType,
+                                             position,
+                                             rotation,
+                                             scale,
+                                             &id);
+        }
+
+        if (!loaded)
+        {
+            id = LoadCsvObject(fileName, objectType, position, rotation, scale);
+        }
 
         g_csvFileNames[csvId] = fileName;
         g_csvObjectIds[csvId] = id;

@@ -16,4 +16,4 @@ ID,FileName,PosX,PosY,PosZ,RotX,RotY,RotZ,Scale
 15,collision_item_sphere.x,5,0.8,1.5,0,0,0,1
 16,collision_item_sphere.x,7,0.5,-3.5,0,0,0,1
 17,tree2/lemonTree.x,11,0,11,0,0,0,1
-18,tree2/lemonTree.Instancing.x,0,0,0,0,0,0,1
+18,tree2/lemonTree.Instancing.x,2,0,0,0,0,0,1
