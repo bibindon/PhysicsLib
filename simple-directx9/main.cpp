@@ -503,6 +503,14 @@ void UpdatePlayer()
         }
     }
 
+    if (g_movingPlatformIndex < g_worldObjects.size())
+    {
+        PhysicsLib::PhysicsLib::UpdateCsvTransform(10,
+            g_worldObjects[g_movingPlatformIndex].position,
+            g_worldObjects[g_movingPlatformIndex].rotation,
+            g_worldObjects[g_movingPlatformIndex].scale);
+    }
+
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 localInputMove(0.0f, 0.0f, 0.0f);
 
