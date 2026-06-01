@@ -72,17 +72,6 @@ float g_inertiaStrength = 1.0f;
 float g_walkSpeed = 6.0f;
 float g_dashSpeed = 18.0f;
 
-struct MovingObjectInfo
-{
-    int physicsId;
-    D3DXVECTOR3 startPos;
-    D3DXVECTOR3 endPos;
-    D3DXVECTOR3 rotation;
-    D3DXVECTOR3 scale;
-    float speed;
-};
-std::vector<MovingObjectInfo> g_movingObjects;
-
 std::map<int, std::basic_string<TCHAR> > g_csvFileNames;
 std::map<int, int> g_csvObjectIds;
 
@@ -1210,8 +1199,6 @@ float PhysicsLib::GetDashSpeed()
 void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
 {
     g_csvFileNames.clear();
-    g_csvObjectIds.clear();
-    g_movingObjects.clear();
 
     FILE* file = NULL;
     if (_tfopen_s(&file, csvPath, _T("rt")) != 0 || file == NULL)
@@ -1285,164 +1272,6 @@ const TCHAR* PhysicsLib::GetCsvFileName(int id)
         return it->second.c_str();
     }
     return NULL;
-}
-
-void PhysicsLib::LoadMoveFromCsv(const TCHAR* csvPath)
-{
-    g_movingObjects.clear();
-
-    FILE* file = NULL;
-    if (_tfopen_s(&file, csvPath, _T("rt")) != 0 || file == NULL)
-    {
-        return;
-    }
-
-    TCHAR line[512];
-    if (_fgetts(line, 512, file) == NULL)
-    {
-        fclose(file);
-        return;
-    }
-
-    while (_fgetts(line, 512, file) != NULL)
-    {
-        TCHAR* context = NULL;
-        TCHAR* token = _tcstok_s(line, _T(",\n"), &context);
-        if (token == NULL)
-        {
-            continue;
-        }
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const int renderId = token != NULL ? _tstoi(token) : -1;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const int physicsId = token != NULL ? _tstoi(token) : -1;
-        const TCHAR* physicsFileName = PhysicsLib::GetCsvFileName(physicsId);
-        if (physicsFileName == NULL)
-        {
-            continue;
-        }
-
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float posX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float posY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float posZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float rotX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float rotY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float rotZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float scale = token != NULL ? static_cast<float>(_tstof(token)) : 1.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float startX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float startY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float startZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float endX = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float endY = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float endZ = token != NULL ? static_cast<float>(_tstof(token)) : 0.0f;
-        token = _tcstok_s(NULL, _T(",\n"), &context);
-        const float duration = token != NULL ? static_cast<float>(_tstof(token)) : 10.0f;
-
-        const D3DXVECTOR3 startPos(startX, startY, startZ);
-        const D3DXVECTOR3 endPos(endX, endY, endZ);
-        D3DXVECTOR3 direction = endPos - startPos;
-        const float dirLength = D3DXVec3Length(&direction);
-        if (dirLength > 0.0001f)
-        {
-            direction /= dirLength;
-        }
-
-        float speed = 1.5f;
-        if (duration > 0.0001f)
-        {
-            speed = 2.0f * dirLength / duration;
-        }
-
-        int id = -1;
-        std::map<int, int>::const_iterator objectIt = g_csvObjectIds.find(physicsId);
-        if (objectIt != g_csvObjectIds.end())
-        {
-            id = objectIt->second;
-            SimpleObject* object = FindSimpleObjectById(id);
-            if (object != nullptr)
-            {
-                object->objectType = PhysicsLib::ObjectType::MovingSlide;
-            }
-        }
-        if (id < 0)
-        {
-            id = PhysicsLib::Load(physicsFileName, PhysicsLib::ObjectType::MovingSlide, 0.0f);
-        }
-
-        PhysicsLib::SetTransform(id,
-                                 D3DXVECTOR3(posX, posY, posZ),
-                                 D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ)),
-                                 D3DXVECTOR3(scale, scale, scale));
-        PhysicsLib::SetVelocity(id, direction * speed);
-
-        MovingObjectInfo info;
-        info.physicsId = id;
-        info.startPos = startPos;
-        info.endPos = endPos;
-        info.rotation = D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ));
-        info.scale = D3DXVECTOR3(scale, scale, scale);
-        info.speed = speed;
-        g_movingObjects.push_back(info);
-    }
-
-    fclose(file);
-}
-
-size_t PhysicsLib::GetMovingObjectCount()
-{
-    return g_movingObjects.size();
-}
-
-int PhysicsLib::GetMovingObjectId(size_t index)
-{
-    if (index >= g_movingObjects.size())
-    {
-        return -1;
-    }
-    return g_movingObjects[index].physicsId;
-}
-
-D3DXVECTOR3 PhysicsLib::GetMovingObjectStart(size_t index)
-{
-    if (index >= g_movingObjects.size())
-    {
-        return D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    }
-    return g_movingObjects[index].startPos;
-}
-
-D3DXVECTOR3 PhysicsLib::GetMovingObjectEnd(size_t index)
-{
-    if (index >= g_movingObjects.size())
-    {
-        return D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    }
-    return g_movingObjects[index].endPos;
-}
-
-void PhysicsLib::ResetMovingObjects()
-{
-    for (size_t i = 0; i < g_movingObjects.size(); ++i)
-    {
-        const MovingObjectInfo& info = g_movingObjects[i];
-        D3DXVECTOR3 direction = info.endPos - info.startPos;
-        D3DXVec3Normalize(&direction, &direction);
-        PhysicsLib::SetTransform(info.physicsId, info.startPos, info.rotation, info.scale);
-        PhysicsLib::SetVelocity(info.physicsId, direction * info.speed);
-    }
 }
 
 void PhysicsLib::Initialize()

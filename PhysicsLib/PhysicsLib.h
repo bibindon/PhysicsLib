@@ -114,18 +114,6 @@ public:
     // CSV の ID に対応するファイル名を取得する。
     static const TCHAR* GetCsvFileName(int id);
 
-    // 移動体 CSV から MovingSlide オブジェクトを読み込む。
-    static void LoadMoveFromCsv(const TCHAR* csvPath);
-
-    // 移動体オブジェクトの情報を取得する。
-    static size_t GetMovingObjectCount();
-    static int GetMovingObjectId(size_t index);
-    static D3DXVECTOR3 GetMovingObjectStart(size_t index);
-    static D3DXVECTOR3 GetMovingObjectEnd(size_t index);
-
-    // すべての移動体を開始位置にリセットする。
-    static void ResetMovingObjects();
-
     // Xファイルを読み込み、衝突オブジェクトとして登録する。戻り値は登録IDである。
     static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
 

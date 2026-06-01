@@ -64,7 +64,6 @@ PhysicsLib::CameraMover g_cameraMover;
 float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
 float g_cameraDistance = 4.0f;
-size_t g_movingPlatformIndex = 0;
 bool g_prevSpacePressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
@@ -420,14 +419,12 @@ void InitScene()
         else
         {
             g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false });
-            if (_tcsstr(fileName, _T("moving_platform")) != NULL)
-            {
-                g_movingPlatformIndex = g_worldObjects.size() - 1;
-            }
         }
     }
 
     fclose(file);
+
+    PhysicsLib::PhysicsLib::LoadFromCsv(_T("XFileListPhysics.csv"));
 
     ResetPlayer();
 }
@@ -475,43 +472,6 @@ void UpdatePlayer()
     g_prevEscPressed = isEscPressed;
 
     PhysicsLib::PhysicsLib::Update();
-
-    for (size_t i = 0; i < PhysicsLib::PhysicsLib::GetMovingObjectCount(); ++i)
-    {
-        const int id = PhysicsLib::PhysicsLib::GetMovingObjectId(i);
-        const D3DXVECTOR3 startPos = PhysicsLib::PhysicsLib::GetMovingObjectStart(i);
-        const D3DXVECTOR3 endPos = PhysicsLib::PhysicsLib::GetMovingObjectEnd(i);
-        const PhysicsLib::PhysicsLib::Transform transform = PhysicsLib::PhysicsLib::GetTransform(id);
-
-        const D3DXVECTOR3 moveDir = endPos - startPos;
-        const float moveLength = D3DXVec3Length(&moveDir);
-
-        const D3DXVECTOR3 vecFromStart = transform.position - startPos;
-        const float distFromStart = D3DXVec3Length(&vecFromStart);
-        if (distFromStart >= moveLength)
-        {
-            D3DXVECTOR3 backDir = startPos - endPos;
-            D3DXVec3Normalize(&backDir, &backDir);
-            const float currentSpeed = D3DXVec3Length(&transform.velocity);
-            PhysicsLib::PhysicsLib::SetVelocity(id, backDir * currentSpeed);
-        }
-
-        const D3DXVECTOR3 vecFromEnd = transform.position - endPos;
-        const float distFromEnd = D3DXVec3Length(&vecFromEnd);
-        if (distFromEnd >= moveLength)
-        {
-            D3DXVECTOR3 forwardDir = endPos - startPos;
-            D3DXVec3Normalize(&forwardDir, &forwardDir);
-            const float currentSpeed = D3DXVec3Length(&transform.velocity);
-            PhysicsLib::PhysicsLib::SetVelocity(id, forwardDir * currentSpeed);
-        }
-
-        if (g_movingPlatformIndex < g_worldObjects.size())
-        {
-            g_worldObjects[g_movingPlatformIndex].position = transform.position;
-            g_worldObjects[g_movingPlatformIndex].rotation = transform.rotation;
-        }
-    }
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 localInputMove(0.0f, 0.0f, 0.0f);
