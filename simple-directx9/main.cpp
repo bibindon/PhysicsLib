@@ -48,10 +48,9 @@ struct SceneObject
 struct InstanceRenderBatch
 {
     LPD3DXMESH mesh;
-    std::vector<D3DXMATRIX> worldMatrices;
     D3DXCOLOR color;
+    DWORD instanceCount;
     LPDIRECT3DVERTEXBUFFER9 instanceBuffer;
-    size_t instanceBufferCapacity;
     LPDIRECT3DVERTEXDECLARATION9 vertexDeclaration;
 };
 
@@ -108,6 +107,8 @@ static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXCOLOR& color,
                      bool useTexture,
                      DWORD numMaterials = 1);
+static void CreateInstanceRenderResources(InstanceRenderBatch& batch,
+                                          const std::vector<D3DXMATRIX>& worldMatrices);
 static void DrawInstancedMesh(InstanceRenderBatch& batch);
 static void ReleaseInstanceRenderBatches();
 static void Cleanup();
@@ -462,9 +463,10 @@ void InitScene()
                 InstanceRenderBatch batch = {};
                 batch.mesh = mesh;
                 batch.color = matColor;
+                batch.instanceCount = 0;
                 batch.instanceBuffer = NULL;
-                batch.instanceBufferCapacity = 0;
                 batch.vertexDeclaration = NULL;
+                std::vector<D3DXMATRIX> worldMatrices;
 
                 TCHAR instLine[512];
                 _fgetts(instLine, 512, instFile);
@@ -515,11 +517,12 @@ void InitScene()
                     D3DXVECTOR3 instPos(instX, instY, instZ);
                     D3DXVECTOR3 instRot(0.0f, D3DXToRadian(instRotY), 0.0f);
                     D3DXVECTOR3 instScl(instScale, instScale, instScale);
-                    batch.worldMatrices.push_back(BuildWorldMatrix(instPos, instScl, instRot));
+                    worldMatrices.push_back(BuildWorldMatrix(instPos, instScl, instRot));
                 }
                 fclose(instFile);
-                if (!batch.worldMatrices.empty())
+                if (!worldMatrices.empty())
                 {
+                    CreateInstanceRenderResources(batch, worldMatrices);
                     g_instancedObjects.push_back(batch);
                 }
             }
@@ -835,29 +838,24 @@ void DrawMesh(LPD3DXMESH mesh,
     }
 }
 
-void DrawInstancedMesh(InstanceRenderBatch& batch)
+void CreateInstanceRenderResources(InstanceRenderBatch& batch, const std::vector<D3DXMATRIX>& worldMatrices)
 {
-    if (batch.mesh == NULL || batch.worldMatrices.empty())
+    if (batch.mesh == NULL || worldMatrices.empty())
     {
         return;
     }
 
     HRESULT hResult = E_FAIL;
-    const size_t instanceCount = batch.worldMatrices.size();
+    const size_t instanceCount = worldMatrices.size();
+    batch.instanceCount = static_cast<DWORD>(instanceCount);
 
-    if (batch.instanceBuffer == NULL || batch.instanceBufferCapacity < instanceCount)
-    {
-        SAFE_RELEASE(batch.instanceBuffer);
-
-        hResult = g_pd3dDevice->CreateVertexBuffer(static_cast<UINT>(sizeof(D3DXMATRIX) * instanceCount),
-                                                   0,
-                                                   0,
-                                                   D3DPOOL_MANAGED,
-                                                   &batch.instanceBuffer,
-                                                   NULL);
-        assert(hResult == S_OK);
-        batch.instanceBufferCapacity = instanceCount;
-    }
+    hResult = g_pd3dDevice->CreateVertexBuffer(static_cast<UINT>(sizeof(D3DXMATRIX) * instanceCount),
+                                               0,
+                                               0,
+                                               D3DPOOL_MANAGED,
+                                               &batch.instanceBuffer,
+                                               NULL);
+    assert(hResult == S_OK);
 
     D3DXMATRIX* instanceMatrices = NULL;
     hResult = batch.instanceBuffer->Lock(0,
@@ -868,35 +866,42 @@ void DrawInstancedMesh(InstanceRenderBatch& batch)
 
     for (size_t i = 0; i < instanceCount; ++i)
     {
-        instanceMatrices[i] = batch.worldMatrices[i];
+        instanceMatrices[i] = worldMatrices[i];
     }
 
     hResult = batch.instanceBuffer->Unlock();
     assert(hResult == S_OK);
 
-    if (batch.vertexDeclaration == NULL)
+    D3DVERTEXELEMENT9 meshDeclaration[MAX_FVF_DECL_SIZE];
+    hResult = batch.mesh->GetDeclaration(meshDeclaration);
+    assert(hResult == S_OK);
+
+    D3DVERTEXELEMENT9 declaration[MAX_FVF_DECL_SIZE + 5];
+    UINT elementCount = 0;
+    while (meshDeclaration[elementCount].Stream != 0xFF)
     {
-        D3DVERTEXELEMENT9 meshDeclaration[MAX_FVF_DECL_SIZE];
-        hResult = batch.mesh->GetDeclaration(meshDeclaration);
-        assert(hResult == S_OK);
-
-        D3DVERTEXELEMENT9 declaration[MAX_FVF_DECL_SIZE + 5];
-        UINT elementCount = 0;
-        while (meshDeclaration[elementCount].Stream != 0xFF)
-        {
-            declaration[elementCount] = meshDeclaration[elementCount];
-            ++elementCount;
-        }
-
-        declaration[elementCount++] = { 1, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 };
-        declaration[elementCount++] = { 1, 16, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2 };
-        declaration[elementCount++] = { 1, 32, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3 };
-        declaration[elementCount++] = { 1, 48, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4 };
-        declaration[elementCount] = D3DDECL_END();
-
-        hResult = g_pd3dDevice->CreateVertexDeclaration(declaration, &batch.vertexDeclaration);
-        assert(hResult == S_OK);
+        declaration[elementCount] = meshDeclaration[elementCount];
+        ++elementCount;
     }
+
+    declaration[elementCount++] = { 1, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 };
+    declaration[elementCount++] = { 1, 16, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2 };
+    declaration[elementCount++] = { 1, 32, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3 };
+    declaration[elementCount++] = { 1, 48, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4 };
+    declaration[elementCount] = D3DDECL_END();
+
+    hResult = g_pd3dDevice->CreateVertexDeclaration(declaration, &batch.vertexDeclaration);
+    assert(hResult == S_OK);
+}
+
+void DrawInstancedMesh(InstanceRenderBatch& batch)
+{
+    if (batch.mesh == NULL || batch.instanceBuffer == NULL || batch.vertexDeclaration == NULL || batch.instanceCount == 0)
+    {
+        return;
+    }
+
+    HRESULT hResult = E_FAIL;
 
     hResult = g_pEffect->SetVector("g_meshColor", (const D3DXVECTOR4*)&batch.color);
     assert(hResult == S_OK);
@@ -929,7 +934,7 @@ void DrawInstancedMesh(InstanceRenderBatch& batch)
     assert(hResult == S_OK);
     hResult = g_pd3dDevice->SetIndices(indexBuffer);
     assert(hResult == S_OK);
-    hResult = g_pd3dDevice->SetStreamSourceFreq(0, D3DSTREAMSOURCE_INDEXEDDATA | static_cast<UINT>(instanceCount));
+    hResult = g_pd3dDevice->SetStreamSourceFreq(0, D3DSTREAMSOURCE_INDEXEDDATA | batch.instanceCount);
     assert(hResult == S_OK);
     hResult = g_pd3dDevice->SetStreamSourceFreq(1, D3DSTREAMSOURCE_INSTANCEDATA | 1);
     assert(hResult == S_OK);
@@ -961,7 +966,7 @@ void ReleaseInstanceRenderBatches()
     {
         SAFE_RELEASE(g_instancedObjects[i].instanceBuffer);
         SAFE_RELEASE(g_instancedObjects[i].vertexDeclaration);
-        g_instancedObjects[i].instanceBufferCapacity = 0;
+        g_instancedObjects[i].instanceCount = 0;
     }
     g_instancedObjects.clear();
 }
