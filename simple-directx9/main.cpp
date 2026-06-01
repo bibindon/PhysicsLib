@@ -45,6 +45,18 @@ struct SceneObject
     DWORD numMaterials;
 };
 
+struct InstanceRenderBatch
+{
+    LPD3DXMESH mesh;
+    std::vector<D3DXMATRIX> worldMatrices;
+    D3DXCOLOR color;
+    bool useTexture;
+    DWORD numMaterials;
+    LPDIRECT3DVERTEXBUFFER9 instanceBuffer;
+    size_t instanceBufferCapacity;
+    LPDIRECT3DVERTEXDECLARATION9 vertexDeclaration;
+};
+
 LPDIRECT3D9 g_pD3D = NULL;
 LPDIRECT3DDEVICE9 g_pd3dDevice = NULL;
 LPD3DXFONT g_pFont = NULL;
@@ -59,6 +71,7 @@ HWND g_mainWindow = NULL;
 std::vector<LPD3DXMESH> g_ownedSceneMeshes;
 std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
+std::vector<InstanceRenderBatch> g_instancedObjects;
 std::set<size_t> g_collectedItemIds;
 PhysicsLib::CharacterMover g_playerMover(kPlayerStartPosition);
 PhysicsLib::CameraMover g_cameraMover;
@@ -87,6 +100,9 @@ static void ResetPlayer();
 static void UpdatePlayer();
 static void UpdateCamera();
 static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor = NULL, DWORD* outNumMaterials = NULL);
+static D3DXMATRIX BuildWorldMatrix(const D3DXVECTOR3& position,
+                                   const D3DXVECTOR3& scale,
+                                   const D3DXVECTOR3& rotation);
 static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXVECTOR3& position,
                      const D3DXVECTOR3& scale,
@@ -94,6 +110,8 @@ static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXCOLOR& color,
                      bool useTexture,
                      DWORD numMaterials = 1);
+static void DrawInstancedMesh(InstanceRenderBatch& batch);
+static void ReleaseInstanceRenderBatches();
 static void Cleanup();
 static void Render();
 static void OnMouseMove(LPARAM lParam);
@@ -365,6 +383,7 @@ void InitD3D(HWND hWnd)
 
 void InitScene()
 {
+    ReleaseInstanceRenderBatches();
     g_worldObjects.clear();
     g_itemObjects.clear();
     g_collectedItemIds.clear();
@@ -432,6 +451,15 @@ void InitScene()
             int openResult = _tfopen_s(&instFile, csvPath.c_str(), _T("rt"));
             if (openResult == 0 && instFile != NULL)
             {
+                InstanceRenderBatch batch = {};
+                batch.mesh = mesh;
+                batch.color = matColor;
+                batch.useTexture = false;
+                batch.numMaterials = numMaterials;
+                batch.instanceBuffer = NULL;
+                batch.instanceBufferCapacity = 0;
+                batch.vertexDeclaration = NULL;
+
                 TCHAR instLine[512];
                 _fgetts(instLine, 512, instFile);
 
@@ -481,9 +509,13 @@ void InitScene()
                     D3DXVECTOR3 instPos(instX, instY, instZ);
                     D3DXVECTOR3 instRot(0.0f, D3DXToRadian(instRotY), 0.0f);
                     D3DXVECTOR3 instScl(instScale, instScale, instScale);
-                    g_worldObjects.push_back({ mesh, instPos, instScl, instRot, matColor, false, numMaterials });
+                    batch.worldMatrices.push_back(BuildWorldMatrix(instPos, instScl, instRot));
                 }
                 fclose(instFile);
+                if (!batch.worldMatrices.empty())
+                {
+                    g_instancedObjects.push_back(batch);
+                }
             }
             else
             {
@@ -718,6 +750,25 @@ LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor, DWORD* out
     return mesh;
 }
 
+D3DXMATRIX BuildWorldMatrix(const D3DXVECTOR3& position,
+                            const D3DXVECTOR3& scale,
+                            const D3DXVECTOR3& rotation)
+{
+    D3DXMATRIX matScale;
+    D3DXMATRIX matRotationX;
+    D3DXMATRIX matRotationY;
+    D3DXMATRIX matRotationZ;
+    D3DXMATRIX matTranslation;
+
+    D3DXMatrixScaling(&matScale, scale.x, scale.y, scale.z);
+    D3DXMatrixRotationX(&matRotationX, rotation.x);
+    D3DXMatrixRotationY(&matRotationY, rotation.y);
+    D3DXMatrixRotationZ(&matRotationZ, rotation.z);
+    D3DXMatrixTranslation(&matTranslation, position.x, position.y, position.z);
+
+    return matScale * matRotationX * matRotationY * matRotationZ * matTranslation;
+}
+
 void DrawMesh(LPD3DXMESH mesh,
               const D3DXVECTOR3& position,
               const D3DXVECTOR3& scale,
@@ -728,22 +779,9 @@ void DrawMesh(LPD3DXMESH mesh,
 {
     HRESULT hResult = E_FAIL;
 
-    D3DXMATRIX matScale;
-    D3DXMATRIX matRotationX;
-    D3DXMATRIX matRotationY;
-    D3DXMATRIX matRotationZ;
-    D3DXMATRIX matTranslation;
-    D3DXMATRIX matWorld;
     D3DXMATRIX matWorldViewProj;
 
-    D3DXMatrixScaling(&matScale, scale.x, scale.y, scale.z);
-    D3DXMatrixRotationX(&matRotationX, rotation.x);
-    D3DXMatrixRotationY(&matRotationY, rotation.y);
-    D3DXMatrixRotationZ(&matRotationZ, rotation.z);
-    D3DXMatrixTranslation(&matTranslation, position.x, position.y, position.z);
-
-    matWorld = matScale * matRotationX * matRotationY * matRotationZ * matTranslation;
-
+    const D3DXMATRIX matWorld = BuildWorldMatrix(position, scale, rotation);
     matWorldViewProj = matWorld * g_cameraView * g_cameraProjection;
 
     hResult = g_pEffect->SetMatrix("g_matWorldViewProj", &matWorldViewProj);
@@ -790,6 +828,147 @@ void DrawMesh(LPD3DXMESH mesh,
     }
 }
 
+void DrawInstancedMesh(InstanceRenderBatch& batch)
+{
+    if (batch.mesh == NULL || batch.worldMatrices.empty())
+    {
+        return;
+    }
+
+    HRESULT hResult = E_FAIL;
+    const size_t instanceCount = batch.worldMatrices.size();
+
+    if (batch.instanceBuffer == NULL || batch.instanceBufferCapacity < instanceCount)
+    {
+        SAFE_RELEASE(batch.instanceBuffer);
+
+        hResult = g_pd3dDevice->CreateVertexBuffer(static_cast<UINT>(sizeof(D3DXMATRIX) * instanceCount),
+                                                   D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
+                                                   0,
+                                                   D3DPOOL_DEFAULT,
+                                                   &batch.instanceBuffer,
+                                                   NULL);
+        assert(hResult == S_OK);
+        batch.instanceBufferCapacity = instanceCount;
+    }
+
+    D3DXMATRIX* instanceMatrices = NULL;
+    hResult = batch.instanceBuffer->Lock(0,
+                                         static_cast<UINT>(sizeof(D3DXMATRIX) * instanceCount),
+                                         reinterpret_cast<void**>(&instanceMatrices),
+                                         D3DLOCK_DISCARD);
+    assert(hResult == S_OK);
+
+    for (size_t i = 0; i < instanceCount; ++i)
+    {
+        instanceMatrices[i] = batch.worldMatrices[i] * g_cameraView * g_cameraProjection;
+    }
+
+    hResult = batch.instanceBuffer->Unlock();
+    assert(hResult == S_OK);
+
+    if (batch.vertexDeclaration == NULL)
+    {
+        D3DVERTEXELEMENT9 meshDeclaration[MAX_FVF_DECL_SIZE];
+        hResult = batch.mesh->GetDeclaration(meshDeclaration);
+        assert(hResult == S_OK);
+
+        D3DVERTEXELEMENT9 declaration[MAX_FVF_DECL_SIZE + 5];
+        UINT elementCount = 0;
+        while (meshDeclaration[elementCount].Stream != 0xFF)
+        {
+            declaration[elementCount] = meshDeclaration[elementCount];
+            ++elementCount;
+        }
+
+        declaration[elementCount++] = { 1, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 };
+        declaration[elementCount++] = { 1, 16, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2 };
+        declaration[elementCount++] = { 1, 32, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3 };
+        declaration[elementCount++] = { 1, 48, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4 };
+        declaration[elementCount] = D3DDECL_END();
+
+        hResult = g_pd3dDevice->CreateVertexDeclaration(declaration, &batch.vertexDeclaration);
+        assert(hResult == S_OK);
+    }
+
+    hResult = g_pEffect->SetVector("g_meshColor", (const D3DXVECTOR4*)&batch.color);
+    assert(hResult == S_OK);
+
+    float useTextureValue = 0.0f;
+    if (batch.useTexture)
+    {
+        useTextureValue = 1.0f;
+    }
+    hResult = g_pEffect->SetFloat("g_useTexture", useTextureValue);
+    assert(hResult == S_OK);
+
+    hResult = g_pEffect->SetTexture("texture1", NULL);
+    assert(hResult == S_OK);
+
+    hResult = g_pEffect->CommitChanges();
+    assert(hResult == S_OK);
+
+    LPDIRECT3DVERTEXBUFFER9 vertexBuffer = NULL;
+    LPDIRECT3DINDEXBUFFER9 indexBuffer = NULL;
+    hResult = batch.mesh->GetVertexBuffer(&vertexBuffer);
+    assert(hResult == S_OK);
+    hResult = batch.mesh->GetIndexBuffer(&indexBuffer);
+    assert(hResult == S_OK);
+
+    hResult = g_pd3dDevice->SetVertexDeclaration(batch.vertexDeclaration);
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetStreamSource(0, vertexBuffer, 0, batch.mesh->GetNumBytesPerVertex());
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetStreamSource(1, batch.instanceBuffer, 0, sizeof(D3DXMATRIX));
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetIndices(indexBuffer);
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetStreamSourceFreq(0, D3DSTREAMSOURCE_INDEXEDDATA | static_cast<UINT>(instanceCount));
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetStreamSourceFreq(1, D3DSTREAMSOURCE_INSTANCEDATA | 1);
+    assert(hResult == S_OK);
+
+    std::vector<D3DXATTRIBUTERANGE> attributeTable(batch.numMaterials);
+    DWORD attributeCount = batch.numMaterials;
+    hResult = batch.mesh->GetAttributeTable(attributeTable.data(), &attributeCount);
+    assert(hResult == S_OK);
+
+    for (DWORD i = 0; i < attributeCount; ++i)
+    {
+        const D3DXATTRIBUTERANGE& range = attributeTable[i];
+        hResult = g_pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
+                                                     0,
+                                                     range.VertexStart,
+                                                     range.VertexCount,
+                                                     range.FaceStart * 3,
+                                                     range.FaceCount);
+        assert(hResult == S_OK);
+    }
+
+    hResult = g_pd3dDevice->SetStreamSourceFreq(0, 1);
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetStreamSourceFreq(1, 1);
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetStreamSource(1, NULL, 0, 0);
+    assert(hResult == S_OK);
+    hResult = g_pd3dDevice->SetIndices(NULL);
+    assert(hResult == S_OK);
+
+    SAFE_RELEASE(indexBuffer);
+    SAFE_RELEASE(vertexBuffer);
+}
+
+void ReleaseInstanceRenderBatches()
+{
+    for (size_t i = 0; i < g_instancedObjects.size(); ++i)
+    {
+        SAFE_RELEASE(g_instancedObjects[i].instanceBuffer);
+        SAFE_RELEASE(g_instancedObjects[i].vertexDeclaration);
+        g_instancedObjects[i].instanceBufferCapacity = 0;
+    }
+    g_instancedObjects.clear();
+}
+
 void Cleanup()
 {
     for (auto& texture : g_pTextures)
@@ -798,6 +977,7 @@ void Cleanup()
     }
 
     PhysicsLib::PhysicsLib::Finalize();
+    ReleaseInstanceRenderBatches();
     for (size_t i = 0; i < g_ownedSceneMeshes.size(); ++i)
     {
         SAFE_RELEASE(g_ownedSceneMeshes[i]);
@@ -962,6 +1142,29 @@ void Render()
 
     hResult = g_pEffect->End();
     assert(hResult == S_OK);
+
+    if (!g_instancedObjects.empty())
+    {
+        hResult = g_pEffect->SetTechnique("TechniqueInstanced");
+        assert(hResult == S_OK);
+
+        hResult = g_pEffect->Begin(&numPass, 0);
+        assert(hResult == S_OK);
+
+        hResult = g_pEffect->BeginPass(0);
+        assert(hResult == S_OK);
+
+        for (size_t i = 0; i < g_instancedObjects.size(); ++i)
+        {
+            DrawInstancedMesh(g_instancedObjects[i]);
+        }
+
+        hResult = g_pEffect->EndPass();
+        assert(hResult == S_OK);
+
+        hResult = g_pEffect->End();
+        assert(hResult == S_OK);
+    }
 
     hResult = g_pd3dDevice->EndScene();
     assert(hResult == S_OK);

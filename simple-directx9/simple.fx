@@ -29,6 +29,32 @@ void VertexShader1(in  float4 inPosition  : POSITION,
     outTexCood = inTexCood;
 }
 
+void VertexShaderInstanced(in  float4 inPosition    : POSITION,
+                           in  float4 inNormal      : NORMAL0,
+                           in  float4 inTexCood     : TEXCOORD0,
+                           in  float4 inMatrixRow0  : TEXCOORD1,
+                           in  float4 inMatrixRow1  : TEXCOORD2,
+                           in  float4 inMatrixRow2  : TEXCOORD3,
+                           in  float4 inMatrixRow3  : TEXCOORD4,
+
+                           out float4 outPosition   : POSITION,
+                           out float4 outDiffuse    : COLOR0,
+                           out float4 outTexCood    : TEXCOORD0)
+{
+    float4x4 instancedWorldViewProj = float4x4(inMatrixRow0,
+                                               inMatrixRow1,
+                                               inMatrixRow2,
+                                               inMatrixRow3);
+    outPosition = mul(inPosition, instancedWorldViewProj);
+
+    float lightIntensity = dot(inNormal, g_lightNormal);
+    outDiffuse.rgb = max(0, lightIntensity);
+    outDiffuse.rgb += 0.3f;
+    outDiffuse.a = 1.0f;
+
+    outTexCood = inTexCood;
+}
+
 void PixelShader1(in float4 inScreenColor : COLOR0,
                   in float2 inTexCood     : TEXCOORD0,
 
@@ -49,6 +75,15 @@ technique Technique1
    pass Pass1
    {
       VertexShader = compile vs_2_0 VertexShader1();
+      PixelShader = compile ps_2_0 PixelShader1();
+   }
+}
+
+technique TechniqueInstanced
+{
+   pass Pass1
+   {
+      VertexShader = compile vs_3_0 VertexShaderInstanced();
       PixelShader = compile ps_2_0 PixelShader1();
    }
 }
