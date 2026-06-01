@@ -48,12 +48,7 @@ void VertexShaderInstanced(in  float4 inPosition    : POSITION,
     worldPosition.w = dot(inPosition, float4(inMatrixRow0.w, inMatrixRow1.w, inMatrixRow2.w, inMatrixRow3.w));
     outPosition = mul(worldPosition, g_matWorldViewProj);
 
-    float3 worldNormal;
-    worldNormal.x = dot(inNormal.xyz, float3(inMatrixRow0.x, inMatrixRow1.x, inMatrixRow2.x));
-    worldNormal.y = dot(inNormal.xyz, float3(inMatrixRow0.y, inMatrixRow1.y, inMatrixRow2.y));
-    worldNormal.z = dot(inNormal.xyz, float3(inMatrixRow0.z, inMatrixRow1.z, inMatrixRow2.z));
-
-    float lightIntensity = dot(normalize(worldNormal), normalize(g_lightNormal.xyz));
+    float lightIntensity = dot(inNormal, g_lightNormal);
     outDiffuse.rgb = max(0, lightIntensity);
     outDiffuse.rgb += 0.3f;
     outDiffuse.a = 1.0f;
