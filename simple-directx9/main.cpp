@@ -417,7 +417,80 @@ void InitScene()
         DWORD numMaterials = 1;
         LPD3DXMESH mesh = LoadSceneMeshFromX(fileName, &matColor, &numMaterials);
 
-        if (_tcsstr(fileName, _T("item_sphere")) != NULL)
+        if (_tcsstr(fileName, _T("Instancing")) != NULL)
+        {
+            TCHAR csvFileName[512];
+            _tcscpy_s(csvFileName, fileName);
+            TCHAR* lastDot = _tcsrchr(csvFileName, _T('.'));
+            if (lastDot != NULL)
+            {
+                _tcscpy_s(lastDot, 512 - static_cast<size_t>(lastDot - csvFileName), _T(".csv"));
+            }
+
+            std::basic_string<TCHAR> csvPath = ResolveAssetPath(csvFileName);
+            FILE* instFile = NULL;
+            int openResult = _tfopen_s(&instFile, csvPath.c_str(), _T("rt"));
+            if (openResult == 0 && instFile != NULL)
+            {
+                TCHAR instLine[512];
+                _fgetts(instLine, 512, instFile);
+
+                while (_fgetts(instLine, 512, instFile) != NULL)
+                {
+                    if (instLine[0] == _T('#'))
+                    {
+                        continue;
+                    }
+
+                    TCHAR* ctx = NULL;
+                    TCHAR* t = _tcstok_s(instLine, _T(",\n"), &ctx);
+                    if (t == NULL)
+                    {
+                        continue;
+                    }
+                    float instX = static_cast<float>(_tstof(t));
+
+                    t = _tcstok_s(NULL, _T(",\n"), &ctx);
+                    if (t == NULL)
+                    {
+                        continue;
+                    }
+                    float instY = static_cast<float>(_tstof(t));
+
+                    t = _tcstok_s(NULL, _T(",\n"), &ctx);
+                    if (t == NULL)
+                    {
+                        continue;
+                    }
+                    float instZ = static_cast<float>(_tstof(t));
+
+                    t = _tcstok_s(NULL, _T(",\n"), &ctx);
+                    if (t == NULL)
+                    {
+                        continue;
+                    }
+                    float instRotY = static_cast<float>(_tstof(t));
+
+                    t = _tcstok_s(NULL, _T(",\n"), &ctx);
+                    if (t == NULL)
+                    {
+                        continue;
+                    }
+                    float instScale = static_cast<float>(_tstof(t));
+
+                    D3DXVECTOR3 instPos(instX, instY, instZ);
+                    D3DXVECTOR3 instRot(0.0f, D3DXToRadian(instRotY), 0.0f);
+                    D3DXVECTOR3 instScl(instScale, instScale, instScale);
+                    g_worldObjects.push_back({ mesh, instPos, instScl, instRot, matColor, false, numMaterials });
+                }
+                fclose(instFile);
+            }
+            else
+            {
+                g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false, numMaterials });
+            }
+        }
+        else if (_tcsstr(fileName, _T("item_sphere")) != NULL)
         {
             g_itemObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false, numMaterials });
         }
