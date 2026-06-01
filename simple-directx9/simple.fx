@@ -41,11 +41,10 @@ void VertexShaderInstanced(in  float4 inPosition    : POSITION,
                            out float4 outDiffuse    : COLOR0,
                            out float4 outTexCood    : TEXCOORD0)
 {
-    float4x4 instancedWorldViewProj = float4x4(inMatrixRow0,
-                                               inMatrixRow1,
-                                               inMatrixRow2,
-                                               inMatrixRow3);
-    outPosition = mul(inPosition, instancedWorldViewProj);
+    outPosition.x = dot(inPosition, float4(inMatrixRow0.x, inMatrixRow1.x, inMatrixRow2.x, inMatrixRow3.x));
+    outPosition.y = dot(inPosition, float4(inMatrixRow0.y, inMatrixRow1.y, inMatrixRow2.y, inMatrixRow3.y));
+    outPosition.z = dot(inPosition, float4(inMatrixRow0.z, inMatrixRow1.z, inMatrixRow2.z, inMatrixRow3.z));
+    outPosition.w = dot(inPosition, float4(inMatrixRow0.w, inMatrixRow1.w, inMatrixRow2.w, inMatrixRow3.w));
 
     float lightIntensity = dot(inNormal, g_lightNormal);
     outDiffuse.rgb = max(0, lightIntensity);
