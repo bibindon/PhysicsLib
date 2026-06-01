@@ -41,12 +41,19 @@ void VertexShaderInstanced(in  float4 inPosition    : POSITION,
                            out float4 outDiffuse    : COLOR0,
                            out float4 outTexCood    : TEXCOORD0)
 {
-    outPosition.x = dot(inPosition, float4(inMatrixRow0.x, inMatrixRow1.x, inMatrixRow2.x, inMatrixRow3.x));
-    outPosition.y = dot(inPosition, float4(inMatrixRow0.y, inMatrixRow1.y, inMatrixRow2.y, inMatrixRow3.y));
-    outPosition.z = dot(inPosition, float4(inMatrixRow0.z, inMatrixRow1.z, inMatrixRow2.z, inMatrixRow3.z));
-    outPosition.w = dot(inPosition, float4(inMatrixRow0.w, inMatrixRow1.w, inMatrixRow2.w, inMatrixRow3.w));
+    float4 worldPosition;
+    worldPosition.x = dot(inPosition, float4(inMatrixRow0.x, inMatrixRow1.x, inMatrixRow2.x, inMatrixRow3.x));
+    worldPosition.y = dot(inPosition, float4(inMatrixRow0.y, inMatrixRow1.y, inMatrixRow2.y, inMatrixRow3.y));
+    worldPosition.z = dot(inPosition, float4(inMatrixRow0.z, inMatrixRow1.z, inMatrixRow2.z, inMatrixRow3.z));
+    worldPosition.w = dot(inPosition, float4(inMatrixRow0.w, inMatrixRow1.w, inMatrixRow2.w, inMatrixRow3.w));
+    outPosition = mul(worldPosition, g_matWorldViewProj);
 
-    float lightIntensity = dot(inNormal, g_lightNormal);
+    float3 worldNormal;
+    worldNormal.x = dot(inNormal.xyz, float3(inMatrixRow0.x, inMatrixRow1.x, inMatrixRow2.x));
+    worldNormal.y = dot(inNormal.xyz, float3(inMatrixRow0.y, inMatrixRow1.y, inMatrixRow2.y));
+    worldNormal.z = dot(inNormal.xyz, float3(inMatrixRow0.z, inMatrixRow1.z, inMatrixRow2.z));
+
+    float lightIntensity = dot(normalize(worldNormal), normalize(g_lightNormal.xyz));
     outDiffuse.rgb = max(0, lightIntensity);
     outDiffuse.rgb += 0.3f;
     outDiffuse.a = 1.0f;
@@ -83,6 +90,6 @@ technique TechniqueInstanced
    pass Pass1
    {
       VertexShader = compile vs_3_0 VertexShaderInstanced();
-      PixelShader = compile ps_2_0 PixelShader1();
+      PixelShader = compile ps_3_0 PixelShader1();
    }
 }
