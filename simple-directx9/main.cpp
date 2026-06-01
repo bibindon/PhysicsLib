@@ -468,6 +468,14 @@ void InitScene()
                 batch.vertexDeclaration = NULL;
                 std::vector<D3DXMATRIX> worldMatrices;
 
+                D3DXMATRIX baseScaleMatrix;
+                D3DXMATRIX baseRotationMatrix;
+                D3DXMATRIX baseTranslationMatrix;
+                D3DXMatrixScaling(&baseScaleMatrix, scaleVec.x, scaleVec.y, scaleVec.z);
+                D3DXMatrixRotationYawPitchRoll(&baseRotationMatrix, rotation.y, rotation.x, rotation.z);
+                D3DXMatrixTranslation(&baseTranslationMatrix, position.x, position.y, position.z);
+                const D3DXMATRIX baseMatrix = baseScaleMatrix * baseRotationMatrix * baseTranslationMatrix;
+
                 TCHAR instLine[512];
                 _fgetts(instLine, 512, instFile);
 
@@ -514,10 +522,13 @@ void InitScene()
                     }
                     float instScale = static_cast<float>(_tstof(t));
 
-                    D3DXVECTOR3 instPos(instX, instY, instZ);
-                    D3DXVECTOR3 instRot(0.0f, D3DXToRadian(instRotY), 0.0f);
-                    D3DXVECTOR3 instScl(instScale, instScale, instScale);
-                    worldMatrices.push_back(BuildWorldMatrix(instPos, instScl, instRot));
+                    D3DXVECTOR3 localPos(instX, instY, instZ);
+                    D3DXVECTOR3 worldPos;
+                    D3DXVec3TransformCoord(&worldPos, &localPos, &baseMatrix);
+
+                    D3DXVECTOR3 worldRot(rotation.x, rotation.y + D3DXToRadian(instRotY), rotation.z);
+                    D3DXVECTOR3 worldScl(scaleVec.x * instScale, scaleVec.y * instScale, scaleVec.z * instScale);
+                    worldMatrices.push_back(BuildWorldMatrix(worldPos, worldScl, worldRot));
                 }
                 fclose(instFile);
                 if (!worldMatrices.empty())
