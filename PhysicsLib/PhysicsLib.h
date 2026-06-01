@@ -114,6 +114,12 @@ public:
     // CSV の ID に対応するファイル名を取得する。
     static const TCHAR* GetCsvFileName(int id);
 
+    // CSV の ID に対応する物理オブジェクトの Transform を更新する。
+    static void UpdateCsvTransform(int csvId,
+                                   const D3DXVECTOR3& position,
+                                   const D3DXVECTOR3& rotation,
+                                   const D3DXVECTOR3& scale);
+
     // Xファイルを読み込み、衝突オブジェクトとして登録する。戻り値は登録IDである。
     static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
 

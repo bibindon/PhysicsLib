@@ -1274,6 +1274,18 @@ const TCHAR* PhysicsLib::GetCsvFileName(int id)
     return NULL;
 }
 
+void PhysicsLib::UpdateCsvTransform(int csvId,
+                                    const D3DXVECTOR3& position,
+                                    const D3DXVECTOR3& rotation,
+                                    const D3DXVECTOR3& scale)
+{
+    std::map<int, int>::const_iterator it = g_csvObjectIds.find(csvId);
+    if (it != g_csvObjectIds.end())
+    {
+        PhysicsLib::SetTransform(it->second, position, rotation, scale);
+    }
+}
+
 void PhysicsLib::Initialize()
 {
     if (g_initialized)
