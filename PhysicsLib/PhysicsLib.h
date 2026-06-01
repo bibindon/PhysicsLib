@@ -114,6 +114,9 @@ public:
     // CSV の ID に対応するファイル名を取得する。
     static const TCHAR* GetCsvFileName(int id);
 
+    // CSV の ID に対応する物理オブジェクト ID を取得する。
+    static int GetCsvObjectId(int csvId);
+
     // CSV の ID に対応する物理オブジェクトの Transform を更新する。
     static void UpdateCsvTransform(int csvId,
                                    const D3DXVECTOR3& position,

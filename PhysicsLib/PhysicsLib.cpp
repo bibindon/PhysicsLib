@@ -74,6 +74,7 @@ float g_dashSpeed = 18.0f;
 
 std::map<int, std::basic_string<TCHAR> > g_csvFileNames;
 std::map<int, int> g_csvObjectIds;
+std::map<int, D3DXVECTOR3> g_csvPrevPositions;
 
 SimpleObject* FindSimpleObjectById(int id)
 {
@@ -1251,6 +1252,12 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
             objectType = PhysicsLib::ObjectType::PassThrough;
         }
 
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token != NULL && (token[0] == _T('y') || token[0] == _T('Y')))
+        {
+            objectType = PhysicsLib::ObjectType::MovingSlide;
+        }
+
         const int id = PhysicsLib::Load(fileName, objectType, 0.0f);
         PhysicsLib::SetTransform(id,
                                  D3DXVECTOR3(posX, posY, posZ),
@@ -1274,6 +1281,16 @@ const TCHAR* PhysicsLib::GetCsvFileName(int id)
     return NULL;
 }
 
+int PhysicsLib::GetCsvObjectId(int csvId)
+{
+    std::map<int, int>::const_iterator it = g_csvObjectIds.find(csvId);
+    if (it != g_csvObjectIds.end())
+    {
+        return it->second;
+    }
+    return -1;
+}
+
 void PhysicsLib::UpdateCsvTransform(int csvId,
                                     const D3DXVECTOR3& position,
                                     const D3DXVECTOR3& rotation,
@@ -1282,7 +1299,17 @@ void PhysicsLib::UpdateCsvTransform(int csvId,
     std::map<int, int>::const_iterator it = g_csvObjectIds.find(csvId);
     if (it != g_csvObjectIds.end())
     {
-        PhysicsLib::SetTransform(it->second, position, rotation, scale);
+        const int id = it->second;
+        PhysicsLib::SetTransform(id, position, rotation, scale);
+
+        std::map<int, D3DXVECTOR3>::const_iterator prevIt = g_csvPrevPositions.find(csvId);
+        if (prevIt != g_csvPrevPositions.end())
+        {
+            const D3DXVECTOR3 delta = position - prevIt->second;
+            const D3DXVECTOR3 velocity = delta * 60.0f;
+            PhysicsLib::SetVelocity(id, velocity);
+        }
+        g_csvPrevPositions[csvId] = position;
     }
 }
 
