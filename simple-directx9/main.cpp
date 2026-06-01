@@ -42,6 +42,7 @@ struct SceneObject
     D3DXVECTOR3 rotation;
     D3DXCOLOR color;
     bool useTexture;
+    DWORD numMaterials;
 };
 
 LPDIRECT3D9 g_pD3D = NULL;
@@ -85,13 +86,14 @@ static void InitScene();
 static void ResetPlayer();
 static void UpdatePlayer();
 static void UpdateCamera();
-static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor = NULL);
+static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor = NULL, DWORD* outNumMaterials = NULL);
 static void DrawMesh(LPD3DXMESH mesh,
                      const D3DXVECTOR3& position,
                      const D3DXVECTOR3& scale,
                      const D3DXVECTOR3& rotation,
                      const D3DXCOLOR& color,
-                     bool useTexture);
+                     bool useTexture,
+                     DWORD numMaterials = 1);
 static void Cleanup();
 static void Render();
 static void OnMouseMove(LPARAM lParam);
@@ -412,15 +414,16 @@ void InitScene()
         const D3DXVECTOR3 scaleVec(scale, scale, scale);
 
         D3DXCOLOR matColor(1.0f, 1.0f, 1.0f, 1.0f);
-        LPD3DXMESH mesh = LoadSceneMeshFromX(fileName, &matColor);
+        DWORD numMaterials = 1;
+        LPD3DXMESH mesh = LoadSceneMeshFromX(fileName, &matColor, &numMaterials);
 
         if (_tcsstr(fileName, _T("item_sphere")) != NULL)
         {
-            g_itemObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false });
+            g_itemObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false, numMaterials });
         }
         else
         {
-            g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false });
+            g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false, numMaterials });
             if (_tcsstr(fileName, _T("moving_platform")) != NULL)
             {
                 g_movingPlatformIndex = g_worldObjects.size() - 1;
@@ -605,23 +608,27 @@ void UpdateCamera()
                                1000.0f);
 }
 
-LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor)
+LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor, DWORD* outNumMaterials)
 {
     LPD3DXMESH mesh = NULL;
     LPD3DXBUFFER materialBuffer = NULL;
+    DWORD numMaterials = 0;
     HRESULT hResult = D3DXLoadMeshFromX(path,
                                         D3DXMESH_SYSTEMMEM,
                                         g_pd3dDevice,
                                         NULL,
                                         &materialBuffer,
                                         NULL,
-                                        NULL,
+                                        &numMaterials,
                                         &mesh);
     assert(hResult == S_OK);
+    if (outNumMaterials != NULL)
+    {
+        *outNumMaterials = numMaterials;
+    }
     if (outColor != NULL && materialBuffer != NULL)
     {
         const D3DXMATERIAL* materials = static_cast<const D3DXMATERIAL*>(materialBuffer->GetBufferPointer());
-        const DWORD numMaterials = materialBuffer->GetBufferSize() / sizeof(D3DXMATERIAL);
         if (numMaterials > 0)
         {
             outColor->r = materials[0].MatD3D.Diffuse.r;
@@ -643,7 +650,8 @@ void DrawMesh(LPD3DXMESH mesh,
               const D3DXVECTOR3& scale,
               const D3DXVECTOR3& rotation,
               const D3DXCOLOR& color,
-              bool useTexture)
+              bool useTexture,
+              DWORD numMaterials)
 {
     HRESULT hResult = E_FAIL;
 
@@ -701,8 +709,11 @@ void DrawMesh(LPD3DXMESH mesh,
         hResult = g_pEffect->CommitChanges();
         assert(hResult == S_OK);
 
-        hResult = mesh->DrawSubset(0);
-        assert(hResult == S_OK);
+        for (DWORD i = 0; i < numMaterials; i++)
+        {
+            hResult = mesh->DrawSubset(i);
+            assert(hResult == S_OK);
+        }
     }
 }
 
@@ -845,7 +856,8 @@ void Render()
                  g_worldObjects[i].scale,
                  g_worldObjects[i].rotation,
                  g_worldObjects[i].color,
-                 g_worldObjects[i].useTexture);
+                 g_worldObjects[i].useTexture,
+                 g_worldObjects[i].numMaterials);
     }
 
     for (size_t i = 0; i < g_itemObjects.size(); i++)
@@ -860,7 +872,8 @@ void Render()
                  g_itemObjects[i].scale,
                  g_itemObjects[i].rotation,
                  g_itemObjects[i].color,
-                 g_itemObjects[i].useTexture);
+                 g_itemObjects[i].useTexture,
+                 g_itemObjects[i].numMaterials);
     }
 
     DrawMesh(g_pCubeMesh,
@@ -868,7 +881,8 @@ void Render()
              D3DXVECTOR3(1.0f, 1.0f, 1.0f),
              D3DXVECTOR3(0.0f, g_playerYaw, 0.0f),
              D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f),
-             true);
+             true,
+             g_dwNumMaterials);
 
     hResult = g_pEffect->EndPass();
     assert(hResult == S_OK);
