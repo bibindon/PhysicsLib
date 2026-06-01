@@ -384,7 +384,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                        340,
-                                       960,
+                                       1000,
                                       ownerWindow,
                                       NULL,
                                       instance,
