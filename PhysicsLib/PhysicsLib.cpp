@@ -77,6 +77,9 @@ struct MovingObjectInfo
     int physicsId;
     D3DXVECTOR3 startPos;
     D3DXVECTOR3 endPos;
+    D3DXVECTOR3 rotation;
+    D3DXVECTOR3 scale;
+    float speed;
 };
 std::vector<MovingObjectInfo> g_movingObjects;
 
@@ -1389,6 +1392,9 @@ void PhysicsLib::LoadMoveFromCsv(const TCHAR* csvPath)
         info.physicsId = id;
         info.startPos = startPos;
         info.endPos = endPos;
+        info.rotation = D3DXVECTOR3(D3DXToRadian(rotX), D3DXToRadian(rotY), D3DXToRadian(rotZ));
+        info.scale = D3DXVECTOR3(scale, scale, scale);
+        info.speed = speed;
         g_movingObjects.push_back(info);
     }
 
@@ -1425,6 +1431,18 @@ D3DXVECTOR3 PhysicsLib::GetMovingObjectEnd(size_t index)
         return D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     }
     return g_movingObjects[index].endPos;
+}
+
+void PhysicsLib::ResetMovingObjects()
+{
+    for (size_t i = 0; i < g_movingObjects.size(); ++i)
+    {
+        const MovingObjectInfo& info = g_movingObjects[i];
+        D3DXVECTOR3 direction = info.endPos - info.startPos;
+        D3DXVec3Normalize(&direction, &direction);
+        PhysicsLib::SetTransform(info.physicsId, info.startPos, info.rotation, info.scale);
+        PhysicsLib::SetVelocity(info.physicsId, direction * info.speed);
+    }
 }
 
 void PhysicsLib::Initialize()

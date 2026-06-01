@@ -28,6 +28,7 @@ const int kCameraAutoMoveCheckboxId = kSettingsCheckboxStartId + 12;
 const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
 const int kSettingsResetButtonId = 4200;
 const int kFileLoadButtonId = 4210;
+const int kResetMovingButtonId = 4211;
 const int kShapeTypeComboBoxId = 4300;
 const int kRadiusEditBoxId = 4400;
 const int kCylinderRadiusEditBoxId = 4401;
@@ -99,6 +100,12 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
                 _tcscat_s(movePath, _T("XFileListMove.csv"));
                 PhysicsLib::LoadMoveFromCsv(movePath);
             }
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kResetMovingButtonId && HIWORD(wParam) == BN_CLICKED)
+        {
+            PhysicsLib::ResetMovingObjects();
             return 0;
         }
 
@@ -377,7 +384,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                        340,
-                                       920,
+                                       960,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -893,6 +900,18 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  32,
                  g_settingsDialog,
                  reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFileLoadButtonId)),
+                 instance,
+                 NULL);
+
+    CreateWindow(_T("BUTTON"),
+                 _T("移動体リセット"),
+                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                 16,
+                 890,
+                 130,
+                 32,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kResetMovingButtonId)),
                  instance,
                  NULL);
 }

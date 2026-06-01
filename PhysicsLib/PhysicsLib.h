@@ -123,6 +123,9 @@ public:
     static D3DXVECTOR3 GetMovingObjectStart(size_t index);
     static D3DXVECTOR3 GetMovingObjectEnd(size_t index);
 
+    // すべての移動体を開始位置にリセットする。
+    static void ResetMovingObjects();
+
     // Xファイルを読み込み、衝突オブジェクトとして登録する。戻り値は登録IDである。
     static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
 
