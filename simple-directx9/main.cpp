@@ -64,6 +64,8 @@ PhysicsLib::CameraMover g_cameraMover;
 float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
 float g_cameraDistance = 4.0f;
+size_t g_movingPlatformIndex = 0;
+bool g_movingPlatformForward = true;
 bool g_prevSpacePressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
@@ -419,12 +421,14 @@ void InitScene()
         else
         {
             g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false });
+            if (_tcsstr(fileName, _T("moving_platform")) != NULL)
+            {
+                g_movingPlatformIndex = g_worldObjects.size() - 1;
+            }
         }
     }
 
     fclose(file);
-
-    PhysicsLib::PhysicsLib::LoadFromCsv(_T("XFileListPhysics.csv"));
 
     ResetPlayer();
 }
@@ -472,6 +476,32 @@ void UpdatePlayer()
     g_prevEscPressed = isEscPressed;
 
     PhysicsLib::PhysicsLib::Update();
+
+    if (g_movingPlatformIndex < g_worldObjects.size())
+    {
+        const float kPlatformSpeed = 1.5f;
+        const float kPlatformMinX = -4.0f;
+        const float kPlatformMaxX = 4.0f;
+        float& platformX = g_worldObjects[g_movingPlatformIndex].position.x;
+        if (g_movingPlatformForward)
+        {
+            platformX += kPlatformSpeed * (1.0f / 60.0f);
+            if (platformX >= kPlatformMaxX)
+            {
+                platformX = kPlatformMaxX;
+                g_movingPlatformForward = false;
+            }
+        }
+        else
+        {
+            platformX -= kPlatformSpeed * (1.0f / 60.0f);
+            if (platformX <= kPlatformMinX)
+            {
+                platformX = kPlatformMinX;
+                g_movingPlatformForward = true;
+            }
+        }
+    }
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 localInputMove(0.0f, 0.0f, 0.0f);
