@@ -27,6 +27,7 @@ const int kSlideCheckCheckboxId = kSettingsCheckboxStartId + 11;
 const int kCameraAutoMoveCheckboxId = kSettingsCheckboxStartId + 12;
 const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
 const int kChargeJumpCheckboxId = 4412;
+const int kLandingStiffnessCheckboxId = 4413;
 const int kSettingsResetButtonId = 4200;
 const int kFileLoadButtonId = 4210;
 const int kShapeTypeComboBoxId = 4300;
@@ -181,6 +182,13 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
             SettingsState::SetChargeJumpEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kLandingStiffnessCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SettingsState::SetLandingStiffnessEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
@@ -375,7 +383,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                         340,
-                                        1040,
+                                        1080,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -888,11 +896,29 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
     }
     SendMessage(chargeCheckbox, BM_SETCHECK, chargeCheckState, 0);
 
+    HWND landingStiffnessCheckbox = CreateWindow(_T("BUTTON"),
+                 _T("着地硬直"),
+                 WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                 16,
+                 880,
+                 210,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kLandingStiffnessCheckboxId)),
+                 instance,
+                 NULL);
+    LRESULT landingCheckState = BST_UNCHECKED;
+    if (SettingsState::IsLandingStiffnessEnabled())
+    {
+        landingCheckState = BST_CHECKED;
+    }
+    SendMessage(landingStiffnessCheckbox, BM_SETCHECK, landingCheckState, 0);
+
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 890,
+                 920,
                  130,
                  32,
                  g_settingsDialog,
@@ -904,7 +930,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("ファイル読込"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  156,
-                 890,
+                 920,
                  130,
                  32,
                  g_settingsDialog,

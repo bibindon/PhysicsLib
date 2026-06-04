@@ -424,8 +424,15 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     {
         if (wasInAir)
         {
-            m_isInLanding = true;
-            m_landingTimer = 0.5f;
+            if (SettingsState::IsLandingStiffnessEnabled())
+            {
+                m_isInLanding = true;
+                m_landingTimer = 0.5f;
+            }
+            else
+            {
+                m_didJump = false;
+            }
             m_isChargingJump = false;
         }
         m_isGrounded = true;

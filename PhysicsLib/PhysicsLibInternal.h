@@ -34,6 +34,8 @@ public:
     static void SetFocusModeEnabled(bool enabled);
     static bool IsChargeJumpEnabled();
     static void SetChargeJumpEnabled(bool enabled);
+    static bool IsLandingStiffnessEnabled();
+    static void SetLandingStiffnessEnabled(bool enabled);
     static bool IsContactEnabled();
     static void SetContactEnabled(bool enabled);
     static bool IsSurfaceContactEnabled();
