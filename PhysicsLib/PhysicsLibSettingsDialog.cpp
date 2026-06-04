@@ -26,6 +26,7 @@ const int kMovingFloorCheckboxId = kSettingsCheckboxStartId + 10;
 const int kSlideCheckCheckboxId = kSettingsCheckboxStartId + 11;
 const int kCameraAutoMoveCheckboxId = kSettingsCheckboxStartId + 12;
 const int kFocusModeCheckboxId = kSettingsCheckboxStartId + 13;
+const int kChargeJumpCheckboxId = 4412;
 const int kSettingsResetButtonId = 4200;
 const int kFileLoadButtonId = 4210;
 const int kShapeTypeComboBoxId = 4300;
@@ -173,6 +174,13 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
             SettingsState::SetFocusModeEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kChargeJumpCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SettingsState::SetChargeJumpEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
@@ -366,8 +374,8 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        WS_CAPTION | WS_BORDER | WS_VISIBLE,
                                        40,
                                        40,
-                                       340,
-                                       1000,
+                                        340,
+                                        1040,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -862,11 +870,29 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  instance,
                  NULL);
 
+    HWND chargeCheckbox = CreateWindow(_T("BUTTON"),
+                 _T("ためジャンプ"),
+                 WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                 16,
+                 850,
+                 210,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kChargeJumpCheckboxId)),
+                 instance,
+                 NULL);
+    LRESULT chargeCheckState = BST_UNCHECKED;
+    if (SettingsState::IsChargeJumpEnabled())
+    {
+        chargeCheckState = BST_CHECKED;
+    }
+    SendMessage(chargeCheckbox, BM_SETCHECK, chargeCheckState, 0);
+
     CreateWindow(_T("BUTTON"),
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 850,
+                 890,
                  130,
                  32,
                  g_settingsDialog,
@@ -878,7 +904,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("ファイル読込"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  156,
-                 850,
+                 890,
                  130,
                  32,
                  g_settingsDialog,

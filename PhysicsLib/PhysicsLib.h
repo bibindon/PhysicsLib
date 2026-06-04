@@ -323,6 +323,7 @@ public:
 
     bool IsGrounded() const;
     bool IsTouchingWall() const;
+    bool IsChargingJump() const;
 
     // 乗っている移動床などのIDである。未接触時は -1 である。
     int GetSupportObjectId() const;
@@ -360,6 +361,16 @@ private:
 
     // 空中であと何回ジャンプできるかを表す。主に2段ジャンプ用である。
     int m_remainingAirJumps;
+
+    // ためジャンプの残り時間（秒）である。
+    float m_chargeJumpTimer;
+
+    // ためジャンプ中かどうかである。
+    bool m_isChargingJump;
+
+    // ためジャンプが地上ジャンプとして始まったかどうかである。
+    bool m_chargeJumpWasGroundJump;
+
     DebugInfo m_debugInfo;
 };
 

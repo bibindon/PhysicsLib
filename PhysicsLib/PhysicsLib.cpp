@@ -55,6 +55,7 @@ bool g_optimizationEnabled = true;
 bool g_movingFloorEnabled = true;
 bool g_cameraAutoMoveEnabled = true;
 bool g_focusModeEnabled = false;
+bool g_chargeJumpEnabled = true;
 bool g_contactEnabled = true;
 bool g_surfaceContactEnabled = true;
 PhysicsLib::ShapeType g_shapeType = PhysicsLib::ShapeType::Sphere;
@@ -1123,6 +1124,16 @@ bool SettingsState::IsFocusModeEnabled()
 void SettingsState::SetFocusModeEnabled(bool enabled)
 {
     g_focusModeEnabled = enabled;
+}
+
+bool SettingsState::IsChargeJumpEnabled()
+{
+    return g_chargeJumpEnabled;
+}
+
+void SettingsState::SetChargeJumpEnabled(bool enabled)
+{
+    g_chargeJumpEnabled = enabled;
 }
 
 bool SettingsState::IsContactEnabled()

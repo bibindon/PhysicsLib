@@ -18,7 +18,10 @@ CharacterMover::CharacterMover()
       m_isGrounded(true),
       m_isTouchingWall(false),
       m_supportObjectId(-1),
-      m_remainingAirJumps(0)
+      m_remainingAirJumps(0),
+      m_chargeJumpTimer(0.0f),
+      m_isChargingJump(false),
+      m_chargeJumpWasGroundJump(false)
 {
 }
 
@@ -29,7 +32,10 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
       m_isGrounded(true),
       m_isTouchingWall(false),
       m_supportObjectId(-1),
-      m_remainingAirJumps(0)
+      m_remainingAirJumps(0),
+      m_chargeJumpTimer(0.0f),
+      m_isChargingJump(false),
+      m_chargeJumpWasGroundJump(false)
 {
 }
 
@@ -72,6 +78,9 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_isTouchingWall = false;
     m_supportObjectId = -1;
     m_remainingAirJumps = 1;
+    m_chargeJumpTimer = 0.0f;
+    m_isChargingJump = false;
+    m_chargeJumpWasGroundJump = false;
     m_debugInfo = DebugInfo();
 }
 
@@ -98,6 +107,11 @@ bool CharacterMover::IsGrounded() const
 bool CharacterMover::IsTouchingWall() const
 {
     return m_isTouchingWall;
+}
+
+bool CharacterMover::IsChargingJump() const
+{
+    return m_isChargingJump;
 }
 
 int CharacterMover::GetSupportObjectId() const
@@ -269,30 +283,55 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     }
 
     const bool isGroundJump = jump && m_isGrounded;
-    bool canJump = false;
-    if (jump && m_isGrounded)
+    if (m_isChargingJump)
     {
-        canJump = true;
-    }
-    else if (jump && SettingsState::IsInfiniteJumpEnabled())
-    {
-        canJump = true;
-    }
-    else if (jump && SettingsState::IsDoubleJumpEnabled() && m_remainingAirJumps > 0)
-    {
-        canJump = true;
-        --m_remainingAirJumps;
-    }
-
-    if (canJump)
-    {
-        if (isGroundJump)
+        m_chargeJumpTimer -= kDeltaSeconds;
+        if (m_chargeJumpTimer <= 0.0f)
         {
-            m_remainingAirJumps = 1;
+            m_isChargingJump = false;
+            if (m_chargeJumpWasGroundJump)
+            {
+                m_remainingAirJumps = 1;
+            }
+            m_velocity.y = m_settings.jumpVelocity;
+            m_isGrounded = false;
+        }
+    }
+    else
+    {
+        bool canJump = false;
+        if (jump && m_isGrounded)
+        {
+            canJump = true;
+        }
+        else if (jump && SettingsState::IsInfiniteJumpEnabled())
+        {
+            canJump = true;
+        }
+        else if (jump && SettingsState::IsDoubleJumpEnabled() && m_remainingAirJumps > 0)
+        {
+            canJump = true;
+            --m_remainingAirJumps;
         }
 
-        m_velocity.y = m_settings.jumpVelocity;
-        m_isGrounded = false;
+        if (canJump)
+        {
+            if (SettingsState::IsChargeJumpEnabled())
+            {
+                m_isChargingJump = true;
+                m_chargeJumpTimer = 0.5f;
+                m_chargeJumpWasGroundJump = isGroundJump;
+            }
+            else
+            {
+                if (isGroundJump)
+                {
+                    m_remainingAirJumps = 1;
+                }
+                m_velocity.y = m_settings.jumpVelocity;
+                m_isGrounded = false;
+            }
+        }
     }
 
     if (SettingsState::IsGravityEnabled())

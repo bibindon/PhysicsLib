@@ -32,6 +32,8 @@ public:
     static void SetCameraAutoMoveEnabled(bool enabled);
     static bool IsFocusModeEnabled();
     static void SetFocusModeEnabled(bool enabled);
+    static bool IsChargeJumpEnabled();
+    static void SetChargeJumpEnabled(bool enabled);
     static bool IsContactEnabled();
     static void SetContactEnabled(bool enabled);
     static bool IsSurfaceContactEnabled();
