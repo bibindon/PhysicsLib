@@ -21,7 +21,9 @@ CharacterMover::CharacterMover()
       m_remainingAirJumps(0),
       m_chargeJumpTimer(0.0f),
       m_isChargingJump(false),
-      m_chargeJumpWasGroundJump(false)
+      m_chargeJumpWasGroundJump(false),
+      m_landingTimer(0.0f),
+      m_isInLanding(false)
 {
 }
 
@@ -35,7 +37,9 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
       m_remainingAirJumps(0),
       m_chargeJumpTimer(0.0f),
       m_isChargingJump(false),
-      m_chargeJumpWasGroundJump(false)
+      m_chargeJumpWasGroundJump(false),
+      m_landingTimer(0.0f),
+      m_isInLanding(false)
 {
 }
 
@@ -81,6 +85,8 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_chargeJumpTimer = 0.0f;
     m_isChargingJump = false;
     m_chargeJumpWasGroundJump = false;
+    m_landingTimer = 0.0f;
+    m_isInLanding = false;
     m_debugInfo = DebugInfo();
 }
 
@@ -101,7 +107,7 @@ D3DXVECTOR3 CharacterMover::GetVelocity() const
 
 bool CharacterMover::IsGrounded() const
 {
-    return m_isGrounded;
+    return m_isGrounded && !m_isInLanding;
 }
 
 bool CharacterMover::IsTouchingWall() const
@@ -112,6 +118,11 @@ bool CharacterMover::IsTouchingWall() const
 bool CharacterMover::IsChargingJump() const
 {
     return m_isChargingJump;
+}
+
+bool CharacterMover::IsJumping() const
+{
+    return m_isChargingJump || !IsGrounded();
 }
 
 int CharacterMover::GetSupportObjectId() const
@@ -282,7 +293,15 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         }
     }
 
-    const bool isGroundJump = jump && m_isGrounded;
+    const bool isGroundJump = jump && m_isGrounded && !m_isInLanding;
+    if (m_isInLanding)
+    {
+        m_landingTimer -= kDeltaSeconds;
+        if (m_landingTimer <= 0.0f)
+        {
+            m_isInLanding = false;
+        }
+    }
     if (m_isChargingJump)
     {
         m_chargeJumpTimer -= kDeltaSeconds;
@@ -300,7 +319,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     else
     {
         bool canJump = false;
-        if (jump && m_isGrounded)
+        if (jump && m_isGrounded && !m_isInLanding)
         {
             canJump = true;
         }
@@ -389,6 +408,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &supportVelocity);
     m_position = nextCollisionPosition - D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
     m_velocity = nextVelocity;
+    const bool wasInAir = !m_isGrounded;
     if (SettingsState::IsGravityEnabled())
     {
         m_isGrounded = false;
@@ -396,6 +416,12 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     }
     if (collided && lastHitNormal.y > 0.0f)
     {
+        if (wasInAir)
+        {
+            m_isInLanding = true;
+            m_landingTimer = 0.5f;
+            m_isChargingJump = false;
+        }
         m_isGrounded = true;
         m_remainingAirJumps = 1;
         m_supportObjectId = supportObjectId;
