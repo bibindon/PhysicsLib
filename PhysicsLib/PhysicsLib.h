@@ -378,6 +378,9 @@ private:
     // 着地後のランディング中かどうかである。
     bool m_isInLanding;
 
+    // ジャンプ操作によって空中にいるかどうかである。
+    bool m_didJump;
+
     DebugInfo m_debugInfo;
 };
 
