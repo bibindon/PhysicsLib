@@ -5,6 +5,7 @@
 #include "PhysicsLibInternal.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <limits>
 #include <map>
@@ -331,6 +332,289 @@ PhysicsLib::Aabb2D PhysicsLib::MakeWorldAabb2D(const D3DXVECTOR3& localBoundsMin
     }
 
     return bounds;
+}
+
+PhysicsLib::Aabb3D PhysicsLib::MakeWorldAabb3D(const D3DXVECTOR3& localBoundsMin,
+                                               const D3DXVECTOR3& localBoundsMax,
+                                               const Transform& transform)
+{
+    D3DXMATRIX worldMatrix = BuildWorldMatrix(transform);
+    const D3DXVECTOR3 corners[8] =
+    {
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMin.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMin.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMax.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMax.y, localBoundsMin.z),
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMin.y, localBoundsMax.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMin.y, localBoundsMax.z),
+        D3DXVECTOR3(localBoundsMin.x, localBoundsMax.y, localBoundsMax.z),
+        D3DXVECTOR3(localBoundsMax.x, localBoundsMax.y, localBoundsMax.z),
+    };
+
+    Aabb3D bounds;
+    bounds.minX = std::numeric_limits<float>::max();
+    bounds.minY = std::numeric_limits<float>::max();
+    bounds.minZ = std::numeric_limits<float>::max();
+    bounds.maxX = -std::numeric_limits<float>::max();
+    bounds.maxY = -std::numeric_limits<float>::max();
+    bounds.maxZ = -std::numeric_limits<float>::max();
+
+    for (int i = 0; i < 8; ++i)
+    {
+        D3DXVECTOR3 worldCorner;
+        D3DXVec3TransformCoord(&worldCorner, &corners[i], &worldMatrix);
+        bounds.minX = std::min(bounds.minX, worldCorner.x);
+        bounds.minY = std::min(bounds.minY, worldCorner.y);
+        bounds.minZ = std::min(bounds.minZ, worldCorner.z);
+        bounds.maxX = std::max(bounds.maxX, worldCorner.x);
+        bounds.maxY = std::max(bounds.maxY, worldCorner.y);
+        bounds.maxZ = std::max(bounds.maxZ, worldCorner.z);
+    }
+
+    return bounds;
+}
+
+PhysicsLib::Aabb3D PhysicsLib::MakeShapeAabb3D(const D3DXVECTOR3& position,
+                                               ShapeType shapeType,
+                                               float radius,
+                                               float height)
+{
+    Aabb3D bounds;
+    if (shapeType == ShapeType::Cuboid)
+    {
+        const float halfWidth = SettingsState::GetCuboidWidth() * 0.5f;
+        const float halfHeight = SettingsState::GetCuboidHeight() * 0.5f;
+        const float halfDepth = SettingsState::GetCuboidDepth() * 0.5f;
+        bounds.minX = position.x - halfWidth;
+        bounds.maxX = position.x + halfWidth;
+        bounds.minY = position.y - halfHeight;
+        bounds.maxY = position.y + halfHeight;
+        bounds.minZ = position.z - halfDepth;
+        bounds.maxZ = position.z + halfDepth;
+        return bounds;
+    }
+
+    if (shapeType == ShapeType::Cylinder)
+    {
+        const float halfHeight = height * 0.5f;
+        bounds.minX = position.x - radius;
+        bounds.maxX = position.x + radius;
+        bounds.minY = position.y - halfHeight;
+        bounds.maxY = position.y + halfHeight;
+        bounds.minZ = position.z - radius;
+        bounds.maxZ = position.z + radius;
+        return bounds;
+    }
+
+    if (shapeType == ShapeType::Sphere)
+    {
+        bounds.minX = position.x - radius;
+        bounds.maxX = position.x + radius;
+        bounds.minY = position.y - radius;
+        bounds.maxY = position.y + radius;
+        bounds.minZ = position.z - radius;
+        bounds.maxZ = position.z + radius;
+        return bounds;
+    }
+
+    bounds.minX = position.x;
+    bounds.maxX = position.x;
+    bounds.minY = position.y;
+    bounds.maxY = position.y;
+    bounds.minZ = position.z;
+    bounds.maxZ = position.z;
+    return bounds;
+}
+
+bool PhysicsLib::IntersectsAabb3D(const Aabb3D& a, const Aabb3D& b)
+{
+    if (a.maxX < b.minX || b.maxX < a.minX)
+    {
+        return false;
+    }
+    if (a.maxY < b.minY || b.maxY < a.minY)
+    {
+        return false;
+    }
+    if (a.maxZ < b.minZ || b.maxZ < a.minZ)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPosition,
+                                               ShapeType shapeType,
+                                               float radius,
+                                               float height,
+                                               D3DXVECTOR3* inOutPosition,
+                                               D3DXVECTOR3* outPushNormal,
+                                               int* outSupportObjectId,
+                                               D3DXVECTOR3* outSupportVelocity)
+{
+    UNREFERENCED_PARAMETER(currentPosition);
+
+    if (inOutPosition == nullptr)
+    {
+        return false;
+    }
+
+    bool pushed = false;
+    D3DXVECTOR3 position = *inOutPosition;
+    D3DXVECTOR3 lastNormal(0.0f, 0.0f, 0.0f);
+    int supportObjectId = -1;
+    D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
+
+    for (int pass = 0; pass < 4; ++pass)
+    {
+        bool pushedThisPass = false;
+        Aabb3D shapeBounds = MakeShapeAabb3D(position, shapeType, radius, height);
+
+        for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+        {
+            if (g_simpleObjects[i].objectType != ObjectType::MovingSlide ||
+                g_simpleObjects[i].mesh == NULL)
+            {
+                continue;
+            }
+
+            const D3DXVECTOR3 objectVelocity = g_simpleObjects[i].transform.velocity;
+            if (D3DXVec3Length(&objectVelocity) <= 0.0001f)
+            {
+                continue;
+            }
+
+            const Aabb3D objectBounds = MakeWorldAabb3D(g_simpleObjects[i].localBoundsMin,
+                                                        g_simpleObjects[i].localBoundsMax,
+                                                        g_simpleObjects[i].transform);
+            if (!IntersectsAabb3D(shapeBounds, objectBounds))
+            {
+                continue;
+            }
+
+            const float positiveX = objectBounds.maxX - shapeBounds.minX + kGroundContactOffset;
+            const float negativeX = objectBounds.minX - shapeBounds.maxX - kGroundContactOffset;
+            const float positiveY = objectBounds.maxY - shapeBounds.minY + kGroundContactOffset;
+            const float negativeY = objectBounds.minY - shapeBounds.maxY - kGroundContactOffset;
+            const float positiveZ = objectBounds.maxZ - shapeBounds.minZ + kGroundContactOffset;
+            const float negativeZ = objectBounds.minZ - shapeBounds.maxZ - kGroundContactOffset;
+
+            D3DXVECTOR3 pushVector(0.0f, 0.0f, 0.0f);
+            float bestAmount = std::numeric_limits<float>::max();
+            bool foundVelocityPush = false;
+            const float velocityEpsilon = 0.0001f;
+
+            if (objectVelocity.x > velocityEpsilon)
+            {
+                pushVector = D3DXVECTOR3(positiveX, 0.0f, 0.0f);
+                bestAmount = fabsf(positiveX);
+                foundVelocityPush = true;
+            }
+            else if (objectVelocity.x < -velocityEpsilon)
+            {
+                pushVector = D3DXVECTOR3(negativeX, 0.0f, 0.0f);
+                bestAmount = fabsf(negativeX);
+                foundVelocityPush = true;
+            }
+
+            if (objectVelocity.y > velocityEpsilon && fabsf(positiveY) < bestAmount)
+            {
+                pushVector = D3DXVECTOR3(0.0f, positiveY, 0.0f);
+                bestAmount = fabsf(positiveY);
+                foundVelocityPush = true;
+            }
+            else if (objectVelocity.y < -velocityEpsilon && fabsf(negativeY) < bestAmount)
+            {
+                pushVector = D3DXVECTOR3(0.0f, negativeY, 0.0f);
+                bestAmount = fabsf(negativeY);
+                foundVelocityPush = true;
+            }
+
+            if (objectVelocity.z > velocityEpsilon && fabsf(positiveZ) < bestAmount)
+            {
+                pushVector = D3DXVECTOR3(0.0f, 0.0f, positiveZ);
+                bestAmount = fabsf(positiveZ);
+                foundVelocityPush = true;
+            }
+            else if (objectVelocity.z < -velocityEpsilon && fabsf(negativeZ) < bestAmount)
+            {
+                pushVector = D3DXVECTOR3(0.0f, 0.0f, negativeZ);
+                bestAmount = fabsf(negativeZ);
+                foundVelocityPush = true;
+            }
+
+            if (!foundVelocityPush)
+            {
+                pushVector = D3DXVECTOR3(positiveX, 0.0f, 0.0f);
+                bestAmount = fabsf(positiveX);
+                if (fabsf(negativeX) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(negativeX, 0.0f, 0.0f);
+                    bestAmount = fabsf(negativeX);
+                }
+                if (fabsf(positiveY) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(0.0f, positiveY, 0.0f);
+                    bestAmount = fabsf(positiveY);
+                }
+                if (fabsf(negativeY) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(0.0f, negativeY, 0.0f);
+                    bestAmount = fabsf(negativeY);
+                }
+                if (fabsf(positiveZ) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(0.0f, 0.0f, positiveZ);
+                    bestAmount = fabsf(positiveZ);
+                }
+                if (fabsf(negativeZ) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(0.0f, 0.0f, negativeZ);
+                }
+            }
+
+            position += pushVector;
+            lastNormal = pushVector;
+            if (D3DXVec3Length(&lastNormal) > 0.0001f)
+            {
+                D3DXVec3Normalize(&lastNormal, &lastNormal);
+            }
+            if (lastNormal.y > 0.0f)
+            {
+                supportObjectId = g_simpleObjects[i].id;
+                supportVelocity = objectVelocity;
+            }
+
+            shapeBounds = MakeShapeAabb3D(position, shapeType, radius, height);
+            pushed = true;
+            pushedThisPass = true;
+        }
+
+        if (!pushedThisPass)
+        {
+            break;
+        }
+    }
+
+    if (pushed)
+    {
+        *inOutPosition = position;
+        if (outPushNormal != nullptr)
+        {
+            *outPushNormal = lastNormal;
+        }
+        if (outSupportObjectId != nullptr && supportObjectId >= 0)
+        {
+            *outSupportObjectId = supportObjectId;
+        }
+        if (outSupportVelocity != nullptr && supportObjectId >= 0)
+        {
+            *outSupportVelocity = supportVelocity;
+        }
+    }
+
+    return pushed;
 }
 
 bool PhysicsLib::ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax)
@@ -1871,6 +2155,29 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                 }
                 collided = true;
             }
+        }
+    }
+
+    D3DXVECTOR3 pushNormal(0.0f, 0.0f, 0.0f);
+    int pushSupportObjectId = -1;
+    D3DXVECTOR3 pushSupportVelocity(0.0f, 0.0f, 0.0f);
+    if (ResolveMovingSlidePenetration(currentPosition,
+                                      shapeType,
+                                      radius,
+                                      height,
+                                      &nextPosition,
+                                      &pushNormal,
+                                      &pushSupportObjectId,
+                                      &pushSupportVelocity))
+    {
+        collided = true;
+        lastHitNormal = pushNormal;
+        lastHitDistance = 0.0f;
+        nextMoveVector = RemoveIntoSurfaceVelocity(nextMoveVector, pushNormal);
+        if (pushSupportObjectId >= 0)
+        {
+            supportObjectId = pushSupportObjectId;
+            supportVelocity = pushSupportVelocity;
         }
     }
 

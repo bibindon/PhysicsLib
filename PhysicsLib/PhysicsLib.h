@@ -175,6 +175,16 @@ private:
         float maxZ = 0.0f;
     };
 
+    struct Aabb3D
+    {
+        float minX = 0.0f;
+        float minY = 0.0f;
+        float minZ = 0.0f;
+        float maxX = 0.0f;
+        float maxY = 0.0f;
+        float maxZ = 0.0f;
+    };
+
     struct QuadTreeNode
     {
         Aabb2D bounds;
@@ -223,6 +233,22 @@ private:
     static Aabb2D MakeWorldAabb2D(const D3DXVECTOR3& localBoundsMin,
                                   const D3DXVECTOR3& localBoundsMax,
                                   const Transform& transform);
+    static Aabb3D MakeWorldAabb3D(const D3DXVECTOR3& localBoundsMin,
+                                  const D3DXVECTOR3& localBoundsMax,
+                                  const Transform& transform);
+    static Aabb3D MakeShapeAabb3D(const D3DXVECTOR3& position,
+                                  ShapeType shapeType,
+                                  float radius,
+                                  float height);
+    static bool IntersectsAabb3D(const Aabb3D& a, const Aabb3D& b);
+    static bool ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPosition,
+                                              ShapeType shapeType,
+                                              float radius,
+                                              float height,
+                                              D3DXVECTOR3* inOutPosition,
+                                              D3DXVECTOR3* outPushNormal,
+                                              int* outSupportObjectId,
+                                              D3DXVECTOR3* outSupportVelocity);
     static bool ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax);
     static void SplitQuadTreeNode(QuadTreeNode* node);
     static bool InsertIntoChildIfContained(QuadTreeNode* node,
