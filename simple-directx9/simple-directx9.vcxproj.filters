@@ -30,8 +30,5 @@
   <ItemGroup>
     <Content Include="cube.png" />
     <Content Include="cube.x" />
-    <Content Include="XFileListMove.csv" />
-    <Content Include="XFileListPhysics.csv" />
-    <Content Include="XFileListRender.csv" />
   </ItemGroup>
 </Project>
