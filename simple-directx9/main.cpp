@@ -36,6 +36,7 @@ const int kCubeNumber = 1;
 
 struct SceneObject
 {
+    int csvId;
     LPD3DXMESH mesh;
     D3DXVECTOR3 position;
     D3DXVECTOR3 scale;
@@ -43,6 +44,18 @@ struct SceneObject
     D3DXCOLOR color;
     bool useTexture;
     DWORD numMaterials;
+};
+
+struct MovingPlatform
+{
+    int renderCsvId;
+    int physicsCsvId;
+    size_t objectIndex;
+    D3DXVECTOR3 startPosition;
+    D3DXVECTOR3 endPosition;
+    float duration;
+    float timer;
+    bool forward;
 };
 
 struct InstanceRenderBatch
@@ -75,8 +88,7 @@ PhysicsLib::CameraMover g_cameraMover;
 float g_cameraYaw = 0.0f;
 float g_cameraPitch = D3DXToRadian(18.0f);
 float g_cameraDistance = 4.0f;
-size_t g_movingPlatformIndex = 0;
-bool g_movingPlatformForward = true;
+std::vector<MovingPlatform> g_movingPlatforms;
 bool g_prevSpacePressed = false;
 float g_displayFps = 0.0f;
 int g_fpsFrameCount = 0;
@@ -93,8 +105,10 @@ static void TextDraw(LPD3DXFONT pFont, TCHAR* text, int X, int Y);
 static std::basic_string<TCHAR> ResolveAssetPath(const TCHAR* fileName);
 static void InitD3D(HWND hWnd);
 static void InitScene();
+static void LoadMovingPlatforms();
 static void ResetPlayer();
 static void UpdatePlayer();
+static void UpdateMovingPlatforms();
 static void UpdateCamera();
 static LPD3DXMESH LoadSceneMeshFromX(const TCHAR* path, D3DXCOLOR* outColor = NULL, DWORD* outNumMaterials = NULL);
 static D3DXMATRIX BuildWorldMatrix(const D3DXVECTOR3& position,
@@ -415,6 +429,7 @@ void InitScene()
         {
             continue;
         }
+        const int csvId = _ttoi(token);
         token = _tcstok_s(NULL, _T(",\n"), &context);
         const TCHAR* fileName = token;
         if (fileName == NULL)
@@ -539,26 +554,161 @@ void InitScene()
             }
             else
             {
-                g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false, numMaterials });
+                g_worldObjects.push_back({ csvId, mesh, position, scaleVec, rotation, matColor, false, numMaterials });
             }
         }
         else if (_tcsstr(fileName, _T("item_sphere")) != NULL)
         {
-            g_itemObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false, numMaterials });
+            g_itemObjects.push_back({ csvId, mesh, position, scaleVec, rotation, matColor, false, numMaterials });
         }
         else
         {
-            g_worldObjects.push_back({ mesh, position, scaleVec, rotation, matColor, false, numMaterials });
-            if (_tcsstr(fileName, _T("moving_platform")) != NULL)
-            {
-                g_movingPlatformIndex = g_worldObjects.size() - 1;
-            }
+            g_worldObjects.push_back({ csvId, mesh, position, scaleVec, rotation, matColor, false, numMaterials });
         }
     }
 
     fclose(file);
 
+    LoadMovingPlatforms();
+
     ResetPlayer();
+}
+
+void LoadMovingPlatforms()
+{
+    g_movingPlatforms.clear();
+
+    const std::basic_string<TCHAR> moveListPath = ResolveAssetPath(_T("XFileListMove.csv"));
+    FILE* file = NULL;
+    if (_tfopen_s(&file, moveListPath.c_str(), _T("rt")) != 0 || file == NULL)
+    {
+        return;
+    }
+
+    TCHAR line[512];
+    _fgetts(line, 512, file);
+
+    while (_fgetts(line, 512, file) != NULL)
+    {
+        TCHAR* context = NULL;
+        TCHAR* token = _tcstok_s(line, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const int renderCsvId = _ttoi(token);
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const int physicsCsvId = _ttoi(token);
+
+        for (int i = 0; i < 7; ++i)
+        {
+            token = _tcstok_s(NULL, _T(",\n"), &context);
+            if (token == NULL)
+            {
+                break;
+            }
+        }
+        if (token == NULL)
+        {
+            continue;
+        }
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float startX = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float startY = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float startZ = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float endX = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float endY = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        const float endZ = static_cast<float>(_tstof(token));
+
+        token = _tcstok_s(NULL, _T(",\n"), &context);
+        if (token == NULL)
+        {
+            continue;
+        }
+        float duration = static_cast<float>(_tstof(token));
+        if (duration <= 0.0001f)
+        {
+            duration = 1.0f;
+        }
+
+        size_t objectIndex = g_worldObjects.size();
+        for (size_t i = 0; i < g_worldObjects.size(); ++i)
+        {
+            if (g_worldObjects[i].csvId == renderCsvId)
+            {
+                objectIndex = i;
+                break;
+            }
+        }
+        if (objectIndex >= g_worldObjects.size())
+        {
+            continue;
+        }
+
+        MovingPlatform platform = {};
+        platform.renderCsvId = renderCsvId;
+        platform.physicsCsvId = physicsCsvId;
+        platform.objectIndex = objectIndex;
+        platform.startPosition = D3DXVECTOR3(startX, startY, startZ);
+        platform.endPosition = D3DXVECTOR3(endX, endY, endZ);
+        platform.duration = duration;
+        platform.timer = 0.0f;
+        platform.forward = true;
+        g_worldObjects[objectIndex].position = platform.startPosition;
+        PhysicsLib::PhysicsLib::UpdateCsvTransform(platform.physicsCsvId,
+                                                   g_worldObjects[objectIndex].position,
+                                                   g_worldObjects[objectIndex].rotation,
+                                                   g_worldObjects[objectIndex].scale);
+        g_movingPlatforms.push_back(platform);
+    }
+
+    fclose(file);
 }
 
 void ResetPlayer()
@@ -579,6 +729,47 @@ void ResetPlayer()
     g_playerMover.SetSettings(settings);
     g_playerMover.Reset(kPlayerStartPosition);
     g_playerYaw = 0.0f;
+}
+
+void UpdateMovingPlatforms()
+{
+    const float deltaSeconds = static_cast<float>(kTargetFrameSeconds);
+    for (size_t i = 0; i < g_movingPlatforms.size(); ++i)
+    {
+        MovingPlatform& platform = g_movingPlatforms[i];
+        if (platform.objectIndex >= g_worldObjects.size())
+        {
+            continue;
+        }
+
+        if (platform.forward)
+        {
+            platform.timer += deltaSeconds;
+            while (platform.timer > platform.duration)
+            {
+                platform.timer = platform.duration - (platform.timer - platform.duration);
+                platform.forward = false;
+            }
+        }
+        else
+        {
+            platform.timer -= deltaSeconds;
+            while (platform.timer < 0.0f)
+            {
+                platform.timer = -platform.timer;
+                platform.forward = true;
+            }
+        }
+
+        const float ratio = platform.timer / platform.duration;
+        const D3DXVECTOR3 position = platform.startPosition + (platform.endPosition - platform.startPosition) * ratio;
+        SceneObject& object = g_worldObjects[platform.objectIndex];
+        object.position = position;
+        PhysicsLib::PhysicsLib::UpdateCsvTransform(platform.physicsCsvId,
+                                                   object.position,
+                                                   object.rotation,
+                                                   object.scale);
+    }
 }
 
 void UpdatePlayer()
@@ -603,41 +794,7 @@ void UpdatePlayer()
     }
     g_prevEscPressed = isEscPressed;
 
-    PhysicsLib::PhysicsLib::Update();
-
-    if (g_movingPlatformIndex < g_worldObjects.size())
-    {
-        const float kPlatformSpeed = 1.5f;
-        const float kPlatformMinX = -4.0f;
-        const float kPlatformMaxX = 4.0f;
-        float& platformX = g_worldObjects[g_movingPlatformIndex].position.x;
-        if (g_movingPlatformForward)
-        {
-            platformX += kPlatformSpeed * (1.0f / 60.0f);
-            if (platformX >= kPlatformMaxX)
-            {
-                platformX = kPlatformMaxX;
-                g_movingPlatformForward = false;
-            }
-        }
-        else
-        {
-            platformX -= kPlatformSpeed * (1.0f / 60.0f);
-            if (platformX <= kPlatformMinX)
-            {
-                platformX = kPlatformMinX;
-                g_movingPlatformForward = true;
-            }
-        }
-    }
-
-    if (g_movingPlatformIndex < g_worldObjects.size())
-    {
-        PhysicsLib::PhysicsLib::UpdateCsvTransform(10,
-            g_worldObjects[g_movingPlatformIndex].position,
-            g_worldObjects[g_movingPlatformIndex].rotation,
-            g_worldObjects[g_movingPlatformIndex].scale);
-    }
+    UpdateMovingPlatforms();
 
     D3DXVECTOR3 inputMove(0.0f, 0.0f, 0.0f);
     D3DXVECTOR3 localInputMove(0.0f, 0.0f, 0.0f);

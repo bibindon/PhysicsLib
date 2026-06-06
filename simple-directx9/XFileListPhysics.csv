@@ -17,3 +17,15 @@ ID,FileName,PosX,PosY,PosZ,RotX,RotY,RotZ,Scale,Type,Move,Instancing
 16,collision_item_sphere.x,7,0.5,-3.5,0,0,0,1,NonCollision,n,n
 17,tree2/lemonTree.x,11,0,11,0,0,0,1,Collision,n,n
 18,tree2/lemonTree.Instancing.x,2,0,0,0,0,0,1,Collision,n,y
+19,collision_moving_platform.x,2.5,4.2,8,0,0,0,1,Collision,y,n
+20,collision_moving_platform.x,5,5.9,6,0,0,0,1,Collision,y,n
+21,collision_moving_platform.x,7.5,7.6,8,0,0,0,1,Collision,y,n
+22,collision_moving_platform.x,10,9.3,6,0,0,0,1,Collision,y,n
+23,collision_moving_platform.x,12.5,11,8,0,0,0,1,Collision,y,n
+24,collision_moving_platform.x,15,12.7,6,0,0,0,1,Collision,y,n
+25,collision_moving_platform.x,17.5,14.4,8,0,0,0,1,Collision,y,n
+26,collision_moving_platform.x,20,16.1,6,0,0,0,1,Collision,y,n
+27,collision_moving_platform.x,22.5,17.8,8,0,0,0,1,Collision,y,n
+28,collision_moving_platform.x,25,19.5,6,0,0,0,1,Collision,y,n
+29,collision_moving_platform.x,27.5,21.2,8,0,0,0,1,Collision,y,n
+30,collision_moving_platform.x,30,22.9,6,0,0,0,1,Collision,y,n
