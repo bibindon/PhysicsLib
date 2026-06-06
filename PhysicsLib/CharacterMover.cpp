@@ -238,6 +238,56 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
 
     m_justJumped = false;
 
+    const PhysicsLib::ShapeType shapeType = SettingsState::GetShapeType();
+    float radius = SettingsState::GetRadius();
+    float height = m_settings.height;
+    if (shapeType == PhysicsLib::ShapeType::Cylinder)
+    {
+        radius = SettingsState::GetCylinderRadius();
+        height = SettingsState::GetCylinderHeight();
+    }
+    if (shapeType == PhysicsLib::ShapeType::Cuboid)
+    {
+        const D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
+        const float inputLength = D3DXVec3Length(&inputMove);
+        if (inputLength > 0.0001f)
+        {
+            const float facingYaw = atan2f(inputMove.x, inputMove.z);
+            SettingsState::SetPlayerFacingYaw(facingYaw);
+        }
+    }
+
+    if (m_isGrounded && SettingsState::IsMovingFloorEnabled() && m_supportObjectId >= 0)
+    {
+        const PhysicsLib::Transform supportTransform = PhysicsLib::GetTransform(m_supportObjectId);
+        const D3DXVECTOR3 supportVelocity = supportTransform.velocity;
+        const D3DXVECTOR3 horizontalSupportVelocity(supportVelocity.x, 0.0f, supportVelocity.z);
+        if (D3DXVec3Length(&horizontalSupportVelocity) > 0.0001f)
+        {
+            m_position += horizontalSupportVelocity * kDeltaSeconds;
+        }
+        if (supportVelocity.y > 0.0001f)
+        {
+            const D3DXVECTOR3 collisionPosition = m_position + D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
+            D3DXVECTOR3 carriedCollisionPosition = collisionPosition;
+            D3DXVECTOR3 unusedNextMoveVector = supportVelocity;
+            PhysicsLib::CheckCollide(collisionPosition,
+                                     D3DXVECTOR3(0.0f, supportVelocity.y, 0.0f),
+                                     shapeType,
+                                     &carriedCollisionPosition,
+                                     &unusedNextMoveVector,
+                                     nullptr,
+                                     nullptr,
+                                     radius,
+                                     height);
+            m_position = carriedCollisionPosition - D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
+        }
+        else if (supportVelocity.y < -0.0001f)
+        {
+            m_position.y += supportVelocity.y * kDeltaSeconds;
+        }
+    }
+
     const bool canChangeMoveDirection = m_isGrounded || SettingsState::IsAirMoveEnabled();
     D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
     if (!canChangeMoveDirection)
@@ -389,25 +439,6 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     D3DXVECTOR3 lastSlideMove(0.0f, 0.0f, 0.0f);
     int slideCount = 0;
     int supportObjectId = -1;
-    D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
-    const PhysicsLib::ShapeType shapeType = SettingsState::GetShapeType();
-    float radius = SettingsState::GetRadius();
-    float height = m_settings.height;
-    if (shapeType == PhysicsLib::ShapeType::Cylinder)
-    {
-        radius = SettingsState::GetCylinderRadius();
-        height = SettingsState::GetCylinderHeight();
-    }
-    if (shapeType == PhysicsLib::ShapeType::Cuboid)
-    {
-        const D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
-        const float inputLength = D3DXVec3Length(&inputMove);
-        if (inputLength > 0.0001f)
-        {
-            const float facingYaw = atan2f(inputMove.x, inputMove.z);
-            SettingsState::SetPlayerFacingYaw(facingYaw);
-        }
-    }
     const bool collided = PhysicsLib::CheckCollide(collisionPosition,
                                                     m_velocity,
                                                     shapeType,
@@ -423,7 +454,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &lastSlideMove,
                                                    &slideCount,
                                                    &supportObjectId,
-                                                   &supportVelocity);
+                                                   nullptr);
     m_position = nextCollisionPosition - D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
     m_velocity = nextVelocity;
     const bool wasInAir = !m_isGrounded;
@@ -457,10 +488,6 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     if (!m_isGrounded)
     {
         m_supportObjectId = -1;
-    }
-    if (m_isGrounded && SettingsState::IsMovingFloorEnabled() && m_supportObjectId >= 0)
-    {
-        m_position += supportVelocity * kDeltaSeconds;
     }
     m_debugInfo = DebugInfo();
     if (collided)
