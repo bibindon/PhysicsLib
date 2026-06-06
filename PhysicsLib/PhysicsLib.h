@@ -326,6 +326,9 @@ public:
     bool IsChargingJump() const;
     bool IsJumping() const;
 
+    // Update() でジャンプが実際に成功したフレームでのみ true を返す。
+    bool JustJumped() const;
+
     // 乗っている移動床などのIDである。未接触時は -1 である。
     int GetSupportObjectId() const;
     DebugInfo GetDebugInfo() const;
@@ -380,6 +383,9 @@ private:
 
     // ジャンプ操作によって空中にいるかどうかである。
     bool m_didJump;
+
+    // Update() 内でジャンプが成功したフレームでのみ true。
+    bool m_justJumped;
 
     DebugInfo m_debugInfo;
 };

@@ -24,7 +24,8 @@ CharacterMover::CharacterMover()
       m_chargeJumpWasGroundJump(false),
       m_landingTimer(0.0f),
       m_isInLanding(false),
-      m_didJump(false)
+      m_didJump(false),
+      m_justJumped(false)
 {
 }
 
@@ -41,7 +42,8 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
       m_chargeJumpWasGroundJump(false),
       m_landingTimer(0.0f),
       m_isInLanding(false),
-      m_didJump(false)
+      m_didJump(false),
+      m_justJumped(false)
 {
 }
 
@@ -90,6 +92,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_landingTimer = 0.0f;
     m_isInLanding = false;
     m_didJump = false;
+    m_justJumped = false;
     m_debugInfo = DebugInfo();
 }
 
@@ -126,6 +129,11 @@ bool CharacterMover::IsChargingJump() const
 bool CharacterMover::IsJumping() const
 {
     return m_didJump && (m_isChargingJump || !IsGrounded());
+}
+
+bool CharacterMover::JustJumped() const
+{
+    return m_justJumped;
 }
 
 int CharacterMover::GetSupportObjectId() const
@@ -227,6 +235,8 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     {
         outSolidIds->clear();
     }
+
+    m_justJumped = false;
 
     const bool canChangeMoveDirection = m_isGrounded || SettingsState::IsAirMoveEnabled();
     D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
@@ -345,6 +355,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                 m_chargeJumpTimer = 0.5f;
                 m_chargeJumpWasGroundJump = isGroundJump;
                 m_didJump = true;
+                m_justJumped = true;
             }
             else
             {
@@ -355,6 +366,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                 m_velocity.y = m_settings.jumpVelocity;
                 m_isGrounded = false;
                 m_didJump = true;
+                m_justJumped = true;
             }
         }
     }
