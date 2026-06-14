@@ -500,78 +500,31 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
             const float positiveZ = objectBounds.maxZ - shapeBounds.minZ + kGroundContactOffset;
             const float negativeZ = objectBounds.minZ - shapeBounds.maxZ - kGroundContactOffset;
 
-            D3DXVECTOR3 pushVector(0.0f, 0.0f, 0.0f);
-            float bestAmount = std::numeric_limits<float>::max();
-            bool foundVelocityPush = false;
-            const float velocityEpsilon = 0.0001f;
-
-            if (objectVelocity.x > velocityEpsilon)
-            {
-                pushVector = D3DXVECTOR3(positiveX, 0.0f, 0.0f);
-                bestAmount = fabsf(positiveX);
-                foundVelocityPush = true;
-            }
-            else if (objectVelocity.x < -velocityEpsilon)
+            D3DXVECTOR3 pushVector(positiveX, 0.0f, 0.0f);
+            float bestAmount = fabsf(positiveX);
+            if (fabsf(negativeX) < bestAmount)
             {
                 pushVector = D3DXVECTOR3(negativeX, 0.0f, 0.0f);
                 bestAmount = fabsf(negativeX);
-                foundVelocityPush = true;
             }
-
-            if (objectVelocity.y > velocityEpsilon && fabsf(positiveY) < bestAmount)
+            if (fabsf(positiveY) < bestAmount)
             {
                 pushVector = D3DXVECTOR3(0.0f, positiveY, 0.0f);
                 bestAmount = fabsf(positiveY);
-                foundVelocityPush = true;
             }
-            else if (objectVelocity.y < -velocityEpsilon && fabsf(negativeY) < bestAmount)
+            if (fabsf(negativeY) < bestAmount)
             {
                 pushVector = D3DXVECTOR3(0.0f, negativeY, 0.0f);
                 bestAmount = fabsf(negativeY);
-                foundVelocityPush = true;
             }
-
-            if (objectVelocity.z > velocityEpsilon && fabsf(positiveZ) < bestAmount)
+            if (fabsf(positiveZ) < bestAmount)
             {
                 pushVector = D3DXVECTOR3(0.0f, 0.0f, positiveZ);
                 bestAmount = fabsf(positiveZ);
-                foundVelocityPush = true;
             }
-            else if (objectVelocity.z < -velocityEpsilon && fabsf(negativeZ) < bestAmount)
+            if (fabsf(negativeZ) < bestAmount)
             {
                 pushVector = D3DXVECTOR3(0.0f, 0.0f, negativeZ);
-                bestAmount = fabsf(negativeZ);
-                foundVelocityPush = true;
-            }
-
-            if (!foundVelocityPush)
-            {
-                pushVector = D3DXVECTOR3(positiveX, 0.0f, 0.0f);
-                bestAmount = fabsf(positiveX);
-                if (fabsf(negativeX) < bestAmount)
-                {
-                    pushVector = D3DXVECTOR3(negativeX, 0.0f, 0.0f);
-                    bestAmount = fabsf(negativeX);
-                }
-                if (fabsf(positiveY) < bestAmount)
-                {
-                    pushVector = D3DXVECTOR3(0.0f, positiveY, 0.0f);
-                    bestAmount = fabsf(positiveY);
-                }
-                if (fabsf(negativeY) < bestAmount)
-                {
-                    pushVector = D3DXVECTOR3(0.0f, negativeY, 0.0f);
-                    bestAmount = fabsf(negativeY);
-                }
-                if (fabsf(positiveZ) < bestAmount)
-                {
-                    pushVector = D3DXVECTOR3(0.0f, 0.0f, positiveZ);
-                    bestAmount = fabsf(positiveZ);
-                }
-                if (fabsf(negativeZ) < bestAmount)
-                {
-                    pushVector = D3DXVECTOR3(0.0f, 0.0f, negativeZ);
-                }
             }
 
             position += pushVector;
