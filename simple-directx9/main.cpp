@@ -410,6 +410,9 @@ void InitScene()
     g_itemObjects.clear();
     g_collectedItemIds.clear();
 
+    const std::basic_string<TCHAR> physicsCsvPath = ResolveAssetPath(_T("XFileListPhysics.csv"));
+    PhysicsLib::PhysicsLib::LoadFromCsv(physicsCsvPath.c_str());
+
     const std::basic_string<TCHAR> renderListPath = ResolveAssetPath(_T("XFileListRender.csv"));
     FILE* file = NULL;
     if (_tfopen_s(&file, renderListPath.c_str(), _T("rt")) != 0 || file == NULL)
