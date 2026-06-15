@@ -1724,6 +1724,8 @@ float PhysicsLib::GetDashSpeed()
 void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
 {
     g_csvFileNames.clear();
+    g_csvObjectIds.clear();
+    g_csvPrevPositions.clear();
 
     FILE* file = NULL;
     if (_tfopen_s(&file, csvPath, _T("rt")) != 0 || file == NULL)
@@ -1812,6 +1814,21 @@ void PhysicsLib::LoadFromCsv(const TCHAR* csvPath)
     }
 
     fclose(file);
+}
+
+void PhysicsLib::ClearObjects()
+{
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        SafeRelease(g_simpleObjects[i].mesh);
+        g_simpleObjects[i].mesh = NULL;
+    }
+
+    g_simpleObjects.clear();
+    g_simpleNextId = 1;
+    g_csvFileNames.clear();
+    g_csvObjectIds.clear();
+    g_csvPrevPositions.clear();
 }
 
 const TCHAR* PhysicsLib::GetCsvFileName(int id)

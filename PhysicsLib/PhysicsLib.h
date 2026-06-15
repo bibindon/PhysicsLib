@@ -111,6 +111,9 @@ public:
     // CSV ファイルから衝突オブジェクトを一括読み込みする。
     static void LoadFromCsv(const TCHAR* csvPath);
 
+    // 登録済みの衝突オブジェクトをすべて削除する。
+    static void ClearObjects();
+
     // CSV の ID に対応するファイル名を取得する。
     static const TCHAR* GetCsvFileName(int id);
 
