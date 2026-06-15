@@ -444,6 +444,108 @@ bool PhysicsLib::IntersectsAabb3D(const Aabb3D& a, const Aabb3D& b)
     return true;
 }
 
+bool PhysicsLib::IsShapeBlockedOppositePush(size_t pushingObjectIndex,
+                                            const Aabb3D& shapeBounds,
+                                            const D3DXVECTOR3& pushVector)
+{
+    const float pushLength = D3DXVec3Length(&pushVector);
+    if (pushLength <= 0.0001f)
+    {
+        return false;
+    }
+
+    const float contactTolerance = kGroundContactOffset * 4.0f;
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (i == pushingObjectIndex ||
+            g_simpleObjects[i].objectType == ObjectType::PassThrough ||
+            g_simpleObjects[i].mesh == NULL)
+        {
+            continue;
+        }
+
+        const Aabb3D objectBounds = MakeWorldAabb3D(g_simpleObjects[i].localBoundsMin,
+                                                    g_simpleObjects[i].localBoundsMax,
+                                                    g_simpleObjects[i].transform);
+
+        if (fabsf(pushVector.x) >= fabsf(pushVector.y) &&
+            fabsf(pushVector.x) >= fabsf(pushVector.z))
+        {
+            const bool overlapsY = shapeBounds.maxY > objectBounds.minY + contactTolerance &&
+                                   shapeBounds.minY < objectBounds.maxY - contactTolerance;
+            const bool overlapsZ = shapeBounds.maxZ > objectBounds.minZ + contactTolerance &&
+                                   shapeBounds.minZ < objectBounds.maxZ - contactTolerance;
+            if (!overlapsY || !overlapsZ)
+            {
+                continue;
+            }
+
+            if (pushVector.x > 0.0f &&
+                shapeBounds.maxX >= objectBounds.minX - contactTolerance &&
+                shapeBounds.minX < objectBounds.minX)
+            {
+                return true;
+            }
+            if (pushVector.x < 0.0f &&
+                shapeBounds.minX <= objectBounds.maxX + contactTolerance &&
+                shapeBounds.maxX > objectBounds.maxX)
+            {
+                return true;
+            }
+        }
+        else if (fabsf(pushVector.y) >= fabsf(pushVector.z))
+        {
+            const bool overlapsX = shapeBounds.maxX > objectBounds.minX + contactTolerance &&
+                                   shapeBounds.minX < objectBounds.maxX - contactTolerance;
+            const bool overlapsZ = shapeBounds.maxZ > objectBounds.minZ + contactTolerance &&
+                                   shapeBounds.minZ < objectBounds.maxZ - contactTolerance;
+            if (!overlapsX || !overlapsZ)
+            {
+                continue;
+            }
+
+            if (pushVector.y > 0.0f &&
+                shapeBounds.maxY >= objectBounds.minY - contactTolerance &&
+                shapeBounds.minY < objectBounds.minY)
+            {
+                return true;
+            }
+            if (pushVector.y < 0.0f &&
+                shapeBounds.minY <= objectBounds.maxY + contactTolerance &&
+                shapeBounds.maxY > objectBounds.maxY)
+            {
+                return true;
+            }
+        }
+        else
+        {
+            const bool overlapsX = shapeBounds.maxX > objectBounds.minX + contactTolerance &&
+                                   shapeBounds.minX < objectBounds.maxX - contactTolerance;
+            const bool overlapsY = shapeBounds.maxY > objectBounds.minY + contactTolerance &&
+                                   shapeBounds.minY < objectBounds.maxY - contactTolerance;
+            if (!overlapsX || !overlapsY)
+            {
+                continue;
+            }
+
+            if (pushVector.z > 0.0f &&
+                shapeBounds.maxZ >= objectBounds.minZ - contactTolerance &&
+                shapeBounds.minZ < objectBounds.minZ)
+            {
+                return true;
+            }
+            if (pushVector.z < 0.0f &&
+                shapeBounds.minZ <= objectBounds.maxZ + contactTolerance &&
+                shapeBounds.maxZ > objectBounds.maxZ)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPosition,
                                                ShapeType shapeType,
                                                float radius,
@@ -451,7 +553,8 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
                                                D3DXVECTOR3* inOutPosition,
                                                D3DXVECTOR3* outPushNormal,
                                                int* outSupportObjectId,
-                                               D3DXVECTOR3* outSupportVelocity)
+                                               D3DXVECTOR3* outSupportVelocity,
+                                               bool* outCrushed)
 {
     UNREFERENCED_PARAMETER(currentPosition);
 
@@ -465,6 +568,7 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
     D3DXVECTOR3 lastNormal(0.0f, 0.0f, 0.0f);
     int supportObjectId = -1;
     D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
+    bool crushed = false;
 
     for (int pass = 0; pass < 4; ++pass)
     {
@@ -540,6 +644,10 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
             }
 
             shapeBounds = MakeShapeAabb3D(position, shapeType, radius, height);
+            if (IsShapeBlockedOppositePush(i, shapeBounds, pushVector))
+            {
+                crushed = true;
+            }
             pushed = true;
             pushedThisPass = true;
         }
@@ -564,6 +672,10 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
         if (outSupportVelocity != nullptr && supportObjectId >= 0)
         {
             *outSupportVelocity = supportVelocity;
+        }
+        if (outCrushed != nullptr)
+        {
+            *outCrushed = crushed;
         }
     }
 
@@ -1887,7 +1999,8 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               D3DXVECTOR3* outSlideMove,
                               int* outSlideCount,
                               int* outSupportObjectId,
-                              D3DXVECTOR3* outSupportVelocity)
+                              D3DXVECTOR3* outSupportVelocity,
+                              bool* outCrushed)
 {
     D3DXVECTOR3 nextPosition = currentPosition + moveVector * kDeltaSeconds;
     D3DXVECTOR3 nextMoveVector = moveVector;
@@ -1899,6 +2012,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     int slideCount = 0;
     int supportObjectId = -1;
     D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
+    bool crushed = false;
 
     if (outPassThroughIds != nullptr)
     {
@@ -2121,7 +2235,8 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                       &nextPosition,
                                       &pushNormal,
                                       &pushSupportObjectId,
-                                      &pushSupportVelocity))
+                                      &pushSupportVelocity,
+                                      &crushed))
     {
         collided = true;
         lastHitNormal = pushNormal;
@@ -2169,6 +2284,10 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     if (outSupportVelocity != nullptr)
     {
         *outSupportVelocity = supportVelocity;
+    }
+    if (outCrushed != nullptr)
+    {
+        *outCrushed = crushed;
     }
 
     return collided;

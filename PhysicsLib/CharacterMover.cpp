@@ -17,6 +17,7 @@ CharacterMover::CharacterMover()
       m_groundNormal(0.0f, 1.0f, 0.0f),
       m_isGrounded(true),
       m_isTouchingWall(false),
+      m_isCrushed(false),
       m_supportObjectId(-1),
       m_remainingAirJumps(0),
       m_chargeJumpTimer(0.0f),
@@ -35,6 +36,7 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
       m_groundNormal(0.0f, 1.0f, 0.0f),
       m_isGrounded(true),
       m_isTouchingWall(false),
+      m_isCrushed(false),
       m_supportObjectId(-1),
       m_remainingAirJumps(0),
       m_chargeJumpTimer(0.0f),
@@ -84,6 +86,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_groundNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     m_isGrounded = true;
     m_isTouchingWall = false;
+    m_isCrushed = false;
     m_supportObjectId = -1;
     m_remainingAirJumps = 1;
     m_chargeJumpTimer = 0.0f;
@@ -129,6 +132,11 @@ bool CharacterMover::IsChargingJump() const
 bool CharacterMover::IsJumping() const
 {
     return m_didJump && (m_isChargingJump || !IsGrounded());
+}
+
+bool CharacterMover::IsCrushed() const
+{
+    return m_isCrushed;
 }
 
 bool CharacterMover::JustJumped() const
@@ -237,6 +245,8 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     }
 
     m_justJumped = false;
+    m_isCrushed = false;
+    bool crushedThisFrame = false;
 
     const PhysicsLib::ShapeType shapeType = SettingsState::GetShapeType();
     float radius = SettingsState::GetRadius();
@@ -271,6 +281,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             const D3DXVECTOR3 collisionPosition = m_position + D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
             D3DXVECTOR3 carriedCollisionPosition = collisionPosition;
             D3DXVECTOR3 unusedNextMoveVector = supportVelocity;
+            bool carriedCrushed = false;
             PhysicsLib::CheckCollide(collisionPosition,
                                      D3DXVECTOR3(0.0f, supportVelocity.y, 0.0f),
                                      shapeType,
@@ -279,8 +290,20 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                      nullptr,
                                      nullptr,
                                      radius,
-                                     height);
+                                     height,
+                                     nullptr,
+                                     nullptr,
+                                     nullptr,
+                                     nullptr,
+                                     nullptr,
+                                     nullptr,
+                                     nullptr,
+                                     &carriedCrushed);
             m_position = carriedCollisionPosition - D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
+            if (carriedCrushed)
+            {
+                crushedThisFrame = true;
+            }
         }
         else if (supportVelocity.y < -0.0001f)
         {
@@ -439,6 +462,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     D3DXVECTOR3 lastSlideMove(0.0f, 0.0f, 0.0f);
     int slideCount = 0;
     int supportObjectId = -1;
+    bool crushed = false;
     const bool collided = PhysicsLib::CheckCollide(collisionPosition,
                                                     m_velocity,
                                                     shapeType,
@@ -454,9 +478,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &lastSlideMove,
                                                    &slideCount,
                                                    &supportObjectId,
-                                                   nullptr);
+                                                   nullptr,
+                                                   &crushed);
     m_position = nextCollisionPosition - D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
     m_velocity = nextVelocity;
+    m_isCrushed = crushedThisFrame || crushed;
     const bool wasInAir = !m_isGrounded;
     if (SettingsState::IsGravityEnabled())
     {
@@ -500,6 +526,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     m_debugInfo.lastHitDistance = lastHitDistance;
     m_debugInfo.lastSlideMove = lastSlideMove;
     m_debugInfo.slideCount = slideCount;
+    m_debugInfo.crushed = m_isCrushed;
     return collided;
 }
 }

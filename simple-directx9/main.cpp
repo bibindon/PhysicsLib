@@ -1238,10 +1238,16 @@ void Render()
     {
         wallText = _T("ON");
     }
+    const TCHAR* crushedText = _T("OFF");
+    if (g_playerMover.IsCrushed())
+    {
+        crushedText = _T("ON");
+    }
     _stprintf_s(contactText,
-                _T("Ground=%s  Wall=%s  Velocity(%.2f, %.2f, %.2f)  Speed=%.2f"),
+                _T("Ground=%s  Wall=%s  Crushed=%s  Velocity(%.2f, %.2f, %.2f)  Speed=%.2f"),
                 groundText,
                 wallText,
+                crushedText,
                 playerVelocity.x,
                 playerVelocity.y,
                 playerVelocity.z,

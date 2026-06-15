@@ -154,7 +154,8 @@ public:
                              D3DXVECTOR3* outSlideMove = nullptr,
                              int* outSlideCount = nullptr,
                              int* outSupportObjectId = nullptr,
-                             D3DXVECTOR3* outSupportVelocity = nullptr);
+                             D3DXVECTOR3* outSupportVelocity = nullptr,
+                             bool* outCrushed = nullptr);
 
     // 指定IDのオブジェクトと position の距離が distance 以下かを判定する。
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
@@ -241,6 +242,9 @@ private:
                                   float radius,
                                   float height);
     static bool IntersectsAabb3D(const Aabb3D& a, const Aabb3D& b);
+    static bool IsShapeBlockedOppositePush(size_t pushingObjectIndex,
+                                           const Aabb3D& shapeBounds,
+                                           const D3DXVECTOR3& pushVector);
     static bool ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPosition,
                                               ShapeType shapeType,
                                               float radius,
@@ -248,7 +252,8 @@ private:
                                               D3DXVECTOR3* inOutPosition,
                                               D3DXVECTOR3* outPushNormal,
                                               int* outSupportObjectId,
-                                              D3DXVECTOR3* outSupportVelocity);
+                                              D3DXVECTOR3* outSupportVelocity,
+                                              bool* outCrushed);
     static bool ComputeMeshLocalBounds(LPD3DXMESH mesh, D3DXVECTOR3* outMin, D3DXVECTOR3* outMax);
     static void SplitQuadTreeNode(QuadTreeNode* node);
     static bool InsertIntoChildIfContained(QuadTreeNode* node,
@@ -287,6 +292,7 @@ public:
         D3DXVECTOR3 lastSlideMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
         float lastHitDistance = 0.0f;
         float lastNormalMove = 0.0f;
+        bool crushed = false;
     };
 
     // プレイヤー移動の設定値である。
@@ -351,6 +357,7 @@ public:
     bool IsTouchingWall() const;
     bool IsChargingJump() const;
     bool IsJumping() const;
+    bool IsCrushed() const;
 
     // Update() でジャンプが実際に成功したフレームでのみ true を返す。
     bool JustJumped() const;
@@ -387,6 +394,7 @@ private:
     D3DXVECTOR3 m_groundNormal;
     bool m_isGrounded;
     bool m_isTouchingWall;
+    bool m_isCrushed;
     int m_supportObjectId;
 
     // 空中であと何回ジャンプできるかを表す。主に2段ジャンプ用である。
