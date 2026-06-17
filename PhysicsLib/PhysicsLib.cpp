@@ -556,8 +556,6 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
                                                D3DXVECTOR3* outSupportVelocity,
                                                bool* outCrushed)
 {
-    UNREFERENCED_PARAMETER(currentPosition);
-
     if (inOutPosition == nullptr)
     {
         return false;
@@ -574,6 +572,7 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
     {
         bool pushedThisPass = false;
         Aabb3D shapeBounds = MakeShapeAabb3D(position, shapeType, radius, height);
+        const Aabb3D currentShapeBounds = MakeShapeAabb3D(currentPosition, shapeType, radius, height);
 
         for (size_t i = 0; i < g_simpleObjects.size(); ++i)
         {
@@ -603,32 +602,42 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
             const float negativeY = objectBounds.minY - shapeBounds.maxY - kGroundContactOffset;
             const float positiveZ = objectBounds.maxZ - shapeBounds.minZ + kGroundContactOffset;
             const float negativeZ = objectBounds.minZ - shapeBounds.maxZ - kGroundContactOffset;
+            const float contactTolerance = kGroundContactOffset * 8.0f;
+            const bool wasAboveObject = currentShapeBounds.minY >= objectBounds.maxY - contactTolerance;
+            const bool wasBelowObject = currentShapeBounds.maxY <= objectBounds.minY + contactTolerance;
+            const bool overlapsObjectTop = shapeBounds.minY <= objectBounds.maxY + contactTolerance &&
+                                           shapeBounds.maxY > objectBounds.maxY + contactTolerance;
+            const bool overlapsObjectBottom = shapeBounds.maxY >= objectBounds.minY - contactTolerance &&
+                                              shapeBounds.minY < objectBounds.minY - contactTolerance;
+            const bool centerAboveTop = position.y >= objectBounds.maxY - contactTolerance;
+            const bool centerBelowBottom = position.y <= objectBounds.minY + contactTolerance;
 
             D3DXVECTOR3 pushVector(positiveX, 0.0f, 0.0f);
             float bestAmount = fabsf(positiveX);
-            if (fabsf(negativeX) < bestAmount)
-            {
-                pushVector = D3DXVECTOR3(negativeX, 0.0f, 0.0f);
-                bestAmount = fabsf(negativeX);
-            }
-            if (fabsf(positiveY) < bestAmount)
+            if ((wasAboveObject || centerAboveTop) && overlapsObjectTop)
             {
                 pushVector = D3DXVECTOR3(0.0f, positiveY, 0.0f);
-                bestAmount = fabsf(positiveY);
             }
-            if (fabsf(negativeY) < bestAmount)
+            else if ((wasBelowObject || centerBelowBottom) && overlapsObjectBottom)
             {
                 pushVector = D3DXVECTOR3(0.0f, negativeY, 0.0f);
-                bestAmount = fabsf(negativeY);
             }
-            if (fabsf(positiveZ) < bestAmount)
+            else
             {
-                pushVector = D3DXVECTOR3(0.0f, 0.0f, positiveZ);
-                bestAmount = fabsf(positiveZ);
-            }
-            if (fabsf(negativeZ) < bestAmount)
-            {
-                pushVector = D3DXVECTOR3(0.0f, 0.0f, negativeZ);
+                if (fabsf(negativeX) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(negativeX, 0.0f, 0.0f);
+                    bestAmount = fabsf(negativeX);
+                }
+                if (fabsf(positiveZ) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(0.0f, 0.0f, positiveZ);
+                    bestAmount = fabsf(positiveZ);
+                }
+                if (fabsf(negativeZ) < bestAmount)
+                {
+                    pushVector = D3DXVECTOR3(0.0f, 0.0f, negativeZ);
+                }
             }
 
             position += pushVector;
