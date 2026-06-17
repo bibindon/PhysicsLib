@@ -25,6 +25,7 @@ namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
 constexpr float kGroundContactOffset = 0.0005f;
+constexpr float kMovingSlidePenetrationPushSpeed = 3.0f;
 constexpr int kQuadTreeMaxDepth = 5;
 constexpr size_t kQuadTreeNodeCapacity = 4;
 
@@ -567,9 +568,15 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
     int supportObjectId = -1;
     D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
     bool crushed = false;
+    float remainingPushDistance = kMovingSlidePenetrationPushSpeed * kDeltaSeconds;
 
     for (int pass = 0; pass < 4; ++pass)
     {
+        if (remainingPushDistance <= 0.0001f)
+        {
+            break;
+        }
+
         bool pushedThisPass = false;
         Aabb3D shapeBounds = MakeShapeAabb3D(position, shapeType, radius, height);
         const Aabb3D currentShapeBounds = MakeShapeAabb3D(currentPosition, shapeType, radius, height);
@@ -640,7 +647,14 @@ bool PhysicsLib::ResolveMovingSlidePenetration(const D3DXVECTOR3& currentPositio
                 }
             }
 
+            const float pushLength = D3DXVec3Length(&pushVector);
+            if (pushLength > remainingPushDistance && pushLength > 0.0001f)
+            {
+                pushVector *= remainingPushDistance / pushLength;
+            }
+
             position += pushVector;
+            remainingPushDistance -= D3DXVec3Length(&pushVector);
             lastNormal = pushVector;
             if (D3DXVec3Length(&lastNormal) > 0.0001f)
             {
