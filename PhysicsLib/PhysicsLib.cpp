@@ -25,6 +25,7 @@ namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
 constexpr float kGroundContactOffset = 0.0005f;
+constexpr float kSlideCastLookAhead = kGroundContactOffset * 48.0f;
 constexpr float kMovingSlidePenetrationPushSpeed = 3.0f;
 constexpr int kQuadTreeMaxDepth = 5;
 constexpr size_t kQuadTreeNodeCapacity = 4;
@@ -2141,7 +2142,11 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                     lastSlideMove = slideMove;
                     if (D3DXVec3Length(&slideMove) > 0.0001f)
                     {
+                        D3DXVECTOR3 slideDirection = slideMove;
+                        D3DXVec3Normalize(&slideDirection, &slideDirection);
                         D3DXVECTOR3 slideEndPosition = nextPosition + slideMove;
+                        const D3DXVECTOR3 slideCastEndPosition =
+                            slideEndPosition + slideDirection * kSlideCastLookAhead;
                         D3DXVECTOR3 slideHitPoint;
                         D3DXVECTOR3 slideHitNormal;
                         float slideHitDistance = 0.0f;
@@ -2150,7 +2155,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                         D3DXVECTOR3 nearestSlideNormal(0.0f, 1.0f, 0.0f);
                         float nearestSlideDistance = std::numeric_limits<float>::max();
                         const std::vector<size_t> slideCandidateIndices =
-                            BuildCollisionCandidateIndices(nextPosition, slideEndPosition, radius);
+                            BuildCollisionCandidateIndices(nextPosition, slideCastEndPosition, radius);
                         for (size_t candidateIndex = 0; candidateIndex < slideCandidateIndices.size(); ++candidateIndex)
                         {
                             const size_t i = slideCandidateIndices[candidateIndex];
@@ -2162,7 +2167,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                             if (RayCastShapeObject(g_simpleObjects[i].mesh,
                                                    g_simpleObjects[i].transform,
                                                    nextPosition,
-                                                   slideEndPosition,
+                                                   slideCastEndPosition,
                                                    shapeType,
                                                    radius,
                                                    height,
@@ -2181,7 +2186,12 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                     continue;
                                 }
 
-                                nearestSlidePoint = slideHitPoint;
+                                float safeSlideDistance = slideHitDistance - kSlideCastLookAhead;
+                                if (safeSlideDistance < 0.0f)
+                                {
+                                    safeSlideDistance = 0.0f;
+                                }
+                                nearestSlidePoint = nextPosition + slideDirection * safeSlideDistance;
                                 nearestSlideNormal = slideHitNormal;
                                 nearestSlideDistance = slideHitDistance;
                                 slideBlocked = true;
@@ -2216,8 +2226,12 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
 
                                 if (D3DXVec3Length(&secondSlideMove) > 0.0001f)
                                 {
+                                    D3DXVECTOR3 secondSlideDirection = secondSlideMove;
+                                    D3DXVec3Normalize(&secondSlideDirection, &secondSlideDirection);
                                     const D3DXVECTOR3 secondSlideEndPosition =
                                         secondSlideStartPosition + secondSlideMove;
+                                    const D3DXVECTOR3 secondSlideCastEndPosition =
+                                        secondSlideEndPosition + secondSlideDirection * kSlideCastLookAhead;
                                     D3DXVECTOR3 secondSlideHitPoint;
                                     D3DXVECTOR3 secondSlideHitNormal;
                                     float secondSlideHitDistance = 0.0f;
@@ -2226,7 +2240,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                     float nearestSecondSlideDistance = std::numeric_limits<float>::max();
                                     const std::vector<size_t> secondSlideCandidateIndices =
                                         BuildCollisionCandidateIndices(secondSlideStartPosition,
-                                                                       secondSlideEndPosition,
+                                                                       secondSlideCastEndPosition,
                                                                        radius);
                                     for (size_t candidateIndex = 0;
                                          candidateIndex < secondSlideCandidateIndices.size();
@@ -2242,7 +2256,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                         if (RayCastShapeObject(g_simpleObjects[i].mesh,
                                                                g_simpleObjects[i].transform,
                                                                secondSlideStartPosition,
-                                                               secondSlideEndPosition,
+                                                               secondSlideCastEndPosition,
                                                                shapeType,
                                                                radius,
                                                                height,
