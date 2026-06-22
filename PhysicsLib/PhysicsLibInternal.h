@@ -9,7 +9,7 @@ enum class InertiaMode
 {
     None = 0,
     Legacy = 1,
-    FixedHalfSecond = 2,
+    PseudoInertia = 2,
 };
 
 class SettingsState
