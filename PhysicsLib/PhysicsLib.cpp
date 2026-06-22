@@ -2191,72 +2191,108 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                         ++slideCount;
                         if (slideBlocked)
                         {
-                            nextPosition = nearestSlidePoint + nearestSlideNormal * kGroundContactOffset;
-                            nextMoveVector = RemoveIntoSurfaceVelocity(nextMoveVector, nearestSlideNormal);
-                            lastHitNormal = nearestSlideNormal;
-                            lastHitDistance = nearestSlideDistance;
-                        }
-                        else
-                        {
                             if (SettingsState::IsSlideCheckEnabled())
                             {
-                                D3DXVECTOR3 secondSlideHitPoint;
-                                D3DXVECTOR3 secondSlideHitNormal;
-                                float secondSlideHitDistance = 0.0f;
-                                bool secondSlideBlocked = false;
-                                D3DXVECTOR3 nearestSecondSlidePoint = slideEndPosition;
-                                D3DXVECTOR3 nearestSecondSlideNormal(0.0f, 1.0f, 0.0f);
-                                float nearestSecondSlideDistance = std::numeric_limits<float>::max();
-                                const std::vector<size_t> secondSlideCandidateIndices =
-                                    BuildCollisionCandidateIndices(currentPosition, slideEndPosition, radius);
-                                for (size_t candidateIndex = 0; candidateIndex < secondSlideCandidateIndices.size(); ++candidateIndex)
+                                const D3DXVECTOR3 slideHitMove = nearestSlidePoint - nextPosition;
+                                const D3DXVECTOR3 secondRemainingMove = slideMove - slideHitMove;
+                                const float secondSlideNormalMove =
+                                    D3DXVec3Dot(&secondRemainingMove, &nearestSlideNormal);
+                                D3DXVECTOR3 secondSlideMove =
+                                    secondRemainingMove - nearestSlideNormal * secondSlideNormalMove;
+                                const float firstSlideNormalMove =
+                                    D3DXVec3Dot(&secondSlideMove, &nearestNormal);
+                                if (firstSlideNormalMove < 0.0f)
                                 {
-                                    const size_t i = secondSlideCandidateIndices[candidateIndex];
-                                    if (g_simpleObjects[i].objectType == ObjectType::PassThrough || g_simpleObjects[i].mesh == NULL)
-                                    {
-                                        continue;
-                                    }
+                                    secondSlideMove -= nearestNormal * firstSlideNormalMove;
+                                }
 
-                                    if (RayCastShapeObject(g_simpleObjects[i].mesh,
-                                                           g_simpleObjects[i].transform,
-                                                           currentPosition,
-                                                           slideEndPosition,
-                                                           shapeType,
-                                                           radius,
-                                                           height,
-                                                           &secondSlideHitPoint,
-                                                           &secondSlideHitNormal,
-                                                           &secondSlideHitDistance))
+                                const D3DXVECTOR3 secondSlideStartPosition =
+                                    nearestSlidePoint + nearestSlideNormal * kGroundContactOffset;
+                                nextPosition = secondSlideStartPosition;
+                                nextMoveVector = RemoveIntoSurfaceVelocity(nextMoveVector, nearestSlideNormal);
+                                lastHitNormal = nearestSlideNormal;
+                                lastHitDistance = nearestSlideDistance;
+                                lastSlideMove = secondSlideMove;
+
+                                if (D3DXVec3Length(&secondSlideMove) > 0.0001f)
+                                {
+                                    const D3DXVECTOR3 secondSlideEndPosition =
+                                        secondSlideStartPosition + secondSlideMove;
+                                    D3DXVECTOR3 secondSlideHitPoint;
+                                    D3DXVECTOR3 secondSlideHitNormal;
+                                    float secondSlideHitDistance = 0.0f;
+                                    bool secondSlideBlocked = false;
+                                    D3DXVECTOR3 nearestSecondSlideNormal(0.0f, 1.0f, 0.0f);
+                                    float nearestSecondSlideDistance = std::numeric_limits<float>::max();
+                                    const std::vector<size_t> secondSlideCandidateIndices =
+                                        BuildCollisionCandidateIndices(secondSlideStartPosition,
+                                                                       secondSlideEndPosition,
+                                                                       radius);
+                                    for (size_t candidateIndex = 0;
+                                         candidateIndex < secondSlideCandidateIndices.size();
+                                         ++candidateIndex)
                                     {
-                                        if (secondSlideHitDistance >= nearestSecondSlideDistance)
+                                        const size_t i = secondSlideCandidateIndices[candidateIndex];
+                                        if (g_simpleObjects[i].objectType == ObjectType::PassThrough ||
+                                            g_simpleObjects[i].mesh == NULL)
                                         {
                                             continue;
                                         }
 
-                                        nearestSecondSlidePoint = secondSlideHitPoint;
-                                        nearestSecondSlideNormal = secondSlideHitNormal;
-                                        nearestSecondSlideDistance = secondSlideHitDistance;
-                                        secondSlideBlocked = true;
-                                    }
-                                }
+                                        if (RayCastShapeObject(g_simpleObjects[i].mesh,
+                                                               g_simpleObjects[i].transform,
+                                                               secondSlideStartPosition,
+                                                               secondSlideEndPosition,
+                                                               shapeType,
+                                                               radius,
+                                                               height,
+                                                               &secondSlideHitPoint,
+                                                               &secondSlideHitNormal,
+                                                               &secondSlideHitDistance))
+                                        {
+                                            if (secondSlideHitDistance >= nearestSecondSlideDistance)
+                                            {
+                                                continue;
+                                            }
 
-                                ++slideCount;
-                                if (secondSlideBlocked)
-                                {
-                                    nextPosition = currentPosition;
-                                    nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-                                    lastHitNormal = nearestSecondSlideNormal;
-                                    lastHitDistance = nearestSecondSlideDistance;
-                                }
-                                else
-                                {
-                                    nextPosition = slideEndPosition;
+                                            const float secondSlideHitNormalMove =
+                                                D3DXVec3Dot(&secondSlideMove, &secondSlideHitNormal);
+                                            if (secondSlideHitNormalMove > 0.0f)
+                                            {
+                                                continue;
+                                            }
+
+                                            nearestSecondSlideNormal = secondSlideHitNormal;
+                                            nearestSecondSlideDistance = secondSlideHitDistance;
+                                            secondSlideBlocked = true;
+                                        }
+                                    }
+
+                                    ++slideCount;
+                                    if (secondSlideBlocked)
+                                    {
+                                        nextPosition = currentPosition;
+                                        nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+                                        lastHitNormal = nearestSecondSlideNormal;
+                                        lastHitDistance = nearestSecondSlideDistance;
+                                    }
+                                    else
+                                    {
+                                        nextPosition = secondSlideEndPosition;
+                                    }
                                 }
                             }
                             else
                             {
-                                nextPosition = slideEndPosition;
+                                nextPosition = nearestSlidePoint + nearestSlideNormal * kGroundContactOffset;
+                                nextMoveVector = RemoveIntoSurfaceVelocity(nextMoveVector, nearestSlideNormal);
+                                lastHitNormal = nearestSlideNormal;
+                                lastHitDistance = nearestSlideDistance;
                             }
+                        }
+                        else
+                        {
+                            nextPosition = slideEndPosition;
                         }
                     }
                 }
