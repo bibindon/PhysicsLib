@@ -335,21 +335,23 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     const InertiaMode inertiaMode = SettingsState::GetInertiaMode();
     if (inertiaMode != InertiaMode::None)
     {
-        float acceleration = m_settings.groundAcceleration;
+        float moveAcceleration = m_settings.groundAcceleration;
+        float stopAcceleration = m_settings.groundAcceleration;
         if (inertiaMode == InertiaMode::FixedHalfSecond)
         {
-            acceleration = m_settings.moveSpeed / kFixedInertiaDuration;
+            moveAcceleration = m_settings.moveSpeed / kFixedInertiaDuration;
+            stopAcceleration = SettingsState::GetDashSpeed() / kFixedInertiaDuration;
         }
 
         if (canChangeMoveDirection && D3DXVec3Length(&inputMove) > 0.0001f)
         {
             if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
             {
-                MoveVelocityToward(&m_velocity, inputMove, acceleration);
+                MoveVelocityToward(&m_velocity, inputMove, moveAcceleration);
             }
             else
             {
-                MoveHorizontalVelocityToward(&m_velocity, inputMove, acceleration);
+                MoveHorizontalVelocityToward(&m_velocity, inputMove, moveAcceleration);
             }
         }
         else if (m_isGrounded)
@@ -358,13 +360,13 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             {
                 MoveVelocityToward(&m_velocity,
                                    D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                   acceleration);
+                                   stopAcceleration);
             }
             else
             {
                 MoveHorizontalVelocityToward(&m_velocity,
                                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                             acceleration);
+                                             stopAcceleration);
             }
         }
         if (inertiaMode == InertiaMode::Legacy &&
