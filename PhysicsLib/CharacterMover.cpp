@@ -9,7 +9,7 @@ namespace PhysicsLib
 namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
-constexpr float kFixedInertiaDuration = 0.5f;
+constexpr float kFixedInertiaDuration = 0.25f;
 }
 
 CharacterMover::CharacterMover()
@@ -340,7 +340,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         if (inertiaMode == InertiaMode::FixedHalfSecond)
         {
             moveAcceleration = m_settings.moveSpeed / kFixedInertiaDuration;
-            stopAcceleration = SettingsState::GetDashSpeed() / kFixedInertiaDuration;
+            stopAcceleration = m_settings.moveSpeed / kFixedInertiaDuration;
         }
 
         if (canChangeMoveDirection && D3DXVec3Length(&inputMove) > 0.0001f)
