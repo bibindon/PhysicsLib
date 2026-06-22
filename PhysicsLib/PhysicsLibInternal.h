@@ -5,6 +5,13 @@
 
 namespace PhysicsLib
 {
+enum class InertiaMode
+{
+    None = 0,
+    Legacy = 1,
+    FixedHalfSecond = 2,
+};
+
 class SettingsState
 {
 public:
@@ -14,8 +21,8 @@ public:
     static void SetInfiniteJumpEnabled(bool enabled);
     static bool IsGravityEnabled();
     static void SetGravityEnabled(bool enabled);
-    static bool IsInertiaEnabled();
-    static void SetInertiaEnabled(bool enabled);
+    static InertiaMode GetInertiaMode();
+    static void SetInertiaMode(InertiaMode mode);
     static bool IsSlideEnabled();
     static void SetSlideEnabled(bool enabled);
     static bool IsSlideCheckEnabled();

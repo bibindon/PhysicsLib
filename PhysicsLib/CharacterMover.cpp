@@ -9,6 +9,7 @@ namespace PhysicsLib
 namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
+constexpr float kFixedInertiaDuration = 0.5f;
 }
 
 CharacterMover::CharacterMover()
@@ -331,17 +332,24 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         inputMove *= m_settings.moveSpeed;
     }
 
-    if (SettingsState::IsInertiaEnabled())
+    const InertiaMode inertiaMode = SettingsState::GetInertiaMode();
+    if (inertiaMode != InertiaMode::None)
     {
+        float acceleration = m_settings.groundAcceleration;
+        if (inertiaMode == InertiaMode::FixedHalfSecond)
+        {
+            acceleration = m_settings.moveSpeed / kFixedInertiaDuration;
+        }
+
         if (canChangeMoveDirection && D3DXVec3Length(&inputMove) > 0.0001f)
         {
             if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
             {
-                MoveVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
+                MoveVelocityToward(&m_velocity, inputMove, acceleration);
             }
             else
             {
-                MoveHorizontalVelocityToward(&m_velocity, inputMove, m_settings.groundAcceleration);
+                MoveHorizontalVelocityToward(&m_velocity, inputMove, acceleration);
             }
         }
         else if (m_isGrounded)
@@ -350,16 +358,18 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             {
                 MoveVelocityToward(&m_velocity,
                                    D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                   m_settings.groundAcceleration);
+                                   acceleration);
             }
             else
             {
                 MoveHorizontalVelocityToward(&m_velocity,
                                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
-                                             m_settings.groundAcceleration);
+                                             acceleration);
             }
         }
-        if (m_isGrounded && D3DXVec3Length(&inputMove) < 0.0001f)
+        if (inertiaMode == InertiaMode::Legacy &&
+            m_isGrounded &&
+            D3DXVec3Length(&inputMove) < 0.0001f)
         {
             const float strength = SettingsState::GetInertiaStrength();
             m_velocity.x *= strength;

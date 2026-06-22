@@ -17,7 +17,7 @@ const int kInfiniteJumpCheckboxId = kSettingsCheckboxStartId + 1;
 const int kGravityCheckboxId = kSettingsCheckboxStartId + 2;
 const int kSlideCheckboxId = kSettingsCheckboxStartId + 3;
 const int kOptimizationCheckboxId = kSettingsCheckboxStartId + 4;
-const int kInertiaCheckboxId = kSettingsCheckboxStartId + 5;
+const int kInertiaModeComboBoxId = kSettingsCheckboxStartId + 5;
 const int kContactCheckboxId = kSettingsCheckboxStartId + 6;
 const int kSurfaceContactCheckboxId = kSettingsCheckboxStartId + 7;
 const int kTangentMoveCheckboxId = kSettingsCheckboxStartId + 8;
@@ -115,10 +115,15 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             return 0;
         }
 
-        if (LOWORD(wParam) == kInertiaCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        if (LOWORD(wParam) == kInertiaModeComboBoxId && HIWORD(wParam) == CBN_SELCHANGE)
         {
-            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
-            SettingsState::SetInertiaEnabled(checkState == BST_CHECKED);
+            const LRESULT selectedIndex = SendMessage(reinterpret_cast<HWND>(lParam), CB_GETCURSEL, 0, 0);
+            if (selectedIndex >= 0 && selectedIndex <= 2)
+            {
+                SettingsState::SetInertiaMode(static_cast<InertiaMode>(selectedIndex));
+                EnableWindow(GetDlgItem(window, kInertiaStrengthEditBoxId),
+                             selectedIndex == static_cast<LRESULT>(InertiaMode::Legacy));
+            }
             return 0;
         }
 
@@ -395,6 +400,40 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
 
     for (int i = 0; i < static_cast<int>(sizeof(kSettingsCheckboxLabels) / sizeof(kSettingsCheckboxLabels[0])); ++i)
     {
+        if (kSettingsCheckboxStartId + i == kInertiaModeComboBoxId)
+        {
+            CreateWindow(_T("STATIC"),
+                         _T("慣性移動:"),
+                         WS_CHILD | WS_VISIBLE,
+                         16,
+                         18 + i * 30,
+                         80,
+                         24,
+                         g_settingsDialog,
+                         NULL,
+                         instance,
+                         NULL);
+            HWND inertiaModeComboBox = CreateWindow(_T("COMBOBOX"),
+                                                     NULL,
+                                                     WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
+                                                     100,
+                                                     16 + i * 30,
+                                                     130,
+                                                     100,
+                                                     g_settingsDialog,
+                                                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInertiaModeComboBoxId)),
+                                                     instance,
+                                                     NULL);
+            SendMessage(inertiaModeComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("なし")));
+            SendMessage(inertiaModeComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("あり")));
+            SendMessage(inertiaModeComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("あり2 (0.5秒)")));
+            SendMessage(inertiaModeComboBox,
+                        CB_SETCURSEL,
+                        static_cast<WPARAM>(SettingsState::GetInertiaMode()),
+                        0);
+            continue;
+        }
+
         HWND checkbox = CreateWindow(_T("BUTTON"),
                                      kSettingsCheckboxLabels[i],
                                      WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
@@ -428,15 +467,6 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
         {
             LRESULT checkState = BST_UNCHECKED;
             if (SettingsState::IsInfiniteJumpEnabled())
-            {
-                checkState = BST_CHECKED;
-            }
-            SendMessage(checkbox, BM_SETCHECK, checkState, 0);
-        }
-        else if (kSettingsCheckboxStartId + i == kInertiaCheckboxId)
-        {
-            LRESULT checkState = BST_UNCHECKED;
-            if (SettingsState::IsInertiaEnabled())
             {
                 checkState = BST_CHECKED;
             }
@@ -801,7 +831,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  NULL);
 
     CreateWindow(_T("STATIC"),
-                 _T("慣性:"),
+                 _T("慣性の強さ:"),
                  WS_CHILD | WS_VISIBLE,
                  16,
                  750,
@@ -814,17 +844,18 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
 
     TCHAR inertiaText[32];
     _stprintf_s(inertiaText, _T("%.2f"), SettingsState::GetInertiaStrength());
-    CreateWindow(_T("EDIT"),
-                 inertiaText,
-                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
-                 150,
-                 750,
-                 80,
-                 24,
-                 g_settingsDialog,
-                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInertiaStrengthEditBoxId)),
-                 instance,
-                  NULL);
+    HWND inertiaStrengthEditBox = CreateWindow(_T("EDIT"),
+                                                inertiaText,
+                                                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                                                150,
+                                                750,
+                                                80,
+                                                24,
+                                                g_settingsDialog,
+                                                reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInertiaStrengthEditBoxId)),
+                                                instance,
+                                                NULL);
+    EnableWindow(inertiaStrengthEditBox, SettingsState::GetInertiaMode() == InertiaMode::Legacy);
 
     CreateWindow(_T("STATIC"),
                  _T("歩き速度:"),

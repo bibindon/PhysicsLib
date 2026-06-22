@@ -48,7 +48,7 @@ int g_simpleNextId = 1;
 bool g_doubleJumpEnabled = false;
 bool g_infiniteJumpEnabled = true;
 bool g_gravityEnabled = true;
-bool g_inertiaEnabled = true;
+InertiaMode g_inertiaMode = InertiaMode::Legacy;
 bool g_slideEnabled = true;
 bool g_slideCheckEnabled = true;
 bool g_tangentMoveEnabled = true;
@@ -1409,14 +1409,14 @@ void SettingsState::SetGravityEnabled(bool enabled)
     g_gravityEnabled = enabled;
 }
 
-bool SettingsState::IsInertiaEnabled()
+InertiaMode SettingsState::GetInertiaMode()
 {
-    return g_inertiaEnabled;
+    return g_inertiaMode;
 }
 
-void SettingsState::SetInertiaEnabled(bool enabled)
+void SettingsState::SetInertiaMode(InertiaMode mode)
 {
-    g_inertiaEnabled = enabled;
+    g_inertiaMode = mode;
 }
 
 bool SettingsState::IsSlideEnabled()
