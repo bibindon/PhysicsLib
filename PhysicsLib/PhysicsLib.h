@@ -354,6 +354,8 @@ public:
     void SetPosition(const D3DXVECTOR3& position);
     D3DXVECTOR3 GetPosition() const;
 
+    // 現在の水平速度を維持したまま、上向き速度を与えて空中状態にする。
+    void ApplyUpwardVelocity(float upwardVelocity);
     D3DXVECTOR3 GetVelocity() const;
 
     bool IsGrounded() const;

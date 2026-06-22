@@ -110,6 +110,22 @@ D3DXVECTOR3 CharacterMover::GetPosition() const
     return m_position;
 }
 
+void CharacterMover::ApplyUpwardVelocity(const float upwardVelocity)
+{
+    if (upwardVelocity <= 0.0f)
+    {
+        return;
+    }
+
+    m_velocity.y = upwardVelocity;
+    m_isGrounded = false;
+    m_supportObjectId = -1;
+    m_isChargingJump = false;
+    m_isInLanding = false;
+    m_didJump = true;
+    m_justJumped = true;
+}
+
 D3DXVECTOR3 CharacterMover::GetVelocity() const
 {
     return m_velocity;
