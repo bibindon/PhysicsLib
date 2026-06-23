@@ -354,6 +354,9 @@ public:
     void SetPosition(const D3DXVECTOR3& position);
     D3DXVECTOR3 GetPosition() const;
 
+    // 現在向いている方向へのダッシュを次の Update() で要求する。
+    void RequestDash(const D3DXVECTOR3& direction);
+
     // 現在の水平速度を維持したまま、上向き速度を与えて空中状態にする。
     void ApplyUpwardVelocity(float upwardVelocity);
     D3DXVECTOR3 GetVelocity() const;
@@ -404,6 +407,24 @@ private:
 
     // 空中であと何回ジャンプできるかを表す。主に2段ジャンプ用である。
     int m_remainingAirJumps;
+
+    // 空中であと何回ダッシュできるかを表す。
+    int m_remainingAirDashes;
+
+    // ダッシュ残り時間（秒）である。
+    float m_dashTimer;
+
+    // ダッシュ中かどうかである。
+    bool m_isDashing;
+
+    // 次の Update() でダッシュ要求を処理するかどうかである。
+    bool m_hasPendingDashRequest;
+
+    // ダッシュ方向である。
+    D3DXVECTOR3 m_dashDirection;
+
+    // 要求されたダッシュ方向である。
+    D3DXVECTOR3 m_pendingDashDirection;
 
     // ためジャンプの残り時間（秒）である。
     float m_chargeJumpTimer;

@@ -73,8 +73,14 @@ public:
     static void SetInertiaStrength(float strength);
     static float GetWalkSpeed();
     static void SetWalkSpeed(float speed);
+    static bool IsGroundDashEnabled();
+    static void SetGroundDashEnabled(bool enabled);
+    static bool IsAirDashEnabled();
+    static void SetAirDashEnabled(bool enabled);
     static float GetDashSpeed();
     static void SetDashSpeed(float speed);
+    static float GetDashDuration();
+    static void SetDashDuration(float duration);
 };
 
 class SettingsDialog

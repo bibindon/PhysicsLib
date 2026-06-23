@@ -43,6 +43,9 @@ const int kCuboidRotZEditBoxId = 4408;
 const int kInertiaStrengthEditBoxId = 4409;
 const int kWalkSpeedEditBoxId = 4410;
 const int kDashSpeedEditBoxId = 4411;
+const int kGroundDashCheckboxId = 4414;
+const int kAirDashCheckboxId = 4415;
+const int kDashDurationEditBoxId = 4416;
 
 const TCHAR* kSettingsCheckboxLabels[] =
 {
@@ -194,6 +197,20 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
         {
             const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
             SettingsState::SetLandingStiffnessEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kGroundDashCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SettingsState::SetGroundDashEnabled(checkState == BST_CHECKED);
+            return 0;
+        }
+
+        if (LOWORD(wParam) == kAirDashCheckboxId && HIWORD(wParam) == BN_CLICKED)
+        {
+            const LRESULT checkState = SendMessage(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0);
+            SettingsState::SetAirDashEnabled(checkState == BST_CHECKED);
             return 0;
         }
 
@@ -349,6 +366,18 @@ LRESULT CALLBACK SettingsDialog::Proc(HWND window, UINT message, WPARAM wParam, 
             }
             return 0;
         }
+
+        if (LOWORD(wParam) == kDashDurationEditBoxId && HIWORD(wParam) == EN_CHANGE)
+        {
+            TCHAR buffer[32];
+            GetWindowText(reinterpret_cast<HWND>(lParam), buffer, 32);
+            const float duration = static_cast<float>(_tstof(buffer));
+            if (duration > 0.0f)
+            {
+                SettingsState::SetDashDuration(duration);
+            }
+            return 0;
+        }
     }
 
     if (message == WM_CLOSE)
@@ -388,7 +417,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                        40,
                                        40,
                                         340,
-                                        1080,
+                                        1140,
                                       ownerWindow,
                                       NULL,
                                       instance,
@@ -909,11 +938,73 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  instance,
                  NULL);
 
+    HWND groundDashCheckbox = CreateWindow(_T("BUTTON"),
+                 _T("地上ダッシュ"),
+                 WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                 16,
+                 840,
+                 210,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kGroundDashCheckboxId)),
+                 instance,
+                 NULL);
+    LRESULT groundDashCheckState = BST_UNCHECKED;
+    if (SettingsState::IsGroundDashEnabled())
+    {
+        groundDashCheckState = BST_CHECKED;
+    }
+    SendMessage(groundDashCheckbox, BM_SETCHECK, groundDashCheckState, 0);
+
+    HWND airDashCheckbox = CreateWindow(_T("BUTTON"),
+                 _T("空中ダッシュ"),
+                 WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                 16,
+                 870,
+                 210,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAirDashCheckboxId)),
+                 instance,
+                 NULL);
+    LRESULT airDashCheckState = BST_UNCHECKED;
+    if (SettingsState::IsAirDashEnabled())
+    {
+        airDashCheckState = BST_CHECKED;
+    }
+    SendMessage(airDashCheckbox, BM_SETCHECK, airDashCheckState, 0);
+
+    CreateWindow(_T("STATIC"),
+                 _T("ダッシュ時間:"),
+                 WS_CHILD | WS_VISIBLE,
+                 16,
+                 900,
+                 130,
+                 24,
+                 g_settingsDialog,
+                 NULL,
+                 instance,
+                 NULL);
+
+    TCHAR dashDurationText[32];
+    _stprintf_s(dashDurationText, _T("%.2f"), SettingsState::GetDashDuration());
+    CreateWindow(_T("EDIT"),
+                 dashDurationText,
+                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | WS_TABSTOP,
+                 150,
+                 900,
+                 80,
+                 24,
+                 g_settingsDialog,
+                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kDashDurationEditBoxId)),
+                 instance,
+                 NULL);
+
     HWND chargeCheckbox = CreateWindow(_T("BUTTON"),
                  _T("ためジャンプ"),
                  WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                  16,
-                 850,
+                 930,
                  210,
                  24,
                  g_settingsDialog,
@@ -931,7 +1022,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("着地硬直"),
                  WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                  16,
-                 880,
+                 960,
                  210,
                  24,
                  g_settingsDialog,
@@ -949,7 +1040,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("リセット"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  16,
-                 920,
+                 1000,
                  130,
                  32,
                  g_settingsDialog,
@@ -961,7 +1052,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                  _T("ファイル読込"),
                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                  156,
-                 920,
+                 1000,
                  130,
                  32,
                  g_settingsDialog,

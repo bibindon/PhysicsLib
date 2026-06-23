@@ -75,7 +75,10 @@ float g_cuboidRotZ = 0.0f;
 float g_playerFacingYaw = 0.0f;
 float g_inertiaStrength = 1.0f;
 float g_walkSpeed = 6.0f;
+bool g_groundDashEnabled = false;
+bool g_airDashEnabled = false;
 float g_dashSpeed = 18.0f;
+float g_dashDuration = 0.2f;
 
 std::map<int, std::basic_string<TCHAR> > g_csvFileNames;
 std::map<int, int> g_csvObjectIds;
@@ -1670,6 +1673,26 @@ void SettingsState::SetWalkSpeed(float speed)
     g_walkSpeed = speed;
 }
 
+bool SettingsState::IsGroundDashEnabled()
+{
+    return g_groundDashEnabled;
+}
+
+void SettingsState::SetGroundDashEnabled(bool enabled)
+{
+    g_groundDashEnabled = enabled;
+}
+
+bool SettingsState::IsAirDashEnabled()
+{
+    return g_airDashEnabled;
+}
+
+void SettingsState::SetAirDashEnabled(bool enabled)
+{
+    g_airDashEnabled = enabled;
+}
+
 float SettingsState::GetDashSpeed()
 {
     return g_dashSpeed;
@@ -1678,6 +1701,16 @@ float SettingsState::GetDashSpeed()
 void SettingsState::SetDashSpeed(float speed)
 {
     g_dashSpeed = speed;
+}
+
+float SettingsState::GetDashDuration()
+{
+    return g_dashDuration;
+}
+
+void SettingsState::SetDashDuration(float duration)
+{
+    g_dashDuration = duration;
 }
 
 bool PhysicsLib::IsFocusModeEnabled()

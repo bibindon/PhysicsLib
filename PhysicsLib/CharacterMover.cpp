@@ -21,6 +21,12 @@ CharacterMover::CharacterMover()
       m_isCrushed(false),
       m_supportObjectId(-1),
       m_remainingAirJumps(0),
+      m_remainingAirDashes(1),
+      m_dashTimer(0.0f),
+      m_isDashing(false),
+      m_hasPendingDashRequest(false),
+      m_dashDirection(0.0f, 0.0f, -1.0f),
+      m_pendingDashDirection(0.0f, 0.0f, 0.0f),
       m_chargeJumpTimer(0.0f),
       m_isChargingJump(false),
       m_chargeJumpWasGroundJump(false),
@@ -40,6 +46,12 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
       m_isCrushed(false),
       m_supportObjectId(-1),
       m_remainingAirJumps(0),
+      m_remainingAirDashes(1),
+      m_dashTimer(0.0f),
+      m_isDashing(false),
+      m_hasPendingDashRequest(false),
+      m_dashDirection(0.0f, 0.0f, -1.0f),
+      m_pendingDashDirection(0.0f, 0.0f, 0.0f),
       m_chargeJumpTimer(0.0f),
       m_isChargingJump(false),
       m_chargeJumpWasGroundJump(false),
@@ -90,6 +102,12 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_isCrushed = false;
     m_supportObjectId = -1;
     m_remainingAirJumps = 1;
+    m_remainingAirDashes = 1;
+    m_dashTimer = 0.0f;
+    m_isDashing = false;
+    m_hasPendingDashRequest = false;
+    m_dashDirection = D3DXVECTOR3(0.0f, 0.0f, -1.0f);
+    m_pendingDashDirection = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     m_chargeJumpTimer = 0.0f;
     m_isChargingJump = false;
     m_chargeJumpWasGroundJump = false;
@@ -108,6 +126,19 @@ void CharacterMover::SetPosition(const D3DXVECTOR3& position)
 D3DXVECTOR3 CharacterMover::GetPosition() const
 {
     return m_position;
+}
+
+void CharacterMover::RequestDash(const D3DXVECTOR3& direction)
+{
+    D3DXVECTOR3 horizontalDirection(direction.x, 0.0f, direction.z);
+    if (D3DXVec3LengthSq(&horizontalDirection) <= 0.0001f)
+    {
+        return;
+    }
+
+    D3DXVec3Normalize(&horizontalDirection, &horizontalDirection);
+    m_pendingDashDirection = horizontalDirection;
+    m_hasPendingDashRequest = true;
 }
 
 void CharacterMover::ApplyUpwardVelocity(const float upwardVelocity)
@@ -330,7 +361,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
 
     const bool canChangeMoveDirection = m_isGrounded || SettingsState::IsAirMoveEnabled();
     D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
-    if (!canChangeMoveDirection)
+    if (m_isDashing)
+    {
+        inputMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else if (!canChangeMoveDirection)
     {
         inputMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     }
@@ -348,8 +383,51 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         inputMove *= m_settings.moveSpeed;
     }
 
+    if (!m_isDashing && m_hasPendingDashRequest)
+    {
+        bool canStartDash = false;
+        if (m_isGrounded && !m_isInLanding && SettingsState::IsGroundDashEnabled())
+        {
+            canStartDash = true;
+        }
+        else if (!m_isGrounded && SettingsState::IsAirDashEnabled() && m_remainingAirDashes > 0)
+        {
+            canStartDash = true;
+            --m_remainingAirDashes;
+        }
+
+        if (canStartDash)
+        {
+            m_isDashing = true;
+            m_dashTimer = SettingsState::GetDashDuration();
+            m_dashDirection = m_pendingDashDirection;
+            m_isChargingJump = false;
+            m_isInLanding = false;
+            m_velocity = m_dashDirection * SettingsState::GetDashSpeed();
+            m_velocity.y = 0.0f;
+            m_supportObjectId = -1;
+        }
+
+        m_hasPendingDashRequest = false;
+    }
+
+    if (m_isDashing)
+    {
+        m_dashTimer -= kDeltaSeconds;
+        if (m_dashTimer <= 0.0f)
+        {
+            m_isDashing = false;
+            m_dashTimer = 0.0f;
+        }
+        else
+        {
+            m_velocity = m_dashDirection * SettingsState::GetDashSpeed();
+            m_velocity.y = 0.0f;
+        }
+    }
+
     const InertiaMode inertiaMode = SettingsState::GetInertiaMode();
-    if (inertiaMode != InertiaMode::None)
+    if (!m_isDashing && inertiaMode != InertiaMode::None)
     {
         float moveAcceleration = m_settings.groundAcceleration;
         float stopAcceleration = m_settings.groundAcceleration;
@@ -394,7 +472,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             m_velocity.z *= strength;
         }
     }
-    else
+    else if (!m_isDashing)
     {
         if (canChangeMoveDirection)
         {
@@ -417,7 +495,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             m_didJump = false;
         }
     }
-    if (m_isChargingJump)
+    if (!m_isDashing && m_isChargingJump)
     {
         m_chargeJumpTimer -= kDeltaSeconds;
         if (m_chargeJumpTimer <= 0.0f)
@@ -431,7 +509,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             m_isGrounded = false;
         }
     }
-    else
+    else if (!m_isDashing)
     {
         bool canJump = false;
         if (jump && m_isGrounded && !m_isInLanding)
@@ -472,7 +550,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         }
     }
 
-    if (SettingsState::IsGravityEnabled())
+    if (m_isDashing)
+    {
+        m_velocity.y = 0.0f;
+    }
+    else if (SettingsState::IsGravityEnabled())
     {
         m_velocity.y -= 9.8f * kDeltaSeconds;
     }
@@ -534,6 +616,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         }
         m_isGrounded = true;
         m_remainingAirJumps = 1;
+        m_remainingAirDashes = 1;
         m_supportObjectId = supportObjectId;
         m_groundNormal = lastHitNormal;
         D3DXVec3Normalize(&m_groundNormal, &m_groundNormal);

@@ -850,7 +850,20 @@ void UpdatePlayer()
     std::vector<int> passThroughIds;
     std::vector<int> solidIds;
     const bool isSpacePressed = isWindowActive && ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0);
-    const bool jump = isSpacePressed && !g_prevSpacePressed;
+    const bool shiftPressed = isWindowActive && ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0);
+    bool jump = false;
+    if (isSpacePressed && !g_prevSpacePressed)
+    {
+        if (shiftPressed)
+        {
+            const D3DXVECTOR3 dashForward(sinf(g_playerYaw), 0.0f, cosf(g_playerYaw));
+            g_playerMover.RequestDash(dashForward);
+        }
+        else
+        {
+            jump = true;
+        }
+    }
     g_prevSpacePressed = isSpacePressed;
     g_playerMover.Update(inputMove, jump, &passThroughIds, &solidIds);
 
