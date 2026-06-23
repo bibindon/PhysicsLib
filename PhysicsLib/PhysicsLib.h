@@ -366,6 +366,7 @@ public:
     bool IsChargingJump() const;
     bool IsJumping() const;
     bool IsCrushed() const;
+    bool IsDashing() const;
 
     // Update() でジャンプが実際に成功したフレームでのみ true を返す。
     bool JustJumped() const;

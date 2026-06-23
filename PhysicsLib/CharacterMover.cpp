@@ -187,6 +187,11 @@ bool CharacterMover::IsCrushed() const
     return m_isCrushed;
 }
 
+bool CharacterMover::IsDashing() const
+{
+    return m_isDashing;
+}
+
 bool CharacterMover::JustJumped() const
 {
     return m_justJumped;
