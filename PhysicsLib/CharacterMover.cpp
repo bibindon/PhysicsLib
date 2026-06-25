@@ -423,6 +423,8 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         {
             m_isDashing = false;
             m_dashTimer = 0.0f;
+            m_velocity.x = 0.0f;
+            m_velocity.z = 0.0f;
         }
         else
         {
