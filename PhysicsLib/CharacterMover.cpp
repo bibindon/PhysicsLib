@@ -388,30 +388,6 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_supportObjectId = -1;
     }
 
-    const bool canChangeMoveDirection = m_isGrounded || SettingsState::IsAirMoveEnabled();
-    D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
-    if (m_isDashing)
-    {
-        inputMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    }
-    else if (!canChangeMoveDirection)
-    {
-        inputMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
-    }
-    else if (D3DXVec3Length(&inputMove) > 0.0001f)
-    {
-        if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
-        {
-            inputMove = ProjectVectorOnPlane(inputMove, m_groundNormal);
-        }
-
-        if (D3DXVec3Length(&inputMove) > 0.0001f)
-        {
-            D3DXVec3Normalize(&inputMove, &inputMove);
-        }
-        inputMove *= m_settings.moveSpeed;
-    }
-
     if (!m_isDashing && !m_booster.IsActive() && m_hasPendingDashRequest)
     {
         bool canStartDash = false;
@@ -455,6 +431,30 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             m_velocity = m_dashDirection * SettingsState::GetDashSpeed();
             m_velocity.y = 0.0f;
         }
+    }
+
+    const bool canChangeMoveDirection = m_isGrounded || SettingsState::IsAirMoveEnabled();
+    D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
+    if (m_isDashing)
+    {
+        inputMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else if (!canChangeMoveDirection)
+    {
+        inputMove = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    }
+    else if (D3DXVec3Length(&inputMove) > 0.0001f)
+    {
+        if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
+        {
+            inputMove = ProjectVectorOnPlane(inputMove, m_groundNormal);
+        }
+
+        if (D3DXVec3Length(&inputMove) > 0.0001f)
+        {
+            D3DXVec3Normalize(&inputMove, &inputMove);
+        }
+        inputMove *= m_settings.moveSpeed;
     }
 
     const InertiaMode inertiaMode = SettingsState::GetInertiaMode();
