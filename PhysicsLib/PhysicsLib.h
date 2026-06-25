@@ -9,6 +9,8 @@
 
 #include <vector>
 
+#include "DashBooster.h"
+
 namespace PhysicsLib
 {
 
@@ -359,6 +361,13 @@ public:
 
     // 現在の水平速度を維持したまま、上向き速度を与えて空中状態にする。
     void ApplyUpwardVelocity(float upwardVelocity);
+
+    // 指定方向へ一定時間射出するブースターを起動する。
+    void ApplyDashBooster(const D3DXVECTOR3& direction, float speed, float duration);
+
+    // ブースト中かどうかを返す。
+    bool IsBoosted() const;
+
     D3DXVECTOR3 GetVelocity() const;
 
     bool IsGrounded() const;
@@ -417,6 +426,8 @@ private:
 
     // ダッシュ中かどうかである。
     bool m_isDashing;
+
+    DashBooster m_booster;
 
     // 次の Update() でダッシュ要求を処理するかどうかである。
     bool m_hasPendingDashRequest;

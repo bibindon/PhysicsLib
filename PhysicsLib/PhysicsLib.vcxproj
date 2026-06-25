@@ -129,10 +129,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="DashBooster.h" />
     <ClInclude Include="PhysicsLibInternal.h" />
     <ClInclude Include="PhysicsLib.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DashBooster.cpp" />
     <ClCompile Include="CameraMover.cpp" />
     <ClCompile Include="CharacterMover.cpp" />
     <ClCompile Include="PhysicsLib.cpp" />

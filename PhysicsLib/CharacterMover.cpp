@@ -116,6 +116,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_didJump = false;
     m_justJumped = false;
     m_debugInfo = DebugInfo();
+    m_booster.Deactivate();
 }
 
 void CharacterMover::SetPosition(const D3DXVECTOR3& position)
@@ -155,6 +156,18 @@ void CharacterMover::ApplyUpwardVelocity(const float upwardVelocity)
     m_isInLanding = false;
     m_didJump = true;
     m_justJumped = true;
+}
+
+void CharacterMover::ApplyDashBooster(const D3DXVECTOR3& direction, float speed, float duration)
+{
+    m_booster.Activate(direction, speed, duration);
+    m_isDashing = false;
+    m_hasPendingDashRequest = false;
+}
+
+bool CharacterMover::IsBoosted() const
+{
+    return m_booster.IsActive();
 }
 
 D3DXVECTOR3 CharacterMover::GetVelocity() const
@@ -364,6 +377,17 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         }
     }
 
+    if (m_booster.IsActive())
+    {
+        D3DXVECTOR3 boosterVelocity(0.0f, 0.0f, 0.0f);
+        m_booster.Update(kDeltaSeconds, &boosterVelocity);
+        m_velocity = boosterVelocity;
+        m_isGrounded = false;
+        m_isChargingJump = false;
+        m_isInLanding = false;
+        m_supportObjectId = -1;
+    }
+
     const bool canChangeMoveDirection = m_isGrounded || SettingsState::IsAirMoveEnabled();
     D3DXVECTOR3 inputMove(inputDirection.x, 0.0f, inputDirection.z);
     if (m_isDashing)
@@ -388,7 +412,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         inputMove *= m_settings.moveSpeed;
     }
 
-    if (!m_isDashing && m_hasPendingDashRequest)
+    if (!m_isDashing && !m_booster.IsActive() && m_hasPendingDashRequest)
     {
         bool canStartDash = false;
         if (m_isGrounded && !m_isInLanding && SettingsState::IsGroundDashEnabled())
@@ -434,7 +458,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     }
 
     const InertiaMode inertiaMode = SettingsState::GetInertiaMode();
-    if (!m_isDashing && inertiaMode != InertiaMode::None)
+    if (!m_isDashing && !m_booster.IsActive() && inertiaMode != InertiaMode::None)
     {
         float moveAcceleration = m_settings.groundAcceleration;
         float stopAcceleration = m_settings.groundAcceleration;
@@ -479,7 +503,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             m_velocity.z *= strength;
         }
     }
-    else if (!m_isDashing)
+    else if (!m_isDashing && !m_booster.IsActive())
     {
         if (canChangeMoveDirection)
         {
@@ -502,7 +526,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             m_didJump = false;
         }
     }
-    if (!m_isDashing && m_isChargingJump)
+    if (!m_isDashing && !m_booster.IsActive() && m_isChargingJump)
     {
         m_chargeJumpTimer -= kDeltaSeconds;
         if (m_chargeJumpTimer <= 0.0f)
@@ -516,7 +540,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
             m_isGrounded = false;
         }
     }
-    else if (!m_isDashing)
+    else if (!m_isDashing && !m_booster.IsActive())
     {
         bool canJump = false;
         if (jump && m_isGrounded && !m_isInLanding)
@@ -560,6 +584,9 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     if (m_isDashing)
     {
         m_velocity.y = 0.0f;
+    }
+    else if (m_booster.IsActive())
+    {
     }
     else if (SettingsState::IsGravityEnabled())
     {

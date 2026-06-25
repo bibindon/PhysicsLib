@@ -58,6 +58,16 @@ struct MovingPlatform
     bool forward;
 };
 
+struct BoosterObject
+{
+    SceneObject sceneObject;
+    D3DXVECTOR3 launchDirection;
+    float speed;
+    float duration;
+    float contactRadius;
+    bool consumed;
+};
+
 struct InstanceRenderBatch
 {
     LPD3DXMESH mesh;
@@ -83,6 +93,7 @@ std::vector<SceneObject> g_worldObjects;
 std::vector<SceneObject> g_itemObjects;
 std::vector<InstanceRenderBatch> g_instancedObjects;
 std::set<size_t> g_collectedItemIds;
+std::vector<BoosterObject> g_boosterObjects;
 PhysicsLib::CharacterMover g_playerMover(kPlayerStartPosition);
 PhysicsLib::CameraMover g_cameraMover;
 float g_cameraYaw = 0.0f;
@@ -572,6 +583,29 @@ void InitScene()
 
     fclose(file);
 
+    {
+        const D3DXVECTOR3 boosterPos(3.0f, 0.25f, 3.0f);
+        D3DXCOLOR matColor(1.0f, 1.0f, 1.0f, 1.0f);
+        DWORD numMaterials = 1;
+        LPD3DXMESH mesh = LoadSceneMeshFromX(_T("collision_item_sphere.x"), &matColor, &numMaterials);
+
+        BoosterObject booster;
+        booster.sceneObject.csvId = 999;
+        booster.sceneObject.mesh = mesh;
+        booster.sceneObject.position = boosterPos;
+        booster.sceneObject.scale = D3DXVECTOR3(0.5f, 0.5f, 0.5f);
+        booster.sceneObject.rotation = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        booster.sceneObject.color = D3DXCOLOR(1.0f, 1.0f, 0.0f, 1.0f);
+        booster.sceneObject.useTexture = false;
+        booster.sceneObject.numMaterials = numMaterials;
+        booster.launchDirection = D3DXVECTOR3(0.3f, 0.8f, 0.5f);
+        booster.speed = 25.0f;
+        booster.duration = 0.4f;
+        booster.contactRadius = 1.0f;
+        booster.consumed = false;
+        g_boosterObjects.push_back(booster);
+    }
+
     LoadMovingPlatforms();
 
     ResetPlayer();
@@ -732,6 +766,10 @@ void ResetPlayer()
     g_playerMover.SetSettings(settings);
     g_playerMover.Reset(kPlayerStartPosition);
     g_playerYaw = 0.0f;
+    for (size_t i = 0; i < g_boosterObjects.size(); ++i)
+    {
+        g_boosterObjects[i].consumed = false;
+    }
 }
 
 void UpdateMovingPlatforms()
@@ -879,6 +917,23 @@ void UpdatePlayer()
         if (D3DXVec3Length(&diff) < 1.0f)
         {
             g_collectedItemIds.insert(i);
+        }
+    }
+
+    for (size_t i = 0; i < g_boosterObjects.size(); ++i)
+    {
+        if (g_boosterObjects[i].consumed)
+        {
+            continue;
+        }
+
+        D3DXVECTOR3 diff = playerPosition - g_boosterObjects[i].sceneObject.position;
+        if (D3DXVec3Length(&diff) < g_boosterObjects[i].contactRadius)
+        {
+            g_playerMover.ApplyDashBooster(g_boosterObjects[i].launchDirection,
+                                            g_boosterObjects[i].speed,
+                                            g_boosterObjects[i].duration);
+            g_boosterObjects[i].consumed = true;
         }
     }
 }
@@ -1228,10 +1283,16 @@ void Render()
     {
         cursorText = _T("ON");
     }
+    const TCHAR* boostedText = _T("OFF");
+    if (g_playerMover.IsBoosted())
+    {
+        boostedText = _T("ON");
+    }
     _stprintf_s(msg,
-                _T("WASD: move  SHIFT: speed x3  SPACE: jump  ESC: cursor=%s  Items: %d/5  Pos(%.2f, %.2f, %.2f)"),
+                _T("WASD: move  SHIFT: speed x3  SPACE: jump  ESC: cursor=%s  Items: %d/5  Boosted: %s  Pos(%.2f, %.2f, %.2f)"),
                 cursorText,
                 (int)g_collectedItemIds.size(),
+                boostedText,
                 playerPosition.x,
                 playerPosition.y,
                 playerPosition.z);
@@ -1319,6 +1380,22 @@ void Render()
                  g_itemObjects[i].color,
                  g_itemObjects[i].useTexture,
                  g_itemObjects[i].numMaterials);
+    }
+
+    for (size_t i = 0; i < g_boosterObjects.size(); i++)
+    {
+        if (g_boosterObjects[i].consumed)
+        {
+            continue;
+        }
+
+        DrawMesh(g_boosterObjects[i].sceneObject.mesh,
+                 g_boosterObjects[i].sceneObject.position,
+                 g_boosterObjects[i].sceneObject.scale,
+                 g_boosterObjects[i].sceneObject.rotation,
+                 D3DXCOLOR(1.0f, 1.0f, 0.0f, 1.0f),
+                 g_boosterObjects[i].sceneObject.useTexture,
+                 g_boosterObjects[i].sceneObject.numMaterials);
     }
 
     DrawMesh(g_pCubeMesh,
