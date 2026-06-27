@@ -9,7 +9,7 @@ namespace PhysicsLib
 namespace
 {
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
-constexpr float kPseudoInertiaDuration = 0.25f;
+constexpr float kPseudoInertiaDuration = 0.5f;
 }
 
 CharacterMover::CharacterMover()
@@ -423,8 +423,6 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         {
             m_isDashing = false;
             m_dashTimer = 0.0f;
-            m_velocity.x = 0.0f;
-            m_velocity.z = 0.0f;
         }
         else
         {
@@ -483,12 +481,21 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         {
             if (SettingsState::IsTangentMoveEnabled())
             {
+                if (inertiaMode == InertiaMode::PseudoInertia)
+                {
+                    stopAcceleration = D3DXVec3Length(&m_velocity) / kPseudoInertiaDuration;
+                }
                 MoveVelocityToward(&m_velocity,
                                    D3DXVECTOR3(0.0f, 0.0f, 0.0f),
                                    stopAcceleration);
             }
             else
             {
+                if (inertiaMode == InertiaMode::PseudoInertia)
+                {
+                    const D3DXVECTOR3 horizontalVelocity(m_velocity.x, 0.0f, m_velocity.z);
+                    stopAcceleration = D3DXVec3Length(&horizontalVelocity) / kPseudoInertiaDuration;
+                }
                 MoveHorizontalVelocityToward(&m_velocity,
                                              D3DXVECTOR3(0.0f, 0.0f, 0.0f),
                                              stopAcceleration);

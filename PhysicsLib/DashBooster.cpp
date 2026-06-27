@@ -55,7 +55,7 @@ bool DashBooster::Update(float deltaSeconds, D3DXVECTOR3* outVelocity)
     {
         m_active = false;
         m_timer = 0.0f;
-        *outVelocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        *outVelocity = m_direction * m_speed;
         return false;
     }
 

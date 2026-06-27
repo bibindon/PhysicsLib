@@ -455,7 +455,7 @@ void PhysicsLib::ShowSettingsDialog(HWND ownerWindow)
                                                      NULL);
             SendMessage(inertiaModeComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("なし")));
             SendMessage(inertiaModeComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("あり")));
-            SendMessage(inertiaModeComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("疑似慣性移動 (0.25秒)")));
+            SendMessage(inertiaModeComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(_T("疑似慣性移動 (0.5秒)")));
             SendMessage(inertiaModeComboBox,
                         CB_SETCURSEL,
                         static_cast<WPARAM>(SettingsState::GetInertiaMode()),
