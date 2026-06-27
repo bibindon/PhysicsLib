@@ -439,6 +439,7 @@ private:
     D3DXVECTOR3 m_pendingDashDirection;
 
     bool m_isPseudoInertiaStopping;
+    bool m_isPseudoInertiaFullStopping;
     float m_pseudoInertiaStopAcceleration;
 
     // ためジャンプの残り時間（秒）である。

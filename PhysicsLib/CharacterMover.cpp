@@ -28,6 +28,7 @@ CharacterMover::CharacterMover()
       m_dashDirection(0.0f, 0.0f, -1.0f),
       m_pendingDashDirection(0.0f, 0.0f, 0.0f),
       m_isPseudoInertiaStopping(false),
+      m_isPseudoInertiaFullStopping(false),
       m_pseudoInertiaStopAcceleration(0.0f),
       m_chargeJumpTimer(0.0f),
       m_isChargingJump(false),
@@ -55,6 +56,7 @@ CharacterMover::CharacterMover(const D3DXVECTOR3& position)
       m_dashDirection(0.0f, 0.0f, -1.0f),
       m_pendingDashDirection(0.0f, 0.0f, 0.0f),
       m_isPseudoInertiaStopping(false),
+      m_isPseudoInertiaFullStopping(false),
       m_pseudoInertiaStopAcceleration(0.0f),
       m_chargeJumpTimer(0.0f),
       m_isChargingJump(false),
@@ -113,6 +115,7 @@ void CharacterMover::Reset(const D3DXVECTOR3& position)
     m_dashDirection = D3DXVECTOR3(0.0f, 0.0f, -1.0f);
     m_pendingDashDirection = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     m_isPseudoInertiaStopping = false;
+    m_isPseudoInertiaFullStopping = false;
     m_pseudoInertiaStopAcceleration = 0.0f;
     m_chargeJumpTimer = 0.0f;
     m_isChargingJump = false;
@@ -386,10 +389,17 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     if (m_booster.IsActive())
     {
         m_isPseudoInertiaStopping = false;
+        m_isPseudoInertiaFullStopping = false;
         m_pseudoInertiaStopAcceleration = 0.0f;
         D3DXVECTOR3 boosterVelocity(0.0f, 0.0f, 0.0f);
-        m_booster.Update(kDeltaSeconds, &boosterVelocity);
+        const bool boosterStillActive = m_booster.Update(kDeltaSeconds, &boosterVelocity);
         m_velocity = boosterVelocity;
+        if (!boosterStillActive && SettingsState::GetInertiaMode() == InertiaMode::PseudoInertia)
+        {
+            m_isPseudoInertiaStopping = true;
+            m_isPseudoInertiaFullStopping = true;
+            m_pseudoInertiaStopAcceleration = D3DXVec3Length(&m_velocity) / kPseudoInertiaDuration;
+        }
         m_isGrounded = false;
         m_isChargingJump = false;
         m_isInLanding = false;
@@ -412,6 +422,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         if (canStartDash)
         {
             m_isPseudoInertiaStopping = false;
+            m_isPseudoInertiaFullStopping = false;
             m_pseudoInertiaStopAcceleration = 0.0f;
             m_isDashing = true;
             m_dashTimer = SettingsState::GetDashDuration();
@@ -479,6 +490,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         if (canChangeMoveDirection && D3DXVec3Length(&inputMove) > 0.0001f)
         {
             m_isPseudoInertiaStopping = false;
+            m_isPseudoInertiaFullStopping = false;
             m_pseudoInertiaStopAcceleration = 0.0f;
             if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
             {
@@ -489,9 +501,22 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                 MoveHorizontalVelocityToward(&m_velocity, inputMove, moveAcceleration);
             }
         }
-        else if (m_isGrounded)
+        else
         {
-            if (SettingsState::IsTangentMoveEnabled())
+            if (inertiaMode == InertiaMode::PseudoInertia && m_isPseudoInertiaFullStopping)
+            {
+                stopAcceleration = m_pseudoInertiaStopAcceleration;
+                MoveVelocityToward(&m_velocity,
+                                   D3DXVECTOR3(0.0f, 0.0f, 0.0f),
+                                   stopAcceleration);
+                if (D3DXVec3Length(&m_velocity) <= 0.0001f)
+                {
+                    m_isPseudoInertiaStopping = false;
+                    m_isPseudoInertiaFullStopping = false;
+                    m_pseudoInertiaStopAcceleration = 0.0f;
+                }
+            }
+            else if (SettingsState::IsTangentMoveEnabled() && m_isGrounded)
             {
                 if (inertiaMode == InertiaMode::PseudoInertia)
                 {
@@ -509,6 +534,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                     D3DXVec3Length(&m_velocity) <= 0.0001f)
                 {
                     m_isPseudoInertiaStopping = false;
+                    m_isPseudoInertiaFullStopping = false;
                     m_pseudoInertiaStopAcceleration = 0.0f;
                 }
             }
@@ -533,15 +559,11 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                     if (D3DXVec3Length(&horizontalVelocity) <= 0.0001f)
                     {
                         m_isPseudoInertiaStopping = false;
+                        m_isPseudoInertiaFullStopping = false;
                         m_pseudoInertiaStopAcceleration = 0.0f;
                     }
                 }
             }
-        }
-        else
-        {
-            m_isPseudoInertiaStopping = false;
-            m_pseudoInertiaStopAcceleration = 0.0f;
         }
         if (inertiaMode == InertiaMode::Legacy &&
             m_isGrounded &&
@@ -635,6 +657,9 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_velocity.y = 0.0f;
     }
     else if (m_booster.IsActive())
+    {
+    }
+    else if (m_isPseudoInertiaFullStopping)
     {
     }
     else if (SettingsState::IsGravityEnabled())

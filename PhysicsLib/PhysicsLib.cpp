@@ -73,7 +73,7 @@ float g_cuboidRotX = 0.0f;
 float g_cuboidRotY = 0.0f;
 float g_cuboidRotZ = 0.0f;
 float g_playerFacingYaw = 0.0f;
-float g_inertiaStrength = 1.0f;
+float g_inertiaStrength = 0.85f;
 float g_walkSpeed = 6.0f;
 bool g_groundDashEnabled = false;
 bool g_airDashEnabled = false;
@@ -1660,7 +1660,7 @@ float SettingsState::GetInertiaStrength()
 
 void SettingsState::SetInertiaStrength(float strength)
 {
-    g_inertiaStrength = strength;
+    g_inertiaStrength = (std::max)(0.0f, (std::min)(strength, 1.0f));
 }
 
 float SettingsState::GetWalkSpeed()
