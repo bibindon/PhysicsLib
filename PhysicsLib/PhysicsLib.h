@@ -438,6 +438,9 @@ private:
     // 要求されたダッシュ方向である。
     D3DXVECTOR3 m_pendingDashDirection;
 
+    bool m_isPseudoInertiaStopping;
+    float m_pseudoInertiaStopAcceleration;
+
     // ためジャンプの残り時間（秒）である。
     float m_chargeJumpTimer;
 
