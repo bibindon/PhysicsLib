@@ -167,9 +167,12 @@ void CharacterMover::ApplyUpwardVelocity(const float upwardVelocity)
     m_justJumped = true;
 }
 
-void CharacterMover::ApplyDashBooster(const D3DXVECTOR3& direction, float speed, float duration)
+void CharacterMover::ApplyDashBooster(const D3DXVECTOR3& direction,
+                                      float speed,
+                                      float duration,
+                                      bool chargeEnabled)
 {
-    m_booster.Activate(direction, speed, duration);
+    m_booster.Activate(direction, speed, duration, chargeEnabled);
     m_isDashing = false;
     m_hasPendingDashRequest = false;
 }

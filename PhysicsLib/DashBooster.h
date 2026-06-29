@@ -12,7 +12,7 @@ public:
     DashBooster();
 
     // 指定方向へ指定速度で射出を開始する。
-    void Activate(const D3DXVECTOR3& direction, float speed, float duration);
+    void Activate(const D3DXVECTOR3& direction, float speed, float duration, bool chargeEnabled = true);
 
     // 毎フレームの更新。ブースト中なら outVelocity に速度を設定して true を返す。
     bool Update(float deltaSeconds, D3DXVECTOR3* outVelocity);
@@ -23,6 +23,7 @@ public:
 
 private:
     bool m_active;
+    float m_chargeTimer;
     float m_timer;
     float m_speed;
     D3DXVECTOR3 m_direction;

@@ -4,16 +4,24 @@
 
 namespace PhysicsLib
 {
+namespace
+{
+constexpr float kDefaultChargeSeconds = 0.5f;
+}
 
 DashBooster::DashBooster()
     : m_active(false)
+    , m_chargeTimer(0.0f)
     , m_timer(0.0f)
     , m_speed(0.0f)
     , m_direction(0.0f, 0.0f, 0.0f)
 {
 }
 
-void DashBooster::Activate(const D3DXVECTOR3& direction, float speed, float duration)
+void DashBooster::Activate(const D3DXVECTOR3& direction,
+                           float speed,
+                           float duration,
+                           bool chargeEnabled)
 {
     if (speed < 0.0f)
     {
@@ -35,6 +43,11 @@ void DashBooster::Activate(const D3DXVECTOR3& direction, float speed, float dura
     D3DXVec3Normalize(&m_direction, &m_direction);
     m_speed = speed;
     m_timer = duration;
+    m_chargeTimer = 0.0f;
+    if (chargeEnabled)
+    {
+        m_chargeTimer = kDefaultChargeSeconds;
+    }
     m_active = true;
 }
 
@@ -50,10 +63,22 @@ bool DashBooster::Update(float deltaSeconds, D3DXVECTOR3* outVelocity)
         return false;
     }
 
+    if (m_chargeTimer > 0.0f)
+    {
+        m_chargeTimer -= deltaSeconds;
+        if (m_chargeTimer < 0.0f)
+        {
+            m_chargeTimer = 0.0f;
+        }
+        *outVelocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+        return true;
+    }
+
     m_timer -= deltaSeconds;
     if (m_timer <= 0.0f)
     {
         m_active = false;
+        m_chargeTimer = 0.0f;
         m_timer = 0.0f;
         *outVelocity = m_direction * m_speed;
         return false;
@@ -71,6 +96,7 @@ bool DashBooster::IsActive() const
 void DashBooster::Deactivate()
 {
     m_active = false;
+    m_chargeTimer = 0.0f;
     m_timer = 0.0f;
 }
 
@@ -81,7 +107,7 @@ float DashBooster::GetRemainingTime() const
         return 0.0f;
     }
 
-    return m_timer;
+    return m_chargeTimer + m_timer;
 }
 
 }

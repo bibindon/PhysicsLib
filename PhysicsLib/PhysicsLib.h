@@ -363,7 +363,10 @@ public:
     void ApplyUpwardVelocity(float upwardVelocity);
 
     // 指定方向へ一定時間射出するブースターを起動する。
-    void ApplyDashBooster(const D3DXVECTOR3& direction, float speed, float duration);
+    void ApplyDashBooster(const D3DXVECTOR3& direction,
+                           float speed,
+                           float duration,
+                           bool chargeEnabled = true);
 
     // ブースト中かどうかを返す。
     bool IsBoosted() const;
