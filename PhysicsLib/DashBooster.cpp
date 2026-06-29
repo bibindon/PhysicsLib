@@ -93,6 +93,11 @@ bool DashBooster::IsActive() const
     return m_active;
 }
 
+bool DashBooster::IsCharging() const
+{
+    return m_active && m_chargeTimer > 0.0f;
+}
+
 void DashBooster::Deactivate()
 {
     m_active = false;

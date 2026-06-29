@@ -182,6 +182,11 @@ bool CharacterMover::IsBoosted() const
     return m_booster.IsActive();
 }
 
+bool CharacterMover::IsDashBoosterCharging() const
+{
+    return m_booster.IsCharging();
+}
+
 D3DXVECTOR3 CharacterMover::GetVelocity() const
 {
     return m_velocity;

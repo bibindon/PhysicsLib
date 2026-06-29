@@ -18,6 +18,7 @@ public:
     bool Update(float deltaSeconds, D3DXVECTOR3* outVelocity);
 
     bool IsActive() const;
+    bool IsCharging() const;
     void Deactivate();
     float GetRemainingTime() const;
 

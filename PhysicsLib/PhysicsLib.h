@@ -371,6 +371,9 @@ public:
     // ブースト中かどうかを返す。
     bool IsBoosted() const;
 
+    // ダッシュブースターの溜め中かどうかを返す。
+    bool IsDashBoosterCharging() const;
+
     D3DXVECTOR3 GetVelocity() const;
 
     bool IsGrounded() const;
