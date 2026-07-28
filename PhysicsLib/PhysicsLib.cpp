@@ -5,11 +5,15 @@
 #include "PhysicsLibInternal.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <map>
+#include <new>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #pragma comment(lib, "d3d9.lib")
@@ -1360,9 +1364,315 @@ D3DXVECTOR3 PhysicsLib::RemoveIntoSurfaceVelocity(const D3DXVECTOR3& velocity,
     return velocity - normalizedNormal * intoSurface;
 }
 
+namespace
+{
+
+class CollisionMeshHierarchyAllocator : public ID3DXAllocateHierarchy
+{
+public:
+    STDMETHOD(CreateFrame)(LPCSTR name, LPD3DXFRAME* outFrame)
+    {
+        if (outFrame == NULL)
+        {
+            return E_POINTER;
+        }
+
+        *outFrame = NULL;
+        D3DXFRAME* frame = new (std::nothrow) D3DXFRAME();
+        if (frame == NULL)
+        {
+            return E_OUTOFMEMORY;
+        }
+
+        D3DXMatrixIdentity(&frame->TransformationMatrix);
+        if (name != NULL)
+        {
+            const size_t nameLength = std::strlen(name);
+            frame->Name = new (std::nothrow) char[nameLength + 1];
+            if (frame->Name == NULL)
+            {
+                delete frame;
+                return E_OUTOFMEMORY;
+            }
+            strcpy_s(frame->Name, nameLength + 1, name);
+        }
+
+        *outFrame = frame;
+        return S_OK;
+    }
+
+    STDMETHOD(CreateMeshContainer)(LPCSTR name,
+                                   const D3DXMESHDATA* meshData,
+                                   const D3DXMATERIAL*,
+                                   const D3DXEFFECTINSTANCE*,
+                                   DWORD,
+                                   const DWORD*,
+                                   LPD3DXSKININFO skinInfo,
+                                   LPD3DXMESHCONTAINER* outMeshContainer)
+    {
+        if (meshData == NULL ||
+            meshData->Type != D3DXMESHTYPE_MESH ||
+            meshData->pMesh == NULL ||
+            outMeshContainer == NULL)
+        {
+            return E_INVALIDARG;
+        }
+
+        *outMeshContainer = NULL;
+        D3DXMESHCONTAINER* container = new (std::nothrow) D3DXMESHCONTAINER();
+        if (container == NULL)
+        {
+            return E_OUTOFMEMORY;
+        }
+
+        if (name != NULL)
+        {
+            const size_t nameLength = std::strlen(name);
+            container->Name = new (std::nothrow) char[nameLength + 1];
+            if (container->Name == NULL)
+            {
+                delete container;
+                return E_OUTOFMEMORY;
+            }
+            strcpy_s(container->Name, nameLength + 1, name);
+        }
+
+        container->MeshData.Type = D3DXMESHTYPE_MESH;
+        container->MeshData.pMesh = meshData->pMesh;
+        container->MeshData.pMesh->AddRef();
+        container->pSkinInfo = skinInfo;
+        if (container->pSkinInfo != NULL)
+        {
+            container->pSkinInfo->AddRef();
+        }
+
+        *outMeshContainer = container;
+        return S_OK;
+    }
+
+    STDMETHOD(DestroyFrame)(LPD3DXFRAME frame)
+    {
+        if (frame != NULL)
+        {
+            delete[] frame->Name;
+            delete frame;
+        }
+        return S_OK;
+    }
+
+    STDMETHOD(DestroyMeshContainer)(LPD3DXMESHCONTAINER meshContainer)
+    {
+        if (meshContainer != NULL)
+        {
+            delete[] meshContainer->Name;
+            if (meshContainer->MeshData.Type == D3DXMESHTYPE_MESH &&
+                meshContainer->MeshData.pMesh != NULL)
+            {
+                meshContainer->MeshData.pMesh->Release();
+            }
+            if (meshContainer->pSkinInfo != NULL)
+            {
+                meshContainer->pSkinInfo->Release();
+            }
+            delete meshContainer;
+        }
+        return S_OK;
+    }
+};
+
+bool UsesBlenderOfficialAxisTransform(const TCHAR* modelPath)
+{
+    FILE* file = NULL;
+    if (_tfopen_s(&file, modelPath, _T("rb")) != 0 || file == NULL)
+    {
+        return false;
+    }
+
+    const size_t maxHeaderSize = 64 * 1024;
+    std::vector<char> fileHeader(maxHeaderSize);
+    const size_t readSize = fread(fileHeader.data(), 1, fileHeader.size(), file);
+    fclose(file);
+
+    std::string compactHeader;
+    compactHeader.reserve(readSize);
+    for (size_t i = 0; i < readSize; ++i)
+    {
+        const unsigned char character = static_cast<unsigned char>(fileHeader[i]);
+        if (std::isspace(character) == 0)
+        {
+            compactHeader.push_back(fileHeader[i]);
+        }
+    }
+
+    const std::string blenderAxisTransform =
+        "FrameTransformMatrix{"
+        "1.000000,0.000000,0.000000,0.000000,"
+        "0.000000,0.000000,-1.000000,0.000000,"
+        "0.000000,1.000000,0.000000,0.000000,";
+    return compactHeader.find(blenderAxisTransform) != std::string::npos;
+}
+
+void CorrectBlenderOfficialAxisTransforms(LPD3DXFRAME frame, bool skipCurrentFrame)
+{
+    if (frame == NULL)
+    {
+        return;
+    }
+
+    if (!skipCurrentFrame)
+    {
+        D3DXMATRIX blenderAxisConversion;
+        D3DXMatrixIdentity(&blenderAxisConversion);
+        blenderAxisConversion._22 = 0.0f;
+        blenderAxisConversion._23 = 1.0f;
+        blenderAxisConversion._32 = 1.0f;
+        blenderAxisConversion._33 = 0.0f;
+        frame->TransformationMatrix =
+            blenderAxisConversion * frame->TransformationMatrix;
+        frame->TransformationMatrix._43 = -frame->TransformationMatrix._43;
+    }
+
+    CorrectBlenderOfficialAxisTransforms(frame->pFrameSibling, false);
+    CorrectBlenderOfficialAxisTransforms(frame->pFrameFirstChild, false);
+}
+
+void GatherHierarchyMeshes(LPD3DXFRAME frame,
+                           const D3DXMATRIX* parentMatrix,
+                           std::vector<LPD3DXMESH>* meshes,
+                           std::vector<D3DXMATRIX>* transforms)
+{
+    if (frame == NULL)
+    {
+        return;
+    }
+
+    D3DXMATRIX combinedMatrix = frame->TransformationMatrix;
+    if (parentMatrix != NULL)
+    {
+        combinedMatrix = frame->TransformationMatrix * (*parentMatrix);
+    }
+
+    LPD3DXMESHCONTAINER container = frame->pMeshContainer;
+    while (container != NULL)
+    {
+        if (container->MeshData.Type == D3DXMESHTYPE_MESH &&
+            container->MeshData.pMesh != NULL)
+        {
+            meshes->push_back(container->MeshData.pMesh);
+            transforms->push_back(combinedMatrix);
+        }
+        container = container->pNextMeshContainer;
+    }
+
+    GatherHierarchyMeshes(frame->pFrameSibling, parentMatrix, meshes, transforms);
+    GatherHierarchyMeshes(frame->pFrameFirstChild, &combinedMatrix, meshes, transforms);
+}
+
+HRESULT LoadBlenderOfficialCollisionMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
+{
+    CollisionMeshHierarchyAllocator allocator;
+    LPD3DXFRAME frameRoot = NULL;
+    HRESULT result = D3DXLoadMeshHierarchyFromX(modelPath,
+                                                D3DXMESH_SYSTEMMEM,
+                                                g_device,
+                                                &allocator,
+                                                NULL,
+                                                &frameRoot,
+                                                NULL);
+    if (FAILED(result) || frameRoot == NULL)
+    {
+        return result;
+    }
+
+    bool hasSyntheticRoot = false;
+    if (frameRoot->pMeshContainer == NULL &&
+        (frameRoot->Name == NULL || frameRoot->Name[0] == '\0'))
+    {
+        hasSyntheticRoot = true;
+    }
+    CorrectBlenderOfficialAxisTransforms(frameRoot, hasSyntheticRoot);
+
+    std::vector<LPD3DXMESH> meshes;
+    std::vector<D3DXMATRIX> transforms;
+    GatherHierarchyMeshes(frameRoot, NULL, &meshes, &transforms);
+    if (meshes.empty())
+    {
+        D3DXFrameDestroy(frameRoot, &allocator);
+        return E_FAIL;
+    }
+
+    D3DVERTEXELEMENT9 declaration[MAX_FVF_DECL_SIZE];
+    result = meshes[0]->GetDeclaration(declaration);
+    if (SUCCEEDED(result))
+    {
+        result = D3DXConcatenateMeshes(meshes.data(),
+                                       static_cast<UINT>(meshes.size()),
+                                       D3DXMESH_SYSTEMMEM | D3DXMESH_32BIT,
+                                       transforms.data(),
+                                       NULL,
+                                       declaration,
+                                       g_device,
+                                       outMesh);
+    }
+
+    D3DXFrameDestroy(frameRoot, &allocator);
+    if (FAILED(result) || *outMesh == NULL)
+    {
+        return result;
+    }
+
+    void* indexBuffer = NULL;
+    result = (*outMesh)->LockIndexBuffer(0, &indexBuffer);
+    if (FAILED(result) || indexBuffer == NULL)
+    {
+        (*outMesh)->Release();
+        *outMesh = NULL;
+        return result;
+    }
+
+    const DWORD faceCount = (*outMesh)->GetNumFaces();
+    if (((*outMesh)->GetOptions() & D3DXMESH_32BIT) != 0)
+    {
+        DWORD* indices = static_cast<DWORD*>(indexBuffer);
+        for (DWORD faceIndex = 0; faceIndex < faceCount; ++faceIndex)
+        {
+            std::swap(indices[faceIndex * 3 + 1], indices[faceIndex * 3 + 2]);
+        }
+    }
+    else
+    {
+        WORD* indices = static_cast<WORD*>(indexBuffer);
+        for (DWORD faceIndex = 0; faceIndex < faceCount; ++faceIndex)
+        {
+            std::swap(indices[faceIndex * 3 + 1], indices[faceIndex * 3 + 2]);
+        }
+    }
+
+    result = (*outMesh)->UnlockIndexBuffer();
+    if (FAILED(result))
+    {
+        (*outMesh)->Release();
+        *outMesh = NULL;
+    }
+    return result;
+}
+
+}
+
 // Xファイルから衝突用メッシュを読み込む処理である。
 void PhysicsLib::LoadMesh(const TCHAR* modelPath, LPD3DXMESH* outMesh)
 {
+    *outMesh = NULL;
+    if (UsesBlenderOfficialAxisTransform(modelPath))
+    {
+        const HRESULT blenderResult = LoadBlenderOfficialCollisionMesh(modelPath, outMesh);
+        if (FAILED(blenderResult) || *outMesh == NULL)
+        {
+            throw std::runtime_error("Failed to load Blender collision mesh.");
+        }
+        return;
+    }
+
     LPD3DXBUFFER materialBuffer = NULL;
     DWORD materialCount = 0;
 
