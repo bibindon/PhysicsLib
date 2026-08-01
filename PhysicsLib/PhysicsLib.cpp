@@ -2747,6 +2747,51 @@ bool PhysicsLib::CheckContact(int id, const D3DXVECTOR3& position, float distanc
     return false;
 }
 
+bool PhysicsLib::CheckContactShape(int id,
+                                   const D3DXVECTOR3& position,
+                                   ShapeType shapeType,
+                                   float radius,
+                                   float height,
+                                   float upOffset,
+                                   float downOffset)
+{
+    if (upOffset < 0.0f || downOffset < 0.0f)
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].id != id)
+        {
+            continue;
+        }
+
+        if (g_simpleObjects[i].mesh == NULL)
+        {
+            return false;
+        }
+
+        const D3DXVECTOR3 sweepStart = position + D3DXVECTOR3(0.0f, upOffset, 0.0f);
+        const D3DXVECTOR3 sweepEnd = position - D3DXVECTOR3(0.0f, downOffset, 0.0f);
+        D3DXVECTOR3 hitPoint;
+        D3DXVECTOR3 hitNormal;
+        float hitDistance = 0.0f;
+        return RayCastShapeObject(g_simpleObjects[i].mesh,
+                                  g_simpleObjects[i].transform,
+                                  sweepStart,
+                                  sweepEnd,
+                                  shapeType,
+                                  radius,
+                                  height,
+                                  &hitPoint,
+                                  &hitNormal,
+                                  &hitDistance);
+    }
+
+    return false;
+}
+
 bool PhysicsLib::ResolveCameraCollision(const D3DXVECTOR3& targetPosition,
                                         const D3DXVECTOR3& desiredCameraPosition,
                                         float minimumDistance,

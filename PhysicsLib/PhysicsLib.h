@@ -165,6 +165,18 @@ public:
     // 指定IDのオブジェクトと position の距離が distance 以下かを判定する。
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);
 
+    // 指定IDのオブジェクトのメッシュと判定形状の接触判定を行う。
+    // position を足元とみなし、上方向 upOffset から下方向 downOffset までの線分を
+    // shapeType / radius / height の形状でスイープし、メッシュと交差したら true を返す。
+    // 溶岩床など、通過可能なメッシュの上にプレイヤーがいるかを調べる用途に使う。
+    static bool CheckContactShape(int id,
+                                  const D3DXVECTOR3& position,
+                                  ShapeType shapeType,
+                                  float radius,
+                                  float height,
+                                  float upOffset = 2.0f,
+                                  float downOffset = 0.5f);
+
     // 注視点と希望カメラ位置の間にある障害物を避けたカメラ位置を求める。
     static bool ResolveCameraCollision(const D3DXVECTOR3& targetPosition,
                                        const D3DXVECTOR3& desiredCameraPosition,
