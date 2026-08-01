@@ -1504,12 +1504,26 @@ bool UsesBlenderOfficialAxisTransform(const TCHAR* modelPath)
         }
     }
 
+    std::string normalizedHeader = compactHeader;
+    std::string::size_type negativeZeroPos = normalizedHeader.find("-0.000000");
+    while (negativeZeroPos != std::string::npos)
+    {
+        normalizedHeader.replace(negativeZeroPos, 9, "0.000000");
+        negativeZeroPos = normalizedHeader.find("-0.000000", negativeZeroPos);
+    }
+
     const std::string blenderAxisTransform =
         "FrameTransformMatrix{"
         "1.000000,0.000000,0.000000,0.000000,"
         "0.000000,0.000000,-1.000000,0.000000,"
         "0.000000,1.000000,0.000000,0.000000,";
-    return compactHeader.find(blenderAxisTransform) != std::string::npos;
+    const std::string blenderAxisTransformWithMirroredX =
+        "FrameTransformMatrix{"
+        "-1.000000,0.000000,0.000000,0.000000,"
+        "0.000000,0.000000,1.000000,0.000000,"
+        "0.000000,1.000000,0.000000,0.000000,";
+    return normalizedHeader.find(blenderAxisTransform) != std::string::npos ||
+           normalizedHeader.find(blenderAxisTransformWithMirroredX) != std::string::npos;
 }
 
 void CorrectBlenderOfficialAxisTransforms(LPD3DXFRAME frame, bool skipCurrentFrame)
