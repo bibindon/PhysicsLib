@@ -1601,18 +1601,55 @@ HRESULT LoadBlenderOfficialCollisionMesh(const TCHAR* modelPath, LPD3DXMESH* out
         return E_FAIL;
     }
 
+    // D3DXConcatenateMeshes は全入力メッシュの頂点宣言が一致している必要がある。
+    // Blender 公式エクスポーターは UV を持つメッシュと持たないメッシュを混在して出力するため
+    // （FVF が D3DFVF_XYZ|D3DFVF_NORMAL|D3DFVF_TEX1 と D3DFVF_XYZ|D3DFVF_NORMAL に分かれる）、
+    // そのまま結合すると D3DERR_INVALIDCALL で失敗する。
+    // 衝突判定には位置のみが必要なので、全メッシュを D3DFVF_XYZ|D3DFVF_NORMAL に統一してから結合する。
+    const DWORD unifiedFvf = D3DFVF_XYZ | D3DFVF_NORMAL;
+    std::vector<LPD3DXMESH> unifiedMeshes;
+    unifiedMeshes.reserve(meshes.size());
+    for (LPD3DXMESH mesh : meshes)
+    {
+        LPD3DXMESH clonedMesh = NULL;
+        if (mesh->GetFVF() == unifiedFvf)
+        {
+            clonedMesh = mesh;
+            clonedMesh->AddRef();
+        }
+        else
+        {
+            result = mesh->CloneMeshFVF(mesh->GetOptions(), unifiedFvf, g_device, &clonedMesh);
+            if (FAILED(result) || clonedMesh == NULL)
+            {
+                for (LPD3DXMESH releasedMesh : unifiedMeshes)
+                {
+                    releasedMesh->Release();
+                }
+                D3DXFrameDestroy(frameRoot, &allocator);
+                return result;
+            }
+        }
+        unifiedMeshes.push_back(clonedMesh);
+    }
+
     D3DVERTEXELEMENT9 declaration[MAX_FVF_DECL_SIZE];
-    result = meshes[0]->GetDeclaration(declaration);
+    result = unifiedMeshes[0]->GetDeclaration(declaration);
     if (SUCCEEDED(result))
     {
-        result = D3DXConcatenateMeshes(meshes.data(),
-                                       static_cast<UINT>(meshes.size()),
+        result = D3DXConcatenateMeshes(unifiedMeshes.data(),
+                                       static_cast<UINT>(unifiedMeshes.size()),
                                        D3DXMESH_SYSTEMMEM | D3DXMESH_32BIT,
                                        transforms.data(),
                                        NULL,
                                        declaration,
                                        g_device,
                                        outMesh);
+    }
+
+    for (LPD3DXMESH clonedMesh : unifiedMeshes)
+    {
+        clonedMesh->Release();
     }
 
     D3DXFrameDestroy(frameRoot, &allocator);
