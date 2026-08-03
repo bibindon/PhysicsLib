@@ -2419,6 +2419,161 @@ PhysicsLib::Transform PhysicsLib::GetTransform(int id)
     return Transform();
 }
 
+bool PhysicsLib::TryMovePushable(int id,
+                                 const D3DXVECTOR3& movement,
+                                 D3DXVECTOR3* outMovedMovement)
+{
+    if (outMovedMovement == nullptr)
+    {
+        return false;
+    }
+
+    *outMovedMovement = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
+    if (D3DXVec3LengthSq(&movement) <= 0.0000001f)
+    {
+        return false;
+    }
+
+    size_t pushableIndex = g_simpleObjects.size();
+    for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+    {
+        if (g_simpleObjects[i].id == id)
+        {
+            pushableIndex = i;
+            break;
+        }
+    }
+
+    if (pushableIndex >= g_simpleObjects.size() ||
+        g_simpleObjects[pushableIndex].objectType != ObjectType::Pushable ||
+        g_simpleObjects[pushableIndex].mesh == NULL)
+    {
+        return false;
+    }
+
+    const float kCollisionTolerance = kGroundContactOffset * 4.0f;
+    D3DXVECTOR3 requestedMovement(movement.x, 0.0f, movement.z);
+    D3DXVECTOR3 movedMovement(0.0f, 0.0f, 0.0f);
+    const float requestedAxisMovement[2] = { requestedMovement.x, requestedMovement.z };
+
+    for (int axis = 0; axis < 2; ++axis)
+    {
+        const float requested = requestedAxisMovement[axis];
+        if (fabsf(requested) <= 0.0001f)
+        {
+            continue;
+        }
+
+        const Aabb3D currentBounds =
+            MakeWorldAabb3D(g_simpleObjects[pushableIndex].localBoundsMin,
+                            g_simpleObjects[pushableIndex].localBoundsMax,
+                            g_simpleObjects[pushableIndex].transform);
+        float allowed = requested;
+
+        for (size_t i = 0; i < g_simpleObjects.size(); ++i)
+        {
+            if (i == pushableIndex ||
+                g_simpleObjects[i].objectType == ObjectType::PassThrough ||
+                g_simpleObjects[i].mesh == NULL)
+            {
+                continue;
+            }
+
+            const Aabb3D obstacleBounds =
+                MakeWorldAabb3D(g_simpleObjects[i].localBoundsMin,
+                                g_simpleObjects[i].localBoundsMax,
+                                g_simpleObjects[i].transform);
+            const bool overlapsY =
+                currentBounds.maxY > obstacleBounds.minY + kCollisionTolerance &&
+                currentBounds.minY < obstacleBounds.maxY - kCollisionTolerance;
+            if (!overlapsY)
+            {
+                continue;
+            }
+
+            if (axis == 0)
+            {
+                const bool overlapsZ =
+                    currentBounds.maxZ > obstacleBounds.minZ + kCollisionTolerance &&
+                    currentBounds.minZ < obstacleBounds.maxZ - kCollisionTolerance;
+                if (!overlapsZ)
+                {
+                    continue;
+                }
+
+                if (requested > 0.0f &&
+                    currentBounds.maxX <= obstacleBounds.minX + kCollisionTolerance &&
+                    currentBounds.maxX + requested > obstacleBounds.minX)
+                {
+                    const float candidate =
+                        obstacleBounds.minX - currentBounds.maxX - kCollisionTolerance;
+                    if (candidate < allowed)
+                    {
+                        allowed = (std::max)(0.0f, candidate);
+                    }
+                }
+                else if (requested < 0.0f &&
+                         currentBounds.minX >= obstacleBounds.maxX - kCollisionTolerance &&
+                         currentBounds.minX + requested < obstacleBounds.maxX)
+                {
+                    const float candidate =
+                        obstacleBounds.maxX - currentBounds.minX + kCollisionTolerance;
+                    if (candidate > allowed)
+                    {
+                        allowed = (std::min)(0.0f, candidate);
+                    }
+                }
+            }
+            else
+            {
+                const bool overlapsX =
+                    currentBounds.maxX > obstacleBounds.minX + kCollisionTolerance &&
+                    currentBounds.minX < obstacleBounds.maxX - kCollisionTolerance;
+                if (!overlapsX)
+                {
+                    continue;
+                }
+
+                if (requested > 0.0f &&
+                    currentBounds.maxZ <= obstacleBounds.minZ + kCollisionTolerance &&
+                    currentBounds.maxZ + requested > obstacleBounds.minZ)
+                {
+                    const float candidate =
+                        obstacleBounds.minZ - currentBounds.maxZ - kCollisionTolerance;
+                    if (candidate < allowed)
+                    {
+                        allowed = (std::max)(0.0f, candidate);
+                    }
+                }
+                else if (requested < 0.0f &&
+                         currentBounds.minZ >= obstacleBounds.maxZ - kCollisionTolerance &&
+                         currentBounds.minZ + requested < obstacleBounds.maxZ)
+                {
+                    const float candidate =
+                        obstacleBounds.maxZ - currentBounds.minZ + kCollisionTolerance;
+                    if (candidate > allowed)
+                    {
+                        allowed = (std::min)(0.0f, candidate);
+                    }
+                }
+            }
+        }
+
+        if (axis == 0)
+        {
+            g_simpleObjects[pushableIndex].transform.position.x += allowed;
+            movedMovement.x += allowed;
+        }
+        else
+        {
+            g_simpleObjects[pushableIndex].transform.position.z += allowed;
+            movedMovement.z += allowed;
+        }
+    }
+
+    *outMovedMovement = movedMovement;
+    return D3DXVec3LengthSq(&movedMovement) > 0.0000001f;
+}
 bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               const D3DXVECTOR3& moveVector,
                               ShapeType shapeType,

@@ -31,6 +31,9 @@ public:
 
         // 速度に従って移動する衝突オブジェクトである。
         MovingSlide,
+
+        // プレイヤーから押されて移動する衝突オブジェクトである。
+        Pushable,
     };
 
     // プレイヤー側の判定形状である。
@@ -142,6 +145,12 @@ public:
 
     // 登録済みオブジェクトの現在の Transform を取得する。
     static Transform GetTransform(int id);
+
+    // プレイヤーなどから押された押し出し可能オブジェクトを水平に移動する。
+    // 壁や別の押し出し可能オブジェクトに当たる場合は、手前で停止する。
+    static bool TryMovePushable(int id,
+                                const D3DXVECTOR3& movement,
+                                D3DXVECTOR3* outMovedMovement);
 
     // currentPosition から moveVector 方向へ移動したときの接面判定を行う。
     static bool CheckCollide(const D3DXVECTOR3& currentPosition,
