@@ -2966,6 +2966,24 @@ bool PhysicsLib::CheckContactShape(int id,
         return false;
     }
 
+    // position is the foot position; shape casting uses the collision center.
+    float collisionCenterOffsetY = 0.0f;
+    if (shapeType == ShapeType::Cylinder)
+    {
+        collisionCenterOffsetY = height * 0.5f;
+    }
+    else if (shapeType == ShapeType::Sphere)
+    {
+        collisionCenterOffsetY = radius;
+    }
+    else if (shapeType == ShapeType::Cuboid)
+    {
+        collisionCenterOffsetY = SettingsState::GetCuboidHeight() * 0.5f;
+    }
+
+    const D3DXVECTOR3 collisionCenterPosition =
+        position + D3DXVECTOR3(0.0f, collisionCenterOffsetY, 0.0f);
+
     for (size_t i = 0; i < g_simpleObjects.size(); ++i)
     {
         if (g_simpleObjects[i].id != id)
@@ -2978,8 +2996,10 @@ bool PhysicsLib::CheckContactShape(int id,
             return false;
         }
 
-        const D3DXVECTOR3 sweepStart = position + D3DXVECTOR3(0.0f, upOffset, 0.0f);
-        const D3DXVECTOR3 sweepEnd = position - D3DXVECTOR3(0.0f, downOffset, 0.0f);
+        const D3DXVECTOR3 sweepStart =
+            collisionCenterPosition + D3DXVECTOR3(0.0f, upOffset, 0.0f);
+        const D3DXVECTOR3 sweepEnd =
+            collisionCenterPosition - D3DXVECTOR3(0.0f, downOffset, 0.0f);
         D3DXVECTOR3 hitPoint;
         D3DXVECTOR3 hitNormal;
         float hitDistance = 0.0f;
