@@ -3356,6 +3356,27 @@ bool PhysicsLib::CheckContactShape(int id,
             return false;
         }
 
+        // メッシュのワールドAABBと判定位置が十分離れている場合は、
+        // レイキャストせずに接触なしとみなす。
+        {
+            const Aabb3D worldBounds = MakeWorldAabb3D(g_simpleObjects[i].localBoundsMin,
+                                                       g_simpleObjects[i].localBoundsMax,
+                                                       g_simpleObjects[i].transform);
+            const float margin = (std::max)(radius, 0.5f);
+            if (position.x > worldBounds.maxX + margin ||
+                position.x < worldBounds.minX - margin ||
+                position.z > worldBounds.maxZ + margin ||
+                position.z < worldBounds.minZ - margin)
+            {
+                return false;
+            }
+            if (position.y + height < worldBounds.minY - margin ||
+                position.y > worldBounds.maxY + margin)
+            {
+                return false;
+            }
+        }
+
         const D3DXVECTOR3 sweepStart =
             collisionCenterPosition + D3DXVECTOR3(0.0f, upOffset, 0.0f);
         const D3DXVECTOR3 sweepEnd =
