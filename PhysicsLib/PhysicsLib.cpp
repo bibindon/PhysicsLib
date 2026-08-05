@@ -1010,6 +1010,10 @@ bool PhysicsLib::ExtractFaceNormal(LPD3DXMESH mesh, DWORD faceIndex, D3DXVECTOR3
 }
 
 // 線分と単一メッシュの接面判定をワールド座標系で行う処理である。
+// レイ-メッシュ交差判定は2つの実装を用意し、コンパイル時マクロで切り替える。
+// PHYSICSLIB_USE_D3DX_INTERSECT を定義すると D3DXIntersect を使う従来実装になり、
+// 未定義なら自前の Möller-Trumbore 実装（高速化版）になる。
+#if defined(PHYSICSLIB_USE_D3DX_INTERSECT)
 
 // 判定対象のメッシュを受け取る。
 bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
@@ -1200,6 +1204,271 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
     // ここまで到達したので判定成功である。
     return true;
 }
+
+#else
+
+// 自前のレイ-三角形交差（Möller-Trumbore）による高速化版。
+// 物理メッシュは低ポリのため、頂点/インデックスバッファを一度だけロックして
+// 全トライアングルを走査し、最近接ヒットを返す。
+
+// 判定対象のメッシュを受け取る。
+bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
+
+                               // 判定対象の位置、回転、拡大率を受け取る。
+                               const Transform& transform,
+
+                               // ワールド座標系での線分の始点を受け取る。
+                               const D3DXVECTOR3& rayOriginWorld,
+
+                               // ワールド座標系での線分の終点を受け取る。
+                               const D3DXVECTOR3& rayEndWorld,
+
+                               // ヒット位置の出力先を受け取る。
+                               D3DXVECTOR3* outPoint,
+
+                               // ヒット面の法線の出力先を受け取る。
+                               D3DXVECTOR3* outSurfaceNormal,
+
+                               // ヒット距離の出力先を受け取る。
+                               float* outDistance)
+{
+    // メッシュが無効なら判定できない。
+    if (mesh == NULL)
+    {
+        // 判定失敗として終了する。
+        return false;
+    }
+
+
+    // オブジェクトの Transform からワールド行列を作る。
+    D3DXMATRIX worldMatrix = BuildWorldMatrix(transform);
+
+    // ワールド座標からローカル座標へ戻す逆行列を用意する。
+    D3DXMATRIX inverseWorldMatrix;
+
+    // ワールド行列の逆行列を計算する。
+    D3DXMatrixInverse(&inverseWorldMatrix, NULL, &worldMatrix);
+
+
+    // 線分始点のローカル座標を格納する。
+    D3DXVECTOR3 originLocal;
+
+    // 線分終点のローカル座標を格納する。
+    D3DXVECTOR3 endLocal;
+
+    // 線分始点をローカル座標系へ変換する。
+    D3DXVec3TransformCoord(&originLocal, &rayOriginWorld, &inverseWorldMatrix);
+
+    // 線分終点をローカル座標系へ変換する。
+    D3DXVec3TransformCoord(&endLocal, &rayEndWorld, &inverseWorldMatrix);
+
+
+    // ローカル座標系での線分ベクトルを求める。
+    D3DXVECTOR3 rayVectorLocal = endLocal - originLocal;
+
+    // ローカル座標系での線分長を求める。
+    const float maxDistanceLocal = D3DXVec3Length(&rayVectorLocal);
+
+    // 線分長がほぼゼロならレイを作れない。
+    if (maxDistanceLocal <= 0.0001f)
+    {
+        // 判定失敗として終了する。
+        return false;
+    }
+
+
+    // 交差判定に使うため、線分方向を正規化する。
+    D3DXVECTOR3 rayDirectionLocal = rayVectorLocal / maxDistanceLocal;
+
+
+    // 頂点バッファとインデックスバッファを一度だけロックして全トライアングルを走査する。
+    void* vertexBuffer = NULL;
+    void* indexBuffer = NULL;
+    const DWORD stride = mesh->GetNumBytesPerVertex();
+
+    // 頂点バッファをロックする。
+    HRESULT result = mesh->LockVertexBuffer(D3DLOCK_READONLY, &vertexBuffer);
+    if (FAILED(result))
+    {
+        // ロック失敗なら判定失敗として終了する。
+        return false;
+    }
+
+    // インデックスバッファをロックする。
+    result = mesh->LockIndexBuffer(D3DLOCK_READONLY, &indexBuffer);
+    if (FAILED(result))
+    {
+        // ロック失敗なら頂点バッファを解放して判定失敗として終了する。
+        mesh->UnlockVertexBuffer();
+        return false;
+    }
+
+
+    const BYTE* vertices = static_cast<const BYTE*>(vertexBuffer);
+    const DWORD* indices32 = static_cast<const DWORD*>(indexBuffer);
+    const WORD* indices16 = static_cast<const WORD*>(indexBuffer);
+    const bool use32BitIndices = (mesh->GetOptions() & D3DXMESH_32BIT) != 0;
+    const DWORD faceCount = mesh->GetNumFaces();
+
+
+    // 最近接ヒットのローカル距離を保持する。
+    float nearestDistanceLocal = std::numeric_limits<float>::max();
+
+    // 最近接ヒットのローカル法線を保持する。
+    D3DXVECTOR3 nearestLocalNormal(0.0f, 0.0f, 0.0f);
+
+    // ヒットが一つでも見つかったかどうかを保持する。
+    bool foundHit = false;
+
+
+    // 全トライアングルを走査する。
+    for (DWORD faceIndex = 0; faceIndex < faceCount; ++faceIndex)
+    {
+        // 面を構成する3頂点のインデックスを取り出す。
+        DWORD index0 = 0;
+        DWORD index1 = 0;
+        DWORD index2 = 0;
+        if (use32BitIndices)
+        {
+            index0 = indices32[faceIndex * 3 + 0];
+            index1 = indices32[faceIndex * 3 + 1];
+            index2 = indices32[faceIndex * 3 + 2];
+        }
+        else
+        {
+            index0 = indices16[faceIndex * 3 + 0];
+            index1 = indices16[faceIndex * 3 + 1];
+            index2 = indices16[faceIndex * 3 + 2];
+        }
+
+        // 三角形の頂点座標を取り出す。
+        const D3DXVECTOR3* p0 = reinterpret_cast<const D3DXVECTOR3*>(vertices + index0 * stride);
+        const D3DXVECTOR3* p1 = reinterpret_cast<const D3DXVECTOR3*>(vertices + index1 * stride);
+        const D3DXVECTOR3* p2 = reinterpret_cast<const D3DXVECTOR3*>(vertices + index2 * stride);
+
+        // 三角形の2辺を求める。
+        const D3DXVECTOR3 edge1 = *p1 - *p0;
+        const D3DXVECTOR3 edge2 = *p2 - *p0;
+
+        // レイ方向と辺2の外積を求める。
+        D3DXVECTOR3 pvec;
+        D3DXVec3Cross(&pvec, &rayDirectionLocal, &edge2);
+
+        // 行列式を求める。ほぼ0ならレイと三角形は平行なのでスキップする。
+        const float determinant = D3DXVec3Dot(&edge1, &pvec);
+        if (determinant > -0.000001f && determinant < 0.000001f)
+        {
+            continue;
+        }
+
+        const float inverseDeterminant = 1.0f / determinant;
+
+        // レイ始点から三角形頂点0へのベクトルを求める。
+        const D3DXVECTOR3 tvec = originLocal - *p0;
+
+        // バリセントリック座標 U を求める。
+        const float u = D3DXVec3Dot(&tvec, &pvec) * inverseDeterminant;
+        if (u < 0.0f || u > 1.0f)
+        {
+            continue;
+        }
+
+        // バリセントリック座標 V を求める。
+        D3DXVECTOR3 qvec;
+        D3DXVec3Cross(&qvec, &tvec, &edge1);
+        const float v = D3DXVec3Dot(&rayDirectionLocal, &qvec) * inverseDeterminant;
+        if (v < 0.0f || u + v > 1.0f)
+        {
+            continue;
+        }
+
+        // ヒット距離を求める。線分の範囲外、または既知の最近接より遠い場合は無視する。
+        const float distanceLocal = D3DXVec3Dot(&edge2, &qvec) * inverseDeterminant;
+        if (distanceLocal < 0.0f ||
+            distanceLocal > maxDistanceLocal ||
+            distanceLocal >= nearestDistanceLocal)
+        {
+            continue;
+        }
+
+        // 最近接ヒットを更新する。
+        nearestDistanceLocal = distanceLocal;
+        foundHit = true;
+
+        // ヒット面のローカル法線を求める。
+        D3DXVec3Cross(&nearestLocalNormal, &edge1, &edge2);
+        D3DXVec3Normalize(&nearestLocalNormal, &nearestLocalNormal);
+    }
+
+
+    // ロックしたバッファを解放する。
+    mesh->UnlockIndexBuffer();
+    mesh->UnlockVertexBuffer();
+
+
+    // ヒットがなければ判定失敗として終了する。
+    if (!foundHit)
+    {
+        return false;
+    }
+
+
+    // ローカル座標系でのヒット位置を求める。
+    const D3DXVECTOR3 localHitPoint = originLocal + rayDirectionLocal * nearestDistanceLocal;
+
+    // ワールド座標系でのヒット位置を格納する。
+    D3DXVECTOR3 worldHitPoint;
+
+    // ヒット位置をワールド座標系へ戻す。
+    D3DXVec3TransformCoord(&worldHitPoint, &localHitPoint, &worldMatrix);
+
+
+    // 法線変換用に逆行列の転置行列を用意する。
+    D3DXMATRIX inverseTransposeWorld;
+
+    // 逆行列を転置して法線変換用行列を作る。
+    D3DXMatrixTranspose(&inverseTransposeWorld, &inverseWorldMatrix);
+
+    // ワールド座標系へ変換した法線を格納する。
+    D3DXVECTOR3 surfaceNormal;
+
+    // ローカル法線をワールド座標系へ変換する。
+    D3DXVec3TransformNormal(&surfaceNormal, &nearestLocalNormal, &inverseTransposeWorld);
+
+    // 変換後の法線を正規化する。
+    D3DXVec3Normalize(&surfaceNormal, &surfaceNormal);
+
+
+    // ワールド座標系での始点からヒット位置までの差分を求める。
+    D3DXVECTOR3 worldHitOffset = worldHitPoint - rayOriginWorld;
+
+
+    // ヒット位置の出力先があれば書き込む。
+    if (outPoint != nullptr)
+    {
+        // ヒット位置を呼び出し元へ返す。
+        *outPoint = worldHitPoint;
+    }
+
+    // 法線の出力先があれば書き込む。
+    if (outSurfaceNormal != nullptr)
+    {
+        // ヒット面の法線を呼び出し元へ返す。
+        *outSurfaceNormal = surfaceNormal;
+    }
+
+    // 距離の出力先があれば書き込む。
+    if (outDistance != nullptr)
+    {
+        // 始点からヒット位置までのワールド距離を呼び出し元へ返す。
+        *outDistance = D3DXVec3Length(&worldHitOffset);
+    }
+
+    // ここまで到達したので判定成功である。
+    return true;
+}
+
+#endif
 
 std::vector<D3DXVECTOR3> PhysicsLib::BuildShapeCastOffsets(ShapeType shapeType, float radius, float height)
 {
