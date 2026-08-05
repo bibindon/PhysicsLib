@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -37,6 +38,38 @@ constexpr size_t kQuadTreeNodeCapacity = 4;
 LPDIRECT3D9 g_direct3d = NULL;
 LPDIRECT3DDEVICE9 g_device = NULL;
 bool g_initialized = false;
+
+// プロファイリング用の累計カウンタと時間計測である。
+std::chrono::steady_clock::duration g_profileRayCastObjectDuration = std::chrono::steady_clock::duration::zero();
+std::chrono::steady_clock::duration g_profileRayCastShapeObjectDuration = std::chrono::steady_clock::duration::zero();
+std::chrono::steady_clock::duration g_profileCheckCollideDuration = std::chrono::steady_clock::duration::zero();
+int g_profileRayCastObjectCount = 0;
+int g_profileRayCastShapeObjectCount = 0;
+int g_profileCheckCollideCount = 0;
+
+// 関数の呼び出し時間をスコープ終了時に累計へ加算する計測ヘルパーである。
+class ProfileScope
+{
+public:
+    ProfileScope(std::chrono::steady_clock::duration* outDuration, int* outCount)
+        : m_outDuration(outDuration)
+        , m_start(std::chrono::steady_clock::now())
+    {
+        if (outCount != nullptr)
+        {
+            ++(*outCount);
+        }
+    }
+
+    ~ProfileScope()
+    {
+        *m_outDuration += std::chrono::steady_clock::now() - m_start;
+    }
+
+private:
+    std::chrono::steady_clock::duration* m_outDuration;
+    std::chrono::steady_clock::time_point m_start;
+};
 
 struct SimpleObject
 {
@@ -1036,6 +1069,9 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
                                // ヒット距離の出力先を受け取る。
                                float* outDistance)
 {
+    // 計測スコープを開始する。
+    ProfileScope profileScope(&g_profileRayCastObjectDuration, &g_profileRayCastObjectCount);
+
     // メッシュが無効なら判定できない。
     if (mesh == NULL)
     {
@@ -1232,6 +1268,9 @@ bool PhysicsLib::RayCastObject(LPD3DXMESH mesh,
                                // ヒット距離の出力先を受け取る。
                                float* outDistance)
 {
+    // 計測スコープを開始する。
+    ProfileScope profileScope(&g_profileRayCastObjectDuration, &g_profileRayCastObjectCount);
+
     // メッシュが無効なら判定できない。
     if (mesh == NULL)
     {
@@ -1558,6 +1597,9 @@ bool PhysicsLib::RayCastShapeObject(LPD3DXMESH mesh,
                                     D3DXVECTOR3* outSurfaceNormal,
                                     float* outDistance)
 {
+    // 計測スコープを開始する。
+    ProfileScope profileScope(&g_profileRayCastShapeObjectDuration, &g_profileRayCastShapeObjectCount);
+
     const std::vector<D3DXVECTOR3> offsets = BuildShapeCastOffsets(shapeType, radius, height);
     bool foundHit = false;
     D3DXVECTOR3 nearestPoint = rayEndWorld;
@@ -1611,6 +1653,52 @@ bool PhysicsLib::RayCastShapeObject(LPD3DXMESH mesh,
     }
 
     return true;
+}
+
+void PhysicsLib::ResetProfileAccumulators()
+{
+    g_profileRayCastObjectDuration = std::chrono::steady_clock::duration::zero();
+    g_profileRayCastShapeObjectDuration = std::chrono::steady_clock::duration::zero();
+    g_profileCheckCollideDuration = std::chrono::steady_clock::duration::zero();
+    g_profileRayCastObjectCount = 0;
+    g_profileRayCastShapeObjectCount = 0;
+    g_profileCheckCollideCount = 0;
+}
+
+void PhysicsLib::GetProfileCounters(int* outRayCastObjectCount,
+                                    int* outRayCastShapeObjectCount,
+                                    int* outCheckCollideCount,
+                                    double* outRayCastObjectMilliseconds,
+                                    double* outRayCastShapeObjectMilliseconds,
+                                    double* outCheckCollideMilliseconds)
+{
+    if (outRayCastObjectCount != nullptr)
+    {
+        *outRayCastObjectCount = g_profileRayCastObjectCount;
+    }
+    if (outRayCastShapeObjectCount != nullptr)
+    {
+        *outRayCastShapeObjectCount = g_profileRayCastShapeObjectCount;
+    }
+    if (outCheckCollideCount != nullptr)
+    {
+        *outCheckCollideCount = g_profileCheckCollideCount;
+    }
+    if (outRayCastObjectMilliseconds != nullptr)
+    {
+        *outRayCastObjectMilliseconds =
+            std::chrono::duration<double, std::milli>(g_profileRayCastObjectDuration).count();
+    }
+    if (outRayCastShapeObjectMilliseconds != nullptr)
+    {
+        *outRayCastShapeObjectMilliseconds =
+            std::chrono::duration<double, std::milli>(g_profileRayCastShapeObjectDuration).count();
+    }
+    if (outCheckCollideMilliseconds != nullptr)
+    {
+        *outCheckCollideMilliseconds =
+            std::chrono::duration<double, std::milli>(g_profileCheckCollideDuration).count();
+    }
 }
 
 // 速度から接触面へ向かう成分だけを取り除く処理である。
@@ -2861,6 +2949,9 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               D3DXVECTOR3* outSupportVelocity,
                               bool* outCrushed)
 {
+    // 計測スコープを開始する。
+    ProfileScope profileScope(&g_profileCheckCollideDuration, &g_profileCheckCollideCount);
+
     D3DXVECTOR3 nextPosition = currentPosition + moveVector * kDeltaSeconds;
     D3DXVECTOR3 nextMoveVector = moveVector;
     bool collided = false;

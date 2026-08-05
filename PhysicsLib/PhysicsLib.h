@@ -193,6 +193,17 @@ public:
                                        float obstacleOffset,
                                        D3DXVECTOR3* outPosition);
 
+    // プロファイリング用の累計計測をリセットする。
+    static void ResetProfileAccumulators();
+
+    // 最後のフレームにおけるレイキャスト回数と累計時間(ミリ秒)を取得する。
+    static void GetProfileCounters(int* outRayCastObjectCount,
+                                   int* outRayCastShapeObjectCount,
+                                   int* outCheckCollideCount,
+                                   double* outRayCastObjectMilliseconds,
+                                   double* outRayCastShapeObjectMilliseconds,
+                                   double* outCheckCollideMilliseconds);
+
 private:
     struct Aabb2D
     {
