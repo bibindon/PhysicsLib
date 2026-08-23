@@ -134,6 +134,9 @@ public:
     // Xファイルを読み込み、衝突オブジェクトとして登録する。戻り値は登録IDである。
     static int Load(const TCHAR* modelPath, ObjectType objectType, float friction);
 
+    // Loadで直接登録した衝突オブジェクトを削除する。
+    static void RemoveObject(int id);
+
     // 登録済みオブジェクトの位置、回転、拡大率を設定する。
     static void SetTransform(int id,
                              const D3DXVECTOR3& position,

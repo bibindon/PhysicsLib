@@ -2734,6 +2734,40 @@ int PhysicsLib::Load(const TCHAR* modelPath, ObjectType objectType, float fricti
     return object.id;
 }
 
+void PhysicsLib::RemoveObject(const int id)
+{
+    for (std::vector<SimpleObject>::iterator objectIterator = g_simpleObjects.begin();
+         objectIterator != g_simpleObjects.end();
+         ++objectIterator)
+    {
+        if (objectIterator->id != id)
+        {
+            continue;
+        }
+
+        SafeRelease(objectIterator->mesh);
+        objectIterator->mesh = NULL;
+        g_simpleObjects.erase(objectIterator);
+
+        for (std::map<int, int>::iterator csvIterator = g_csvObjectIds.begin();
+             csvIterator != g_csvObjectIds.end();)
+        {
+            if (csvIterator->second == id)
+            {
+                const int csvId = csvIterator->first;
+                csvIterator = g_csvObjectIds.erase(csvIterator);
+                g_csvFileNames.erase(csvId);
+                g_csvPrevPositions.erase(csvId);
+            }
+            else
+            {
+                ++csvIterator;
+            }
+        }
+        return;
+    }
+}
+
 void PhysicsLib::SetTransform(int id,
                               const D3DXVECTOR3& position,
                               const D3DXVECTOR3& rotation,
