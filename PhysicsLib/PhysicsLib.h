@@ -62,6 +62,15 @@ public:
         D3DXVECTOR3 velocity = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
     };
 
+    // 1回の移動中に接触した面の種類を保持する。
+    // 複数面に接触した場合も、最後の衝突面とは別に情報を残す。
+    struct CollisionContactInfo
+    {
+        bool hasGroundContact = false;
+        D3DXVECTOR3 groundNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
+        bool hasWallContact = false;
+    };
+
     static void Initialize();
     static void Finalize();
 
@@ -172,7 +181,8 @@ public:
                              int* outSlideCount = nullptr,
                              int* outSupportObjectId = nullptr,
                              D3DXVECTOR3* outSupportVelocity = nullptr,
-                             bool* outCrushed = nullptr);
+                             bool* outCrushed = nullptr,
+                             CollisionContactInfo* outContactInfo = nullptr);
 
     // 指定IDのオブジェクトと position の距離が distance 以下かを判定する。
     static bool CheckContact(int id, const D3DXVECTOR3& position, float distance);

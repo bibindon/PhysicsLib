@@ -689,6 +689,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
     int slideCount = 0;
     int supportObjectId = -1;
     bool crushed = false;
+    PhysicsLib::CollisionContactInfo contactInfo;
     const bool collided = PhysicsLib::CheckCollide(collisionPosition,
                                                     m_velocity,
                                                     shapeType,
@@ -703,9 +704,10 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
                                                    &lastHitDistance,
                                                    &lastSlideMove,
                                                    &slideCount,
-                                                   &supportObjectId,
-                                                   nullptr,
-                                                   &crushed);
+                                                    &supportObjectId,
+                                                    nullptr,
+                                                    &crushed,
+                                                    &contactInfo);
     m_position = nextCollisionPosition - D3DXVECTOR3(0.0f, m_settings.collisionCenterY, 0.0f);
     m_velocity = nextVelocity;
     m_isCrushed = crushedThisFrame || crushed;
@@ -715,7 +717,7 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_isGrounded = false;
         m_groundNormal = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
     }
-    if (collided && lastHitNormal.y > 0.0f)
+    if (contactInfo.hasGroundContact)
     {
         if (wasInAir)
         {
@@ -734,10 +736,10 @@ bool CharacterMover::Update(const D3DXVECTOR3& inputDirection,
         m_remainingAirJumps = 1;
         m_remainingAirDashes = 1;
         m_supportObjectId = supportObjectId;
-        m_groundNormal = lastHitNormal;
+        m_groundNormal = contactInfo.groundNormal;
         D3DXVec3Normalize(&m_groundNormal, &m_groundNormal);
     }
-    m_isTouchingWall = false;
+    m_isTouchingWall = contactInfo.hasWallContact;
     if (!m_isGrounded)
     {
         m_supportObjectId = -1;

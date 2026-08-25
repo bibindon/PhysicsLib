@@ -31,6 +31,7 @@ namespace
 constexpr float kDeltaSeconds = 1.0f / 60.0f;
 constexpr float kGroundContactOffset = 0.0005f;
 constexpr float kSlideCastLookAhead = kGroundContactOffset * 48.0f;
+constexpr float kWallNormalYThreshold = 0.0001f;
 constexpr float kMovingSlidePenetrationPushSpeed = 3.0f;
 constexpr int kQuadTreeMaxDepth = 5;
 constexpr size_t kQuadTreeNodeCapacity = 4;
@@ -2981,7 +2982,8 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                               int* outSlideCount,
                               int* outSupportObjectId,
                               D3DXVECTOR3* outSupportVelocity,
-                              bool* outCrushed)
+                              bool* outCrushed,
+                              CollisionContactInfo* outContactInfo)
 {
     // 計測スコープを開始する。
     ProfileScope profileScope(&g_profileCheckCollideDuration, &g_profileCheckCollideCount);
@@ -2997,6 +2999,23 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     int supportObjectId = -1;
     D3DXVECTOR3 supportVelocity(0.0f, 0.0f, 0.0f);
     bool crushed = false;
+    CollisionContactInfo contactInfo;
+
+    const auto recordContact = [&contactInfo](const D3DXVECTOR3& normal)
+    {
+        if (normal.y > 0.0f)
+        {
+            if (!contactInfo.hasGroundContact || normal.y > contactInfo.groundNormal.y)
+            {
+                contactInfo.groundNormal = normal;
+            }
+            contactInfo.hasGroundContact = true;
+        }
+        else if (fabsf(normal.y) <= kWallNormalYThreshold)
+        {
+            contactInfo.hasWallContact = true;
+        }
+    };
 
     if (outPassThroughIds != nullptr)
     {
@@ -3065,6 +3084,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
 
             if (foundHit)
             {
+                recordContact(nearestNormal);
                 nextPosition = nearestPoint;
                 nextPosition += nearestNormal * kGroundContactOffset;
                 nextMoveVector = RemoveIntoSurfaceVelocity(moveVector, nearestNormal);
@@ -3144,6 +3164,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                         ++slideCount;
                         if (slideBlocked)
                         {
+                            recordContact(nearestSlideNormal);
                             if (SettingsState::IsSlideCheckEnabled())
                             {
                                 const D3DXVECTOR3 slideHitMove = nearestSlidePoint - nextPosition;
@@ -3228,6 +3249,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                     ++slideCount;
                                     if (secondSlideBlocked)
                                     {
+                                        recordContact(nearestSecondSlideNormal);
                                         nextPosition = currentPosition;
                                         nextMoveVector = D3DXVECTOR3(0.0f, 0.0f, 0.0f);
                                         lastHitNormal = nearestSecondSlideNormal;
@@ -3272,6 +3294,7 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
                                       &crushed))
     {
         collided = true;
+        recordContact(pushNormal);
         lastHitNormal = pushNormal;
         lastHitDistance = 0.0f;
         nextMoveVector = RemoveIntoSurfaceVelocity(nextMoveVector, pushNormal);
@@ -3321,6 +3344,10 @@ bool PhysicsLib::CheckCollide(const D3DXVECTOR3& currentPosition,
     if (outCrushed != nullptr)
     {
         *outCrushed = crushed;
+    }
+    if (outContactInfo != nullptr)
+    {
+        *outContactInfo = contactInfo;
     }
 
     return collided;
