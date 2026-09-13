@@ -7,6 +7,7 @@ namespace PhysicsLib
 namespace
 {
 constexpr float kDefaultChargeSeconds = 0.5f;
+constexpr float kMaximumControlLockSeconds = 0.12f;
 }
 
 DashBooster::DashBooster()
@@ -43,6 +44,10 @@ void DashBooster::Activate(const D3DXVECTOR3& direction,
     D3DXVec3Normalize(&m_direction, &m_direction);
     m_speed = speed;
     m_timer = duration;
+    if (m_timer > kMaximumControlLockSeconds)
+    {
+        m_timer = kMaximumControlLockSeconds;
+    }
     m_chargeTimer = 0.0f;
     if (chargeEnabled)
     {

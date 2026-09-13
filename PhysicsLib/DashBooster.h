@@ -5,13 +5,13 @@
 namespace PhysicsLib
 {
 
-// 指定方向へ一定時間射出する状態を管理する。
+// 指定方向へ短時間だけ射出し、その後は通常操作へ戻す状態を管理する。
 class DashBooster
 {
 public:
     DashBooster();
 
-    // 指定方向へ指定速度で射出を開始する。
+    // 指定方向へ指定速度で射出を開始する。操作不能時間は最大0.12秒。
     void Activate(const D3DXVECTOR3& direction, float speed, float duration, bool chargeEnabled = true);
 
     // 毎フレームの更新。ブースト中なら outVelocity に速度を設定して true を返す。
